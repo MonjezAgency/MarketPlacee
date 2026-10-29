@@ -33,7 +33,7 @@ export default function SponsoredProductCard({ product, index }: SponsoredProduc
         addItem({
             id: product.id,
             name: product.name,
-            brand: product.brand || 'Atlantis',
+            brand: product.brand || 'Ali FMCG',
             price: product.price || 0,
             image: product.images?.[0] || '',
             unit: tc('case'),
@@ -67,7 +67,7 @@ export default function SponsoredProductCard({ product, index }: SponsoredProduc
 
             <div className="flex flex-col flex-1 pt-3.5 px-0.5">
                 <p className="text-[12px] font-bold text-ink truncate mb-1.5">
-                    {product.brand || 'Atlantis'}
+                    {product.brand || 'Ali FMCG'}
                 </p>
                 <Link href={`/products/${product.id}`}>
                     <h3 className="font-sans text-[15px] font-semibold leading-snug line-clamp-2 h-[2.75em] text-ink hover:text-teal transition-colors">

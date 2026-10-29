@@ -29,7 +29,7 @@ export function applyEditorCatalogFields(body: any, catalog: BrandCatalog, opts:
         if (r.kind === 'known') body.brand = r.name;
         else if (r.kind === 'new') {
             if (opts.enforce && !confirmedNew) {
-                const reason = `“${r.name.slice(0, 60)}” isn’t a brand on Atlantis yet. Choose it from the list${r.similar.length ? ` (did you mean ${r.similar[0]}?)` : ''}, or confirm it as a new brand.`;
+                const reason = `“${r.name.slice(0, 60)}” isn’t a brand on Ali FMCG yet. Choose it from the list${r.similar.length ? ` (did you mean ${r.similar[0]}?)` : ''}, or confirm it as a new brand.`;
                 throw new BadRequestException({ code: BRAND_NOT_ON_ATLANTIS, message: reason, brand: r.name, suggestions: r.similar, invalid: [{ field: 'brand', label: 'Brand', reason }] });
             }
             body.brand = r.name;
@@ -54,8 +54,8 @@ export function applyEditorCatalogFields(body: any, catalog: BrandCatalog, opts:
 
 /**
  * Brands on import rows (after buildFromValues). A known brand is written with
- * its canonical spelling; a brand not on Atlantis keeps the file's most common
- * spelling for it and gets the row warning "New brand “X” — not on Atlantis
+ * its canonical spelling; a brand not on Ali FMCG keeps the file's most common
+ * spelling for it and gets the row warning "New brand “X” — not on Ali FMCG
  * yet" (with "Did you mean …?" for a close spelling, never applied). Committing
  * the reviewed import is the supplier's confirmation. Returns the new brands.
  */
@@ -71,12 +71,12 @@ export function applyImportBrands(rows: { product: any; warnings: string[]; note
     rows.forEach((b, i) => {
         const r = resolved[i];
         if (r.kind === 'known') {
-            if (r.changed) b.notes.brand = `${b.notes.brand ? `${b.notes.brand}; ` : ''}“${tidyBrand(b.product.brand)}” written as ${r.name}, as on Atlantis`;
+            if (r.changed) b.notes.brand = `${b.notes.brand ? `${b.notes.brand}; ` : ''}“${tidyBrand(b.product.brand)}” written as ${r.name}, as on Ali FMCG`;
             b.product.brand = r.name;
         } else if (r.kind === 'new') {
             const name = inFile.byKey.get(brandMatchKey(r.name))?.name ?? r.name;
             b.product.brand = name;
-            b.warnings.push(`New brand “${name}” — not on Atlantis yet. Importing adds it as a new brand.${r.similar.length ? ` Did you mean ${r.similar.map((s) => `“${s}”`).join(' or ')}?` : ''}`);
+            b.warnings.push(`New brand “${name}” — not on Ali FMCG yet. Importing adds it as a new brand.${r.similar.length ? ` Did you mean ${r.similar.map((s) => `“${s}”`).join(' or ')}?` : ''}`);
         }
     });
     return inFile.entries.map((e) => e.name).sort((a, b) => a.localeCompare(b));

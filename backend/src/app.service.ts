@@ -8,7 +8,7 @@ export class AppService implements OnModuleInit {
     constructor(private prisma: PrismaService) { }
 
     /**
-     * Boot-time check for the founding Atlantis OWNER account.
+     * Boot-time check for the founding Ali FMCG OWNER account.
      *
      * Keeps the account's role / status / verification flags intact but
      * NEVER changes its password. (It used to force-reset the password to
@@ -103,7 +103,7 @@ export class AppService implements OnModuleInit {
             }
             const user = await this.prisma.user.create({
                 data: {
-                    email, name: 'Ali Dawara', companyName: 'Atlantis FMCG',
+                    email, name: 'Ali Dawara', companyName: 'Ali FMCG',
                     password: await bcrypt.hash(initial, 10),
                     role: 'OWNER', status: 'ACTIVE', emailVerified: true, kycStatus: 'VERIFIED', onboardingCompleted: true,
                 },

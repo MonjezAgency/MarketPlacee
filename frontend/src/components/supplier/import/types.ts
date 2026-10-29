@@ -102,7 +102,7 @@ export interface CommitResult {
     productId?: string; status?: string; missing?: string[]; imageMissing?: boolean; reasons?: string[]; notes?: string[]; changes?: string[];
 }
 
-/** Fields shown in the "what Atlantis needs" checklist, in order, and which value sources each can use. `label` is a supplierCatalog dictionary key. */
+/** Fields shown in the "what Ali FMCG needs" checklist, in order, and which value sources each can use. `label` is a supplierCatalog dictionary key. */
 export const NEEDS: { key: string; label: string; also?: string[]; sources: Source['kind'][] }[] = [
     { key: 'name', label: 'needName', sources: [] },
     { key: 'ean', label: 'needEan', also: ['eanPair'], sources: [] },

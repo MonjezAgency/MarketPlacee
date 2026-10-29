@@ -20,9 +20,9 @@ const ZONES = [
 const SCALE = 21;
 
 const FACTS = [
-    { icon: Globe2, t: 'Destination checked first', d: 'Your delivery country is checked at checkout against where Atlantis delivers.' },
-    { icon: Calculator, t: 'Priced from real rates', d: 'Where Atlantis has a rate for your route, the charge is shown before you order. Otherwise it’s quoted after.' },
-    { icon: ShieldCheck, t: 'Nothing ships unconfirmed', d: 'Goods move only after the supplier confirmed and Atlantis approved the order — and you accepted any quoted charge.' },
+    { icon: Globe2, t: 'Destination checked first', d: 'Your delivery country is checked at checkout against where Ali FMCG delivers.' },
+    { icon: Calculator, t: 'Priced from real rates', d: 'Where Ali FMCG has a rate for your route, the charge is shown before you order. Otherwise it’s quoted after.' },
+    { icon: ShieldCheck, t: 'Nothing ships unconfirmed', d: 'Goods move only after the supplier confirmed and Ali FMCG approved the order — and you accepted any quoted charge.' },
     { icon: Receipt, t: 'Excluding VAT and duties', d: 'Prices exclude VAT (shown on the invoice) and any import duties at destination.' },
 ];
 
@@ -34,7 +34,7 @@ export default function ShippingClient() {
                     <Reveal hero className="max-w-2xl">
                         <Eyebrow pill>Policies · Updated October 2026</Eyebrow>
                         <h1 className="mt-5 font-sans text-display-sm sm:text-display text-heading">Shipping policy</h1>
-                        <p className="mt-5 text-body sm:text-lead text-ink-2">How delivery works for Atlantis orders: where we deliver, how delivery is priced, how long it usually takes, and what to do if something goes wrong.</p>
+                        <p className="mt-5 text-body sm:text-lead text-ink-2">How delivery works for Ali FMCG orders: where we deliver, how delivery is priced, how long it usually takes, and what to do if something goes wrong.</p>
                     </Reveal>
                     <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         {FACTS.map((f, i) => (
@@ -56,7 +56,7 @@ export default function ShippingClient() {
                         <Reveal className="rounded-2xl ring-1 ring-line p-6">
                             <p className="flex items-center gap-2 text-subtitle text-heading"><Building2 size={18} className="text-teal" aria-hidden /> Platform-wide (this page)</p>
                             <ul className="mt-4 space-y-2 text-body text-ink-2 list-disc ps-5 marker:text-ink-4">
-                                <li>Which countries Atlantis delivers to</li>
+                                <li>Which countries Ali FMCG delivers to</li>
                                 <li>How delivery charges are priced and accepted</li>
                                 <li>Typical transit times by zone</li>
                                 <li>Customs, duties, and what to do about problems</li>
@@ -78,7 +78,7 @@ export default function ShippingClient() {
             {/* Zones */}
             <Section tone="muted" labelledBy="zones-title">
                 <Container size="content">
-                    <SectionHeader id="zones-title" eyebrow="Transit times" title="Estimated transit by zone" lead="Estimates in business days from dispatch — not from when you order, and not guarantees. Customs can add time outside Atlantis’s control." />
+                    <SectionHeader id="zones-title" eyebrow="Transit times" title="Estimated transit by zone" lead="Estimates in business days from dispatch — not from when you order, and not guarantees. Customs can add time outside Ali FMCG’s control." />
                     <Reveal className="mt-10 rounded-2xl ring-1 ring-line bg-surface p-5 sm:p-7">
                         <div className="hidden sm:grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_6rem] gap-4 pb-3 border-b border-line text-small text-ink-3">
                             <span>Destination</span>
@@ -100,7 +100,7 @@ export default function ShippingClient() {
                             ))}
                         </ul>
                     </Reveal>
-                    <p className="mt-4 text-small text-ink-3">Whether Atlantis delivers to your country is checked at checkout; a zone listed here isn’t a promise of delivery to every country in it. See <Link href="/warehouses" className="font-medium text-teal hover:underline">where Atlantis delivers</Link>.</p>
+                    <p className="mt-4 text-small text-ink-3">Whether Ali FMCG delivers to your country is checked at checkout; a zone listed here isn’t a promise of delivery to every country in it. See <Link href="/warehouses" className="font-medium text-teal hover:underline">where Ali FMCG delivers</Link>.</p>
                 </Container>
             </Section>
 
@@ -112,8 +112,8 @@ export default function ShippingClient() {
                         <h2 id="price-title" className="mt-3 font-sans text-title-sm sm:text-title text-heading">How delivery is priced</h2>
                         <ol className="mt-6 space-y-5">
                             {[
-                                ['Configured rate', 'Where Atlantis has a rate for your route, the delivery charge is calculated from it and shown at checkout, with what it’s based on (per pallet, per truck).'],
-                                ['Quoted after the order', 'Where there’s no rate yet, delivery is quoted by Atlantis after the order. Nothing is added until you accept it as part of the confirmed terms.'],
+                                ['Configured rate', 'Where Ali FMCG has a rate for your route, the delivery charge is calculated from it and shown at checkout, with what it’s based on (per pallet, per truck).'],
+                                ['Quoted after the order', 'Where there’s no rate yet, delivery is quoted by Ali FMCG after the order. Nothing is added until you accept it as part of the confirmed terms.'],
                                 ['What the price depends on', 'Destination, weight and volume (cases, pallets or a full truck) and the carrier booked for your route.'],
                             ].map(([t, d], i) => (
                                 <li key={t} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
@@ -122,19 +122,19 @@ export default function ShippingClient() {
                                 </li>
                             ))}
                         </ol>
-                        <p className="mt-6 text-body text-ink-2">Atlantis books a carrier for each order — for example DB Schenker, LKW Walter, Raben or DHL — depending on the route.</p>
+                        <p className="mt-6 text-body text-ink-2">Ali FMCG books a carrier for each order — for example DB Schenker, LKW Walter, Raben or DHL — depending on the route.</p>
                     </Reveal>
                     <Reveal delay={0.08}>
                         <Eyebrow>Delivery methods</Eyebrow>
                         <h2 className="mt-3 font-sans text-title-sm sm:text-title text-heading">Who moves the goods</h2>
                         <div className="mt-6 space-y-4">
                             <div className="rounded-2xl ring-1 ring-line p-5">
-                                <p className="flex items-center justify-between gap-3 text-[16px] font-semibold text-heading"><span className="flex items-center gap-2"><Truck size={18} className="text-teal" aria-hidden /> Atlantis arranges collection</span><Pill tone="success">Available</Pill></p>
-                                <p className="mt-2 text-body text-ink-2">A carrier booked by Atlantis collects from the supplier’s EXW location and delivers to you. Responsibility passes at collection.</p>
+                                <p className="flex items-center justify-between gap-3 text-[16px] font-semibold text-heading"><span className="flex items-center gap-2"><Truck size={18} className="text-teal" aria-hidden /> Ali FMCG arranges collection</span><Pill tone="success">Available</Pill></p>
+                                <p className="mt-2 text-body text-ink-2">A carrier booked by Ali FMCG collects from the supplier’s EXW location and delivers to you. Responsibility passes at collection.</p>
                             </div>
                             <div className="rounded-2xl ring-1 ring-line p-5">
-                                <p className="flex items-center justify-between gap-3 text-[16px] font-semibold text-heading"><span className="flex items-center gap-2"><Warehouse size={18} className="text-teal" aria-hidden /> Via an Atlantis hub</span><Pill>When a hub is verified</Pill></p>
-                                <p className="mt-2 text-body text-ink-2">The supplier delivers to a verified Atlantis hub and Atlantis ships onward. Available only where a verified hub exists — see <Link href="/warehouses" className="font-medium text-teal hover:underline">Warehouses</Link>.</p>
+                                <p className="flex items-center justify-between gap-3 text-[16px] font-semibold text-heading"><span className="flex items-center gap-2"><Warehouse size={18} className="text-teal" aria-hidden /> Via an Ali FMCG hub</span><Pill>When a hub is verified</Pill></p>
+                                <p className="mt-2 text-body text-ink-2">The supplier delivers to a verified Ali FMCG hub and Ali FMCG ships onward. Available only where a verified hub exists — see <Link href="/warehouses" className="font-medium text-teal hover:underline">Warehouses</Link>.</p>
                             </div>
                         </div>
                     </Reveal>
@@ -146,9 +146,9 @@ export default function ShippingClient() {
                 <Container size="content">
                     <ul className="grid gap-4 md:grid-cols-3">
                         {[
-                            { icon: Clock, t: 'Processing time', d: 'After your order is confirmed and payment is received, Atlantis has up to 48 business hours to begin processing it. Preparing the goods (picking, packing, dispatch) is separate from transit and follows the lead time on each product.' },
+                            { icon: Clock, t: 'Processing time', d: 'After your order is confirmed and payment is received, Ali FMCG has up to 48 business hours to begin processing it. Preparing the goods (picking, packing, dispatch) is separate from transit and follows the lead time on each product.' },
                             { icon: PackageSearch, t: 'Tracking', d: <>When the order is marked shipped, its status updates in your account and you get an email. A tracking number appears on the order once the carrier reference is added. Go to <Link href="/dashboard/customer/orders" className="font-medium text-teal hover:underline">Orders &amp; tracking</Link>.</> },
-                            { icon: FileWarning, t: 'Customs and duties', d: 'For destinations outside the EU, or with import restrictions, customs duties, taxes or fees may be charged at destination. They are the buyer’s responsibility and not included in Atlantis prices.' },
+                            { icon: FileWarning, t: 'Customs and duties', d: 'For destinations outside the EU, or with import restrictions, customs duties, taxes or fees may be charged at destination. They are the buyer’s responsibility and not included in Ali FMCG prices.' },
                         ].map((c, i) => (
                             <Reveal as="li" key={c.t} delay={i * 0.06} className="rounded-2xl bg-surface ring-1 ring-line p-6">
                                 <span className="w-10 h-10 rounded-xl bg-teal-soft text-teal flex items-center justify-center"><c.icon size={18} aria-hidden /></span>
@@ -180,7 +180,7 @@ export default function ShippingClient() {
                 <Container>
                     <SectionHeader id="faq-title" align="center" title="Shipping questions" />
                     <Faq className="mt-10" items={[
-                        { q: 'Why isn’t the delivery charge shown at checkout?', a: 'Atlantis hasn’t configured a rate for your route yet, so delivery is quoted after the order. You accept the quote before anything ships.' },
+                        { q: 'Why isn’t the delivery charge shown at checkout?', a: 'Ali FMCG hasn’t configured a rate for your route yet, so delivery is quoted after the order. You accept the quote before anything ships.' },
                         { q: 'Can the delivery charge change after I order?', a: 'Only as a new version of the confirmed terms, which you see and accept before shipping.' },
                         { q: 'Are the transit times guaranteed?', a: 'No. They are typical times from dispatch. Customs and route conditions can add time.' },
                         { q: 'Can I collect the goods myself?', a: 'Ask the team before you order. Where self-collection from the EXW location is possible, it is agreed per order.' },

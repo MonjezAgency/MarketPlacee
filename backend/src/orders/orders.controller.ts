@@ -31,7 +31,7 @@ import { CheckOwnership } from '../auth/check-ownership.decorator';
 import { Role, OrderStatus } from '@prisma/client';
 import { OrderDto } from '../common/dtos/order.dto';
 
-/** What a supplier gets back after answering: never the buyer total (it includes the Atlantis margin). */
+/** What a supplier gets back after answering: never the buyer total (it includes the Ali FMCG margin). */
 const supplierResult = (o: any) => ({ id: o?.id, status: o?.status, reviewStatus: o?.reviewStatus, accepted: o?.accepted, rejected: o?.rejected });
 import { plainToInstance } from 'class-transformer';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
@@ -277,7 +277,7 @@ export class OrdersController {
 
     // ─── Confirmation workflow ───────────────────────────────────────
 
-    /** Atlantis approval — only after every supplier accepted the current terms. */
+    /** Ali FMCG approval — only after every supplier accepted the current terms. */
     @Post(':id/approve')
     @Roles(Role.ADMIN, Role.OWNER)
     approve(@Param('id') id: string, @Body('note') note: string, @Request() req) {

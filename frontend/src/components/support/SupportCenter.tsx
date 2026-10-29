@@ -10,9 +10,9 @@ import { AssistantPanel, type AssistantSession } from './AssistantPanel';
 import { OrderThreads } from './OrderThreads';
 
 /**
- * The Atlantis Support workspace (suppliers and buyers): a header with the
+ * The Ali FMCG Support workspace (suppliers and buyers): a header with the
  * real assistant state, and two clearly separate areas — the assistant
- * conversation, and per-order threads with the Atlantis team.
+ * conversation, and per-order threads with the Ali FMCG team.
  */
 export default function SupportCenter({ role, heightClass }: { role: 'supplier' | 'buyer'; heightClass: string }) {
     return <React.Suspense fallback={null}><Center role={role} heightClass={heightClass} /></React.Suspense>;

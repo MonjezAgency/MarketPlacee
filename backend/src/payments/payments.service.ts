@@ -210,7 +210,7 @@ export class PaymentsService {
                     ? `${(order as any).shippingAddress}`
                     : 'See dashboard',
             },
-            description: `Atlantis B2B Order ${orderId}`,
+            description: `Ali FMCG B2B Order ${orderId}`,
         });
 
         // Initialize or Update escrow record safely

@@ -4,7 +4,7 @@ import { approvalBlocker, buyerMustAccept, confirmationState, supplierView, term
 /**
  * The confirmation workflow end to end against an in-memory database:
  * nothing moves forward on the buyer's word, every supplier must accept the
- * exact terms, Atlantis approves, changed terms are confirmed again.
+ * exact terms, Ali FMCG approves, changed terms are confirmed again.
  */
 function makeDb() {
     let seq = 0;
@@ -98,8 +98,8 @@ describe('order workflow rules', () => {
         expect(approvalBlocker({ ...order, termsVersion: 2 }, confirmationState([{ ...confs[0] }, { ...confs[1], status: 'ACCEPTED' }], 2, ['a', 'b']))).toMatch(/Waiting/);
     });
     it('status changes can’t skip approval; legacy orders keep the old rules', () => {
-        expect(workflowBlocker(order, 'PROCESSING')).toMatch(/only by Atlantis approval/);
-        expect(workflowBlocker(order, 'PAID')).toMatch(/only by Atlantis approval/);
+        expect(workflowBlocker(order, 'PROCESSING')).toMatch(/only by Ali FMCG approval/);
+        expect(workflowBlocker(order, 'PAID')).toMatch(/only by Ali FMCG approval/);
         expect(workflowBlocker(order, 'PROCESSING', { viaApproval: true })).toBeNull();
         expect(workflowBlocker({ ...order, status: 'PROCESSING', reviewStatus: 'APPROVED', termsVersion: 2 }, 'SHIPPED')).toMatch(/buyer hasn’t accepted/);
         expect(workflowBlocker({ ...order, status: 'PROCESSING', reviewStatus: 'APPROVED', termsVersion: 2, buyerAcceptedVersion: 2 }, 'SHIPPED')).toBeNull();
@@ -122,7 +122,7 @@ describe('order workflow rules', () => {
 });
 
 describe('order workflow service', () => {
-    it('a supplier’s acceptance alone confirms nothing; Atlantis approves only when every supplier accepted', async () => {
+    it('a supplier’s acceptance alone confirms nothing; Ali FMCG approves only when every supplier accepted', async () => {
         const db = makeDb(); seed(db, ['sup-a', 'sup-b']);
         const { svc } = makeService(db);
         await svc.supplierAccept('ord-1', 'sup-a');

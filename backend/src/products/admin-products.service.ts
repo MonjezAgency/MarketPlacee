@@ -8,7 +8,7 @@ import { planBulk, type BulkAction, type BulkCandidate, type BulkPlan } from './
 /**
  * Admin Products page and product review view — read models only.
  *
- *  • Two scopes, never mixed (catalog-scope.ts): Atlantis Catalog = products
+ *  • Two scopes, never mixed (catalog-scope.ts): Ali FMCG Catalog = products
  *    owned by staff accounts; Supplier Submissions = everything else. Counts,
  *    facets and pages are computed for the scope requested, on the server.
  *  • Completeness is the publish checklist (catalog-rules.ts missingForPublish),
@@ -30,7 +30,7 @@ export interface AdminListQuery { status?: string; q?: string; category?: string
 export class AdminProductsService {
     constructor(private readonly prisma: PrismaService, private readonly reviewTrail: ProductReviewService) {}
 
-    /** Ids of every staff account (owners of Atlantis Catalog products). */
+    /** Ids of every staff account (owners of Ali FMCG Catalog products). */
     async staffIds(): Promise<string[]> {
         const rows = await this.prisma.user.findMany({ where: { role: { in: [...STAFF_ROLES] as any } }, select: { id: true } });
         return rows.map((r) => r.id);

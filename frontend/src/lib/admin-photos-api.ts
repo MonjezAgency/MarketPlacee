@@ -3,7 +3,7 @@ import { ApiError, type DiscoveryCandidate, type ImageDiscovery } from '@/lib/su
 
 /**
  * Admin → Products → Product photos. Backend: backend/src/products/admin-product-photos.controller.ts
- * (list and search again: OWNER/ADMIN/MODERATOR; using or dismissing a found photo: OWNER/ADMIN, Atlantis
+ * (list and search again: OWNER/ADMIN/MODERATOR; using or dismissing a found photo: OWNER/ADMIN, Ali FMCG
  * Catalog products only). Ranking and identity checks are the server's (image-discovery.service.ts,
  * image-quality.ts); nothing here decides which photo is right.
  */

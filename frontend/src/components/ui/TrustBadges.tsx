@@ -54,7 +54,7 @@ export default function TrustBadges() {
                     viewport={{ once: true }}
                     transition={{ duration: 0.5 }}
                 >
-                    <h2 className="section-title">Why Choose <span className="text-teal">Atlantis</span>?</h2>
+                    <h2 className="section-title">Why Choose <span className="text-teal">Ali FMCG</span>?</h2>
                     <p className="section-subtitle">
                         Trusted by over 500+ businesses worldwide. We make B2B procurement simple, secure, and scalable.
                     </p>

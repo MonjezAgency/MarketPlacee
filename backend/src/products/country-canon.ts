@@ -5,7 +5,7 @@ import { COUNTRY_NAMES } from '../shipping/delivery-policy';
  * warehouse, not the delivery destination (those are separate fields).
  *
  * Product.origin keeps storing a plain string, as before, but always the
- * canonical English country name from the ISO 3166-1 list Atlantis already
+ * canonical English country name from the ISO 3166-1 list Ali FMCG already
  * ships (shipping/delivery-policy.ts COUNTRY_NAMES, the same list as the
  * storefront's country picker, frontend/src/lib/countries.ts). The name, not
  * the code, because the product page, the origin filter and older listings

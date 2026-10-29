@@ -33,13 +33,13 @@ export class ProductsService {
 
     /** Where staff open a product for review. */
     private static adminReviewLink(id: string) { return `/admin/products/${id}`; }
-    /** Where the supplier reads Atlantis feedback on a product. */
+    /** Where the supplier reads Ali FMCG feedback on a product. */
     private static supplierFeedbackLink(id: string) { return `/supplier/products/${id}/edit#feedback`; }
 
     private buildWhiteCatalogPlaceholder(name?: string, ean?: string): string {
         const title = String(name || 'FMCG product').slice(0, 48).replace(/[&<>"']/g, '');
         const code = String(ean || '').slice(0, 20).replace(/[&<>"']/g, '');
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200"><rect width="1200" height="1200" fill="#fff"/><rect x="120" y="120" width="960" height="760" rx="32" fill="#f8fafc" stroke="#e2e8f0" stroke-width="6"/><text x="600" y="500" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="54" font-weight="700">${title}</text><text x="600" y="590" text-anchor="middle" fill="#64748b" font-family="Arial" font-size="30">${code}</text><text x="600" y="1010" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="24">Atlantis FMCG catalog image</text></svg>`;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200"><rect width="1200" height="1200" fill="#fff"/><rect x="120" y="120" width="960" height="760" rx="32" fill="#f8fafc" stroke="#e2e8f0" stroke-width="6"/><text x="600" y="500" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="54" font-weight="700">${title}</text><text x="600" y="590" text-anchor="middle" fill="#64748b" font-family="Arial" font-size="30">${code}</text><text x="600" y="1010" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="24">Ali FMCG catalog image</text></svg>`;
         return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     }
 
@@ -250,7 +250,7 @@ export class ProductsService {
 
         // One completeness rule for every path (catalog-rules.ts). Suppliers:
         // incomplete or not submitted → DRAFT (never public), complete and
-        // submitted → PENDING (Atlantis review). Staff: complete → APPROVED,
+        // submitted → PENDING (Ali FMCG review). Staff: complete → APPROVED,
         // incomplete → PENDING with a note listing what's missing.
         const missing = missingForPublish({ ...createProductDto, unit: (createProductDto as any).unit || 'piece', images: productImages, basePrice: (createProductDto as any).price });
         const submit = options?.submit !== false;
@@ -766,7 +766,7 @@ export class ProductsService {
         if (product.supplierId) {
             delivery.inApp = await this.notificationsService.notifyUser(
                 product.supplierId,
-                'Atlantis sent you a comment on a product',
+                'Ali FMCG sent you a comment on a product',
                 `Your product "${product.name}" needs changes before it can be approved.\n\nReason: ${text}\n\nFix the row in your inventory and click "Resend for Review".`,
                 'WARNING',
                 { productId: product.id, type: 'PRODUCT_NEEDS_CHANGES', link: ProductsService.supplierFeedbackLink(product.id), kind: 'PRODUCT_CHANGES_REQUESTED', params: { product: product.name, message: text.slice(0, 300) } },
@@ -775,14 +775,14 @@ export class ProductsService {
         if (!(product as any).supplier?.email) delivery.email = null;
         else delivery.email = await this.emailService.sendMail(
                 (product as any).supplier.email,
-                `Atlantis · "${product.name}" needs changes`,
+                `Ali FMCG · "${product.name}" needs changes`,
                 `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px;color:#0F172A;">
                     <h2 style="margin:0 0 12px;">A change is needed on "${product.name}"</h2>
                     <p style="color:#475569;line-height:1.6;">Hi ${(product as any).supplier.name || 'there'},</p>
                     <p style="color:#475569;line-height:1.6;">Our team reviewed your product submission and left the following note:</p>
                     <div style="border-left:4px solid #F59E0B;background:#FFFBEB;padding:16px 20px;margin:16px 0;border-radius:0 10px 10px 0;color:#0F172A;font-size:14px;line-height:1.6;">${text.replace(/\n/g, '<br/>')}</div>
                     <p style="color:#475569;line-height:1.6;">Open your inventory, fix the row, then click <strong>Resend for Review</strong> to push it back to us.</p>
-                    <p style="color:#94A3B8;font-size:12px;margin-top:32px;">— The Atlantis team</p>
+                    <p style="color:#94A3B8;font-size:12px;margin-top:32px;">— The Ali FMCG team</p>
                 </div>`,
             ).then((r: any) => r === true, (e: any) => { this.logger.warn(`feedback email failed for ${product.id}: ${e?.message}`); return false; });
 
@@ -1334,7 +1334,7 @@ export class ProductsService {
             // Operator rule: only APPROVED listings show on the inventory
             // dashboard. PENDING / REJECTED / NEEDS_CHANGES rows live on
             // /supplier/products where the supplier handles them — there's
-            // no warehouse number to manage until Atlantis says yes.
+            // no warehouse number to manage until Ali FMCG says yes.
             where: { supplierId, status: 'APPROVED' },
             select: {
                 id: true,
@@ -1910,7 +1910,7 @@ export class ProductsService {
         return buildBrandCatalog(groups.map((g: any) => ({ brand: g.brand, count: g._count.brand })));
     }
 
-    /** Brands already on Atlantis (live listings) plus the supplier's own — for reading a brand from a product name. */
+    /** Brands already on Ali FMCG (live listings) plus the supplier's own — for reading a brand from a product name. */
     async knownBrands(supplierId: string): Promise<string[]> {
         const rows = await this.prisma.product.findMany({
             where: { brand: { not: null }, OR: [{ status: ProductStatus.APPROVED }, { supplierId }] },

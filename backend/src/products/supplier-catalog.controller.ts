@@ -246,7 +246,7 @@ export class SupplierCatalogController {
         return this.enrich.status(req.user.sub, id);
     }
 
-    /** Copy an accepted candidate into Atlantis storage; returns the stored URL. */
+    /** Copy an accepted candidate into Ali FMCG storage; returns the stored URL. */
     @Post('image-lookup/accept')
     @Throttle({ default: { limit: 30, ttl: 60_000 } })
     accept(@Body() body: { url: string }) {

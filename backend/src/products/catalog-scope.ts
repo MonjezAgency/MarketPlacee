@@ -1,10 +1,10 @@
 /**
- * Atlantis Catalog vs Supplier Submissions — the ONE rule for which side of the
+ * Ali FMCG Catalog vs Supplier Submissions — the ONE rule for which side of the
  * admin Products page a product belongs to.
  *
  * Products have no "source" column. What tells the two apart is who owns the
  * row: `Product.supplierId`. Staff accounts (the platform owner and the team,
- * see STAFF_ROLES) create and import products on behalf of Atlantis — the
+ * see STAFF_ROLES) create and import products on behalf of Ali FMCG — the
  * controller even re-attributes admin uploads to the platform account
  * (ProductsController.resolvePlatformSupplierId). Everything owned by a
  * non-staff account was submitted by a supplier.

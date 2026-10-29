@@ -342,7 +342,7 @@ export default function Navbar() {
                     <Link href="/" className="flex items-center gap-2.5 shrink-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60 focus-visible:ring-offset-2" aria-label={t('nav', 'homeAria')}>
                         <img src="/brand/atlantis-mark.png" alt="" width={32} height={32} className="w-8 h-8 object-contain rounded-lg" />
                         <span dir="ltr" className="text-[18px] font-black tracking-tighter uppercase hidden sm:inline">
-                            <span className="text-heading">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
+                            <span className="text-heading">ALI&nbsp;</span><span className="text-[#2EC4B6]">FMCG.</span>
                         </span>
                     </Link>
 

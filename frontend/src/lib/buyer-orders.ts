@@ -25,7 +25,7 @@ export interface BuyerOrder {
     shipment?: { trackingNumber: string | null; carrier: string | null; status: string | null; expectedDelivery: string | null } | null;
     /** Confirmation workflow summary (null for orders placed before it existed). */
     workflow?: { reviewStatus: string; termsVersion: number; party: { key: string; buyer: string } | null; buyerMustAccept: boolean } | null;
-    /** Latest inspection Atlantis recorded on this order, if any. */
+    /** Latest inspection Ali FMCG recorded on this order, if any. */
     inspection?: 'SCHEDULED' | 'PASSED' | 'PASSED_WITH_FINDINGS' | 'FAILED' | null;
     delivery?: BuyerDelivery | null;
 }
@@ -38,7 +38,7 @@ export type Tone = 'wait' | 'ok' | 'move' | 'done' | 'off';
 
 /**
  * Status from what the server actually records (supplier confirmation and
- * Atlantis approval for workflow orders), as keys of the `orders` dictionary
+ * Ali FMCG approval for workflow orders), as keys of the `orders` dictionary
  * section so every language shows the same state.
  */
 export function statusKeys(o: BuyerOrder): { label: string; tone: Tone; note: string; vars?: Record<string, string> } {
@@ -78,8 +78,8 @@ export type StageState = 'done' | 'current' | 'todo' | 'off';
 
 /**
  * The stages this order really goes through, from data the server records:
- * workflow orders show supplier confirmation and Atlantis approval; an
- * inspection stage appears only when Atlantis recorded one. Nothing is
+ * workflow orders show supplier confirmation and Ali FMCG approval; an
+ * inspection stage appears only when Ali FMCG recorded one. Nothing is
  * inferred beyond the recorded statuses.
  */
 export function orderStages(o: BuyerOrder): { key: StageKey; state: StageState }[] {

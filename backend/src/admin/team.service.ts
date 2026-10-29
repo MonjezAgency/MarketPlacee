@@ -105,8 +105,8 @@ export class TeamService {
         if (existing) {
             const staff = (STAFF_ROLES as readonly string[]).includes(String(existing.role));
             throw new ConflictException(staff
-                ? { code: 'ALREADY_MEMBER', message: 'This person is already on the Atlantis team.', userId: existing.id }
-                : { code: 'EMAIL_HAS_ACCOUNT', message: 'This email already has an Atlantis buyer or supplier account. Invite a different work email.' });
+                ? { code: 'ALREADY_MEMBER', message: 'This person is already on the Ali FMCG team.', userId: existing.id }
+                : { code: 'EMAIL_HAS_ACCOUNT', message: 'This email already has an Ali FMCG buyer or supplier account. Invite a different work email.' });
         }
         const now = new Date();
         const open = await this.prisma.inviteToken.findMany({
@@ -152,7 +152,7 @@ export class TeamService {
 
     private async inviterName(actorId: string) {
         const u = await this.prisma.user.findUnique({ where: { id: actorId }, select: { name: true } });
-        return u?.name || 'The Atlantis team';
+        return u?.name || 'The Ali FMCG team';
     }
 
     async invite(actor: Actor, body: any) {

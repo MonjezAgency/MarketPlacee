@@ -15,7 +15,7 @@ import { Roles } from '../auth/roles.decorator';
 import { DiscountsService } from './discounts.service';
 
 /**
- * Tiered pricing and customer-group discounts: an Atlantis pricing tool, OWNER/ADMIN only.
+ * Tiered pricing and customer-group discounts: an Ali FMCG pricing tool, OWNER/ADMIN only.
  * Before, any signed-in account (a buyer included) could create tiers or join a discount group.
  */
 @Controller('discounts')

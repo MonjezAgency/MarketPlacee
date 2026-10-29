@@ -1,14 +1,14 @@
 /**
  * Commercial privacy — who may see which price.
  *
- *  • Atlantis staff: everything (supplier price, markups, notes).
+ *  • Ali FMCG staff: everything (supplier price, markups, notes).
  *  • The supplier who owns a product: their own price (basePrice) and the
  *    review notes — never the buyer price, so the margin can't be derived.
  *  • Everyone else (buyers, other suppliers): buyer prices only. `basePrice`
  *    is replaced by the buyer case price (supplier price × case-tier markup)
  *    and the markup endpoint returns only the ratio between tiers, so the
  *    storefront's tier maths still produces the exact buyer prices while the
- *    supplier price and Atlantis's markup never leave the server.
+ *    supplier price and Ali FMCG's markup never leave the server.
  *
  * Applied to every API response by PricePrivacyInterceptor.
  */
@@ -47,7 +47,7 @@ function viewProduct(p: any, viewer: Viewer, m: Markups, ownerScoped = false) {
     delete p.supplierPrice;
     delete p.supplierCurrency;
     delete p.adminNotes;
-    // Who supplies a product is Atlantis's business: another supplier sees neither the id nor the account.
+    // Who supplies a product is Ali FMCG's business: another supplier sees neither the id nor the account.
     delete p.supplierId;
     if (p.supplier && typeof p.supplier === 'object') delete p.supplier;
 }

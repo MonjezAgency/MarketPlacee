@@ -14,11 +14,11 @@ export interface PricedProduct {
 }
 
 /**
- * Update the net price of ONE Atlantis Catalog product
+ * Update the net price of ONE Ali FMCG Catalog product
  * (PATCH /admin-catalog/products/:id/price). The field changed is the listing's
  * own price per case in its currency (supplierPrice / supplierCurrency → basePrice
  * in EUR) — the same field and rules a supplier uses for their own products. The
- * buyer price is never typed here: the server recalculates it with the Atlantis
+ * buyer price is never typed here: the server recalculates it with the Ali FMCG
  * markup, and the value shown after saving is what the server returned.
  */
 export default function UpdatePriceDialog({ product, onClose, onSaved }: { product: PricedProduct | null; onClose: () => void; onSaved: () => void }) {

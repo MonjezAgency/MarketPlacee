@@ -8,8 +8,8 @@ const D = (s: string) => new Date(s);
 
 describe('sale eligibility and recognition date', () => {
     const base = { createdAt: D('2026-10-01T08:00:00Z') };
-    it('workflow orders count only once Atlantis approved them, at the approval time', () => {
-        expect(saleRecognizedAt({ ...base, status: 'PENDING', reviewStatus: 'PENDING_REVIEW' })).toBeNull(); // waiting for suppliers / Atlantis
+    it('workflow orders count only once Ali FMCG approved them, at the approval time', () => {
+        expect(saleRecognizedAt({ ...base, status: 'PENDING', reviewStatus: 'PENDING_REVIEW' })).toBeNull(); // waiting for suppliers / Ali FMCG
         expect(saleRecognizedAt({ ...base, status: 'PROCESSING', reviewStatus: 'PENDING_REVIEW' })).toBeNull(); // moved without approval (webhook path)
         expect(saleRecognizedAt({ ...base, status: 'CANCELLED', reviewStatus: 'REJECTED', reviewedAt: D('2026-10-02T00:00:00Z') })).toBeNull();
         expect(saleRecognizedAt({ ...base, status: 'CANCELLED', reviewStatus: 'APPROVED', reviewedAt: D('2026-10-02T00:00:00Z') })).toBeNull(); // cancelled after approval
@@ -81,7 +81,7 @@ describe('orders awaiting the supplier (current)', () => {
     const conf = (status: string, termsVersion = 1, deadline: string | null = '2026-10-20T00:00:00Z') => ({ termsVersion, status, deadline });
     it('matches the orders page rule', () => {
         expect(awaitingSupplier({ status: 'PENDING', reviewStatus: 'PENDING_REVIEW', confirmations: [conf('PENDING')] }, NOW)).toBe(true);
-        expect(awaitingSupplier({ status: 'PENDING', reviewStatus: 'PENDING_REVIEW', confirmations: [conf('ACCEPTED')] }, NOW)).toBe(false); // waiting for Atlantis, not me
+        expect(awaitingSupplier({ status: 'PENDING', reviewStatus: 'PENDING_REVIEW', confirmations: [conf('ACCEPTED')] }, NOW)).toBe(false); // waiting for Ali FMCG, not me
         expect(awaitingSupplier({ status: 'PENDING', reviewStatus: 'PENDING_REVIEW', confirmations: [conf('PENDING', 1, '2026-10-16T00:00:00Z')] }, NOW)).toBe(false); // expired
         expect(awaitingSupplier({ status: 'PENDING', reviewStatus: 'PENDING_REVIEW', confirmations: [conf('ACCEPTED', 1), conf('PENDING', 2)] }, NOW)).toBe(true); // new version
         expect(awaitingSupplier({ status: 'PROCESSING', reviewStatus: 'APPROVED', confirmations: [conf('ACCEPTED')] }, NOW)).toBe(false);

@@ -16,7 +16,7 @@ import { useDiscoveryReason } from '@/components/supplier/ImageDiscoveryPanel';
 /**
  * Admin → Products → Product photos (/admin/products/photos): products that
  * need a photo, or have photos found by barcode waiting for review, grouped by
- * the reason. Atlantis Catalog products can be searched again and — by an
+ * the reason. Ali FMCG Catalog products can be searched again and — by an
  * owner or admin — given the photos found. Supplier products are listed for
  * their status only: the supplier chooses their own photos (server-enforced).
  */
@@ -178,7 +178,7 @@ export default function ProductPhotosWorkspace() {
     );
 }
 
-/** The photos found for one Atlantis Catalog product: ranked, with why; owner/admin can use or dismiss them. */
+/** The photos found for one Ali FMCG Catalog product: ranked, with why; owner/admin can use or dismiss them. */
 function ReviewDialog({ row, canApply, onClose, onChanged }: { row: PhotoRow; canApply: boolean; onClose: () => void; onChanged: () => void }) {
     const { t } = useLanguage();
     const tp = (k: string, v?: Record<string, string | number>) => t('productPhotos', k, v);

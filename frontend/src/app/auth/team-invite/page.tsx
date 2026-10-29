@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 type View = 'checking' | 'form' | 'done' | 'EXPIRED' | 'ACCEPTED' | 'REVOKED' | 'INVALID' | 'EXISTS' | 'OFFLINE';
 
 /**
- * Accept an Atlantis team invitation. The secret is read from the URL fragment
+ * Accept an Ali FMCG team invitation. The secret is read from the URL fragment
  * (#token=…), removed from the address bar at once, and only ever sent in a POST body.
  * The server validates it, creates the account with the invited role and consumes
  * the invitation in one step; the invitee chooses their own password.

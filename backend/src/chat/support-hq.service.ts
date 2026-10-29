@@ -35,7 +35,7 @@ export class SupportHqService {
     constructor(private readonly prisma: PrismaService, private readonly chat: ChatService) {}
 
     private assertHq(role: string) {
-        if (!HQ_ROLES.includes(upper(role))) throw new ForbiddenException('Support HQ is for the Atlantis support team.');
+        if (!HQ_ROLES.includes(upper(role))) throw new ForbiddenException('Support HQ is for the Ali FMCG support team.');
     }
 
     private async loadThreads(role: string) {

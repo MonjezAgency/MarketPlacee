@@ -81,7 +81,7 @@ export default function GoogleSyncPage() {
             <div className="text-center">
                 <div className="w-16 h-16 border-4 border-[#1BC7C9]/20 border-t-[#1BC7C9] rounded-full animate-spin mx-auto mb-6" />
                 <p className="text-[#0A1A2F] font-black text-sm uppercase tracking-[0.3em]">Syncing Account</p>
-                <p className="text-slate-400 text-xs mt-2">Connecting to Atlantis...</p>
+                <p className="text-slate-400 text-xs mt-2">Connecting to Ali FMCG...</p>
             </div>
         </div>
     );

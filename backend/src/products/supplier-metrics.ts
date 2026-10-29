@@ -8,7 +8,7 @@ import { minOrderCases } from '../common/markups';
  * records; nothing here changes an order, a payment or a product.
  *
  * GROSS SALES (what the supplier may see: their own net value, never the
- * buyer price or the Atlantis margin)
+ * buyer price or the Ali FMCG margin)
  *   = Σ OrderItem.supplierUnitPrice × OrderItem.quantity over the supplier's
  *     own lines (OrderItem.product.supplierId) on ELIGIBLE orders whose sale
  *     was RECOGNISED in the period. Lines placed before supplierUnitPrice was
@@ -16,15 +16,15 @@ import { minOrderCases } from '../common/markups';
  *
  * ELIGIBLE + RECOGNISED (saleRecognizedAt):
  *   • Workflow orders (reviewStatus ≠ LEGACY): reviewStatus = APPROVED and
- *     status ≠ CANCELLED. Atlantis can only approve after every supplier
+ *     status ≠ CANCELLED. Ali FMCG can only approve after every supplier
  *     accepted (order-workflow.ts approvalBlocker), so approval implies the
  *     supplier's acceptance. Recognised at Order.reviewedAt — the approval
  *     time, written once by approveOrder.
- *     Requests awaiting a supplier or Atlantis, rejected requests, and orders
+ *     Requests awaiting a supplier or Ali FMCG, rejected requests, and orders
  *     moved to PROCESSING without approval (the Stripe webhook path, TX-03)
  *     are not sales.
  *   • Legacy orders (placed before the workflow): status PAID, PROCESSING,
- *     SHIPPED or DELIVERED — confirmed by Atlantis with the status controls.
+ *     SHIPPED or DELIVERED — confirmed by Ali FMCG with the status controls.
  *     Recognised at the first OrderStatusHistory row that moved the order into
  *     one of those statuses; Order.createdAt when no such row exists.
  *   An order cancelled later stops counting, also in past periods.

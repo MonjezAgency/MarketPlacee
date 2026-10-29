@@ -121,7 +121,7 @@ export class CreateProductDto {
     origin?: string;
 
     /**
-     * EXW (Ex Works) — where the goods physically sit today. Atlantis
+     * EXW (Ex Works) — where the goods physically sit today. Ali FMCG
      * logistics uses this to quote transport from origin warehouse to
      * the buyer. The Excel importer makes this practically required:
      * a row without an EXW value is held in PENDING with an explicit

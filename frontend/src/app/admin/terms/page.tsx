@@ -125,7 +125,7 @@ export default function AdminTermsPage() {
                 <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    placeholder={`# Atlantis Marketplace — Terms & Conditions\n\n## 1. Acceptance of Terms\nBy accessing or using …\n\n## 2. Eligibility\n…`}
+                    placeholder={`# Ali FMCG Marketplace — Terms & Conditions\n\n## 1. Acceptance of Terms\nBy accessing or using …\n\n## 2. Eligibility\n…`}
                     rows={28}
                     className="w-full font-mono text-sm leading-relaxed p-6 rounded-2xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-y"
                 />

@@ -5,7 +5,7 @@
  * creation, so every screen shows the same figures. Rules:
  *  • The supplier's net goods price never changes with the method; charges
  *    are separate lines with their basis and source.
- *  • A charge exists only when Atlantis configured a rate for that exact
+ *  • A charge exists only when Ali FMCG configured a rate for that exact
  *    route and unit, or the supplier declared their own freight. Otherwise
  *    the option is "quote_required" — never estimated.
  *  • Hubs count only when verified and active.
@@ -68,8 +68,8 @@ export interface FulfillmentOption {
 
 export const METHOD_INFO: Record<FulfillmentMethod, { label: string; summary: string; steps: Step[]; handover: string }> = {
     ATLANTIS_COLLECTION: {
-        label: 'Atlantis arranges collection',
-        summary: 'A carrier booked by Atlantis collects from your EXW location and delivers to the buyer. Your net price stays the same; freight is added for the buyer.',
+        label: 'Ali FMCG arranges collection',
+        summary: 'A carrier booked by Ali FMCG collects from your EXW location and delivers to the buyer. Your net price stays the same; freight is added for the buyer.',
         steps: [
             { who: 'Supplier', what: 'Prepares the confirmed goods at the EXW location.' },
             { who: 'Atlantis', what: 'Books the carrier and agrees the collection date with you.' },
@@ -78,10 +78,10 @@ export const METHOD_INFO: Record<FulfillmentMethod, { label: string; summary: st
         handover: 'At collection from your EXW location (Ex Works).',
     },
     SUPPLIER_TO_HUB: {
-        label: 'You deliver to an Atlantis hub',
-        summary: 'You bring the goods to a verified Atlantis hub at your own cost. Your declared freight is added on top of your net price; Atlantis ships from the hub to the buyer.',
+        label: 'You deliver to an Ali FMCG hub',
+        summary: 'You bring the goods to a verified Ali FMCG hub at your own cost. Your declared freight is added on top of your net price; Ali FMCG ships from the hub to the buyer.',
         steps: [
-            { who: 'Supplier', what: 'Delivers the confirmed goods to the agreed Atlantis hub.' },
+            { who: 'Supplier', what: 'Delivers the confirmed goods to the agreed Ali FMCG hub.' },
             { who: 'Atlantis', what: 'Receives the goods at the hub (and inspects them where the hub offers inspection).' },
             { who: 'Carrier', what: 'Ships from the hub to the buyer.' },
         ],
@@ -137,17 +137,17 @@ function legCharge(rates: Rate[], method: Rate['method'], origin: string, dest: 
     for (const t of tryUnits) {
         if (!t.count) continue;
         const { rate, conflict } = findRate(rates, method, origin, dest, t.unit, hubId);
-        if (conflict) return { reason: `Two different rates are configured for ${routeLabel} per ${t.unit.toLowerCase()} — Atlantis will quote this route.` };
+        if (conflict) return { reason: `Two different rates are configured for ${routeLabel} per ${t.unit.toLowerCase()} — Ali FMCG will quote this route.` };
         if (!rate) continue;
         const amount = round2(rate.amountEur * t.count);
         const partial = t.word === 'pallet space' ? ` (${plural(u.cases!, 'case')} fill ${plural(t.count, 'pallet space')})` : '';
         return {
-            charge: { key: `${method}:${t.unit}`, label, basis: `${plural(t.count, t.word)} × ${eur(rate.amountEur)}${partial}`, amount, paidTo: 'Atlantis', source: `Atlantis rate, ${routeLabel}` },
+            charge: { key: `${method}:${t.unit}`, label, basis: `${plural(t.count, t.word)} × ${eur(rate.amountEur)}${partial}`, amount, paidTo: 'Atlantis', source: `Ali FMCG rate, ${routeLabel}` },
             transit: rate.minTransitDays != null && rate.maxTransitDays != null ? { min: rate.minTransitDays, max: rate.maxTransitDays } : null,
         };
     }
-    if (spec.tier === 'carton' && !u.pallets) return { reason: `No rate per case for ${routeLabel}, and the product has no cases-per-pallet to work out pallet spaces — Atlantis will quote it.` };
-    return { reason: `No Atlantis rate is configured for ${routeLabel} — the freight is quoted after the order.` };
+    if (spec.tier === 'carton' && !u.pallets) return { reason: `No rate per case for ${routeLabel}, and the product has no cases-per-pallet to work out pallet spaces — Ali FMCG will quote it.` };
+    return { reason: `No Ali FMCG rate is configured for ${routeLabel} — the freight is quoted after the order.` };
 }
 
 export interface PriceArgs {
@@ -169,14 +169,14 @@ export function priceOption(a: PriceArgs): FulfillmentOption {
     const name = a.countryName || ((c: string) => c);
     const base: FulfillmentOption = { method: a.method, label: info.label, status: 'quote_required', reasons: [], charges: [], total: null, transitDays: null, hub: null, steps: info.steps, handover: info.handover };
     if (a.method === 'SUPPLIER_DIRECT') {
-        return { ...base, status: 'unavailable', reasons: ['Direct shipment by suppliers isn’t offered on Atlantis yet.'] };
+        return { ...base, status: 'unavailable', reasons: ['Direct shipment by suppliers isn’t offered on Ali FMCG yet.'] };
     }
     if (!a.destination) return { ...base, reasons: ['Choose a delivery country to see delivery charges.'] };
-    if (a.destinationSupported === false) return { ...base, status: 'unavailable', reasons: [`Atlantis doesn’t deliver to ${name(a.destination)} at the moment.`] };
+    if (a.destinationSupported === false) return { ...base, status: 'unavailable', reasons: [`Ali FMCG doesn’t deliver to ${name(a.destination)} at the moment.`] };
     if (!(Number(a.spec.quantity) > 0)) return { ...base, reasons: ['Enter a quantity.'] };
 
     if (a.method === 'ATLANTIS_COLLECTION') {
-        if (!a.dispatchCountry) return { ...base, reasons: ['The EXW location doesn’t name a country Atlantis recognises — freight is quoted after the order.'] };
+        if (!a.dispatchCountry) return { ...base, reasons: ['The EXW location doesn’t name a country Ali FMCG recognises — freight is quoted after the order.'] };
         const route = `${name(a.dispatchCountry)} → ${name(a.destination)}`;
         const leg = legCharge(a.rates, 'ATLANTIS_COLLECTION', a.dispatchCountry, a.destination, a.spec, null, 'Freight (collection to delivery)', route);
         if (!leg.charge) return { ...base, reasons: [leg.reason!] };
@@ -186,9 +186,9 @@ export function priceOption(a: PriceArgs): FulfillmentOption {
     // SUPPLIER_TO_HUB
     const hub = a.supplier?.hubId ? a.hubs.find((h) => h.id === a.supplier!.hubId) : undefined;
     const verifiedHubs = a.hubs.filter((h) => h.verified && h.active);
-    if (!verifiedHubs.length) return { ...base, status: 'unavailable', reasons: ['Atlantis has no verified hub accepting deliveries yet.'] };
-    if (!hub) return { ...base, status: 'unavailable', reasons: ['Choose the Atlantis hub you deliver to in your fulfilment settings.'] };
-    if (!hub.verified || !hub.active) return { ...base, status: 'unavailable', reasons: [`${hub.name} isn’t a verified, active Atlantis hub.`] };
+    if (!verifiedHubs.length) return { ...base, status: 'unavailable', reasons: ['Ali FMCG has no verified hub accepting deliveries yet.'] };
+    if (!hub) return { ...base, status: 'unavailable', reasons: ['Choose the Ali FMCG hub you deliver to in your fulfilment settings.'] };
+    if (!hub.verified || !hub.active) return { ...base, status: 'unavailable', reasons: [`${hub.name} isn’t a verified, active Ali FMCG hub.`] };
     const withHub = { ...base, hub: { id: hub.id, name: hub.name, city: hub.city, country: hub.country } };
     const u = shippingUnits(a.spec);
     const charges: Charge[] = [];
@@ -204,7 +204,7 @@ export function priceOption(a: PriceArgs): FulfillmentOption {
     return { ...withHub, status: 'priced', charges, total: round2(charges.reduce((s, c) => s + c.amount, 0)), transitDays: leg.transit ?? null };
 }
 
-/** The method a product actually uses: its own override, else the supplier's default, else Atlantis collection. */
+/** The method a product actually uses: its own override, else the supplier's default, else Ali FMCG collection. */
 export function methodFor(product: { fulfillmentMethod?: string | null }, supplier: SupplierFulfillmentSettings | null): FulfillmentMethod {
     const m = (product.fulfillmentMethod || supplier?.defaultMethod || 'ATLANTIS_COLLECTION') as FulfillmentMethod;
     return FULFILLMENT_METHODS.includes(m) ? m : 'ATLANTIS_COLLECTION';

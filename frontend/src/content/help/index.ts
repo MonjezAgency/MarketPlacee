@@ -12,7 +12,7 @@ import { troubleshooting } from './articles/troubleshooting';
 import { glossary } from './articles/glossary';
 
 export const CATEGORIES: Category[] = [
-    { id: 'welcome', title: 'Welcome to Atlantis', description: 'What Atlantis is, how buying and selling work, and where to start.', icon: 'compass' },
+    { id: 'welcome', title: 'Welcome to Ali FMCG', description: 'What Ali FMCG is, how buying and selling work, and where to start.', icon: 'compass' },
     { id: 'account', title: 'Account setup & verification', description: 'Signing up, approval, security, identity verification and your business profile.', icon: 'user' },
     { id: 'buyers', title: 'Buyer guide', description: 'Finding products, comparing offers, ordering and following your orders.', icon: 'cart' },
     { id: 'suppliers', title: 'Supplier guide', description: 'Listing products, prices and stock, bulk files, and handling orders.', icon: 'store' },
@@ -22,7 +22,7 @@ export const CATEGORIES: Category[] = [
     { id: 'delivery', title: 'Delivery & fulfillment', description: 'Delivery countries, freight quotes, dispatch and tracking.', icon: 'truck' },
     { id: 'settings', title: 'Account, settings & data', description: 'Notifications, currency, sign-in security, sessions and data downloads.', icon: 'settings' },
     { id: 'troubleshooting', title: 'Troubleshooting & common errors', description: 'What an error means and how to fix it.', icon: 'alert' },
-    { id: 'glossary', title: 'Glossary & best practices', description: 'The terms used on Atlantis, and how to keep catalog data clean.', icon: 'book' },
+    { id: 'glossary', title: 'Glossary & best practices', description: 'The terms used on Ali FMCG, and how to keep catalog data clean.', icon: 'book' },
 ];
 
 export const ARTICLES: Article[] = [

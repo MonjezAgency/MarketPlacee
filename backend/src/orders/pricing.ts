@@ -32,7 +32,7 @@
  *    never above 100% of the products' own stated capacity.
  *  • Minimum order in a mixed load: a product's MOQ applies to that product
  *    (its SKU) in the load. Its variants — the only things that share a
- *    SKU on Atlantis (one Product row = one supplier listing) — count
+ *    SKU on Ali FMCG (one Product row = one supplier listing) — count
  *    together; other products never count toward it. E.g. MOQ 5 pallets:
  *    3 pallets Grape + 2 pallets Lemon of the same product qualify. No supplier /
  *    location compatibility rule is applied (not yet defined by the
@@ -272,7 +272,7 @@ export interface PricedLoad {
 /**
  * Where a mixed load would be dispatched from.
  *  VERIFIED   — every product sits in the same verified warehouse (or the same stated EXW location).
- *  UNVERIFIED — location missing, or same country but different/unknown sites: Atlantis must check first.
+ *  UNVERIFIED — location missing, or same country but different/unknown sites: Ali FMCG must check first.
  *  (Different countries are rejected outright with ORIGIN_MISMATCH.)
  */
 export interface LoadOrigin { status: 'VERIFIED' | 'UNVERIFIED'; label: string | null; country: string | null; unverified: string[] }
@@ -398,7 +398,7 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
     }
     // Mixing several products needs one verified dispatch site; never assumed.
     if (new Set(out.map((l) => l.productId)).size > 1 && origin.status !== 'VERIFIED') {
-        issues.push(`Dispatch location needs verification before these products can ship together (${origin.unverified.join(', ')}). Atlantis will confirm.`);
+        issues.push(`Dispatch location needs verification before these products can ship together (${origin.unverified.join(', ')}). Ali FMCG will confirm.`);
     }
     // What leaves the server is buyer-priced: each line carries the mix markup,
     // so neither the supplier price nor the markup is part of a quote.

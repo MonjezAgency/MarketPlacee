@@ -3,7 +3,7 @@ import { ApiError } from '@/lib/supplier-api';
 
 /**
  * Endpoints of the bulk import wizard per destination. `supplier` imports into
- * the signed-in supplier's catalog; `catalog` imports into the Atlantis Catalog
+ * the signed-in supplier's catalog; `catalog` imports into the Ali FMCG Catalog
  * (staff only, server-enforced in admin-catalog.controller.ts).
  */
 export type ImportTarget = 'supplier' | 'catalog';

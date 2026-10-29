@@ -1,5 +1,5 @@
 /**
- * Atlantis staff roles → admin pages. Least privilege, mirrored by the backend
+ * Ali FMCG staff roles → admin pages. Least privilege, mirrored by the backend
  * @Roles decorators (the backend is the authority; this decides what the sidebar
  * shows and which pages render a "no access" state). Backend tests:
  * backend/src/admin/__tests__/rbac-matrix.spec.ts. Team rules: backend/src/admin/staff-access.ts.
@@ -125,7 +125,7 @@ export const ADMIN_ACTION_ROLES = {
     changeOrderStatus: ['OWNER', 'ADMIN', 'LOGISTICS'] as StaffRole[],
     exportOrders: OA,
     reviewProducts: CATALOG,
-    applyCatalogPhotos: OA,      // use / dismiss photos found by barcode on Atlantis Catalog products
+    applyCatalogPhotos: OA,      // use / dismiss photos found by barcode on Ali FMCG Catalog products
     reviewOffers: CATALOG,
     manageSpecialOffers: OA,
     answerTargetPrices: OA,

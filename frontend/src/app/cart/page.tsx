@@ -38,7 +38,7 @@ function dispatchStrip(rows: { leadTime?: number | null; readyForDispatch?: bool
     const dispatch = allReady ? 'Ready for dispatch' : unknown ? null : `Dispatch lead time up to ${lead} days`;
     // An arrival estimate is shown only when configured, and always marked indicative (no carrier integration yet).
     const left = ARRIVAL_ESTIMATE ? `Estimated arrival ${ARRIVAL_ESTIMATE} (indicative)${dispatch ? ` · ${dispatch}` : ''}` : dispatch;
-    // The product's stated EXW (Ex Works) location — the commercial term stored on Atlantis listings.
+    // The product's stated EXW (Ex Works) location — the commercial term stored on Ali FMCG listings.
     const locs = Array.from(new Set(rows.map((r) => r.exwLocation).filter(Boolean))) as string[];
     return { left, right: locs.length === 1 ? `EXW · ${locs[0]}` : locs.length > 1 ? `EXW · ${locs.length} locations` : null };
 }
@@ -473,7 +473,7 @@ export default function CartPage() {
                                 </div>
                                 <div className="mt-4 rounded-xl ring-1 ring-line p-4 flex gap-3">
                                     <ShieldCheck size={18} className="text-teal shrink-0 mt-0.5" />
-                                    <p className="text-[13px] text-ink-2"><span className="font-medium text-ink">Nothing is charged at checkout.</span> Atlantis re-checks prices, minimums and stock when you place the order, then contacts you to confirm payment and delivery.</p>
+                                    <p className="text-[13px] text-ink-2"><span className="font-medium text-ink">Nothing is charged at checkout.</span> Ali FMCG re-checks prices, minimums and stock when you place the order, then contacts you to confirm payment and delivery.</p>
                                 </div>
                                 {quoteState === 'error' && <p className="mt-3 text-[13px] text-[#DC2626]">{quoteError}</p>}
                                 {legacy && <p className="mt-3 text-[12.5px] text-ink-3">Estimated from product-page prices; the final total is confirmed when you place the order.</p>}

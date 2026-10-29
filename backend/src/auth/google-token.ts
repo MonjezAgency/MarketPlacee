@@ -4,7 +4,7 @@ import axios from 'axios';
  * Google sign-in must be proven by a Google-signed ID token, verified here on
  * the server. The email in the request body is never trusted.
  */
-// Public OAuth client id of the Atlantis web app (it appears in every Google
+// Public OAuth client id of the Ali FMCG web app (it appears in every Google
 // redirect URL; not a secret). GOOGLE_CLIENT_IDS can add/override others.
 const DEFAULT_CLIENT_IDS = ['1019170641470-u17pm1ribq6lv91n5bi8v5glqhvlqsrg.apps.googleusercontent.com'];
 export const allowedGoogleAudiences = () =>

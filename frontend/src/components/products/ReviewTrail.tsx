@@ -8,8 +8,8 @@ import type { ReviewEvent } from '@/lib/admin-api';
 
 /**
  * The review trail of one product (ProductReviewEvent rows): submissions,
- * Atlantis decisions and feedback, oldest first. Staff see team members'
- * names; a supplier sees "Atlantis" and "You". Text is from `productReview`.
+ * Ali FMCG decisions and feedback, oldest first. Staff see team members'
+ * names; a supplier sees "Ali FMCG" and "You". Text is from `productReview`.
  */
 const ICON: Record<string, { icon: React.ElementType; cls: string }> = {
     SUBMITTED: { icon: Send, cls: 'bg-sky-50 text-sky-800 ring-sky-200' },

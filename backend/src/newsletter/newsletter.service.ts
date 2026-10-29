@@ -60,10 +60,10 @@ export class NewsletterService {
 
         const base = process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com';
         const link = `${base}/newsletter/confirm?token=${encodeURIComponent(token)}`;
-        const result = await this.emailService.sendMailDetailed(trimmed, 'Confirm your Atlantis newsletter subscription',
+        const result = await this.emailService.sendMailDetailed(trimmed, 'Confirm your Ali FMCG newsletter subscription',
             `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:28px;color:#0F172A">
               <h2 style="margin:0 0 8px">Confirm your subscription</h2>
-              <p style="color:#475569;line-height:1.6">You asked to receive the Atlantis newsletter: FMCG market updates with new products and offers on the Atlantis marketplace.</p>
+              <p style="color:#475569;line-height:1.6">You asked to receive the Ali FMCG newsletter: FMCG market updates with new products and offers on the Ali FMCG marketplace.</p>
               <p style="margin:24px 0"><a href="${link}" style="background:#0B1F3A;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Confirm subscription</a></p>
               <p style="color:#64748B;font-size:12px">If you didn't ask for this, ignore this email — you won't be subscribed.</p></div>`);
         if (!result.success) {
@@ -102,7 +102,7 @@ export class NewsletterService {
      */
     async sendTestEmail(to: string) {
         if (!to || !isValidEmail(normalizeEmail(to))) throw new BadRequestException('A valid recipient email is required');
-        const html = `<div style="font-family:Arial,sans-serif;padding:24px;max-width:520px;margin:auto;"><h2 style="color:#0F172A;">Atlantis test email</h2><p style="color:#475569;">If you can read this, the Atlantis email pipeline reached your inbox.</p><p style="color:#64748B;font-size:12px;">Sent at ${new Date().toISOString()}</p></div>`;
-        return this.emailService.sendMailDetailed(to, 'Atlantis · Email Pipeline Test', html);
+        const html = `<div style="font-family:Arial,sans-serif;padding:24px;max-width:520px;margin:auto;"><h2 style="color:#0F172A;">Ali FMCG test email</h2><p style="color:#475569;">If you can read this, the Ali FMCG email pipeline reached your inbox.</p><p style="color:#64748B;font-size:12px;">Sent at ${new Date().toISOString()}</p></div>`;
+        return this.emailService.sendMailDetailed(to, 'Ali FMCG · Email Pipeline Test', html);
     }
 }

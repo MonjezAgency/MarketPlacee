@@ -260,7 +260,7 @@ export default function AdminBillingPage() {
                         <div className="space-y-2">
                             <h4 className="text-sm font-black text-[#0A1A2F] dark:text-white uppercase tracking-widest">Audit Protocol</h4>
                             <p className="text-[11px] text-[#555] dark:text-[#999] font-medium leading-relaxed">
-                                All financial data is synchronized with your regional Atlantis Node. VAT profiles are verified against the EU VIES protocol every 24 hours.
+                                All financial data is synchronized with your regional Ali FMCG Node. VAT profiles are verified against the EU VIES protocol every 24 hours.
                             </p>
                         </div>
                         <ul className="space-y-2">

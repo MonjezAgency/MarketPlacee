@@ -197,7 +197,7 @@ export class FinanceController {
     /**
      * OWNER/ADMIN only. Its "gross" is OrderItem.price (the buyer price) and it derives the
      * platform fee, so a supplier must never call it (suppliers never see the buyer price or
-     * the Atlantis margin). No page uses it; the supplier's own figures are in /supplier.
+     * the Ali FMCG margin). No page uses it; the supplier's own figures are in /supplier.
      */
     @Get('reports/supplier-earnings')
     @Roles(Role.ADMIN)

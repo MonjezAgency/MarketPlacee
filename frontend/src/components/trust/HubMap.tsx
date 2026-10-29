@@ -4,7 +4,7 @@ import * as React from 'react';
 import type { PublicHub } from '@/lib/fulfillment';
 
 /**
- * Europe map of verified Atlantis hubs. Leaflet is loaded from cdnjs on
+ * Europe map of verified Ali FMCG hubs. Leaflet is loaded from cdnjs on
  * demand (no bundle cost) with OpenStreetMap tiles. Only hubs the server
  * returns — verified and active — are plotted; nothing else is drawn.
  */
@@ -88,7 +88,7 @@ export function HubMap({ hubs, selected, onSelect, className }: { hubs: PublicHu
     return (
         <div className={className}>
             <style>{'.atl-tiles{filter:grayscale(1) contrast(.9) brightness(1.06)} .atl-pin{background:none;border:0} .leaflet-container{font:inherit;background:#EEF2F5}'}</style>
-            <div ref={el} className="w-full h-full" role="region" aria-label="Map of verified Atlantis hubs in Europe" />
+            <div ref={el} className="w-full h-full" role="region" aria-label="Map of verified Ali FMCG hubs in Europe" />
             {failed && <div className="absolute inset-0 flex items-center justify-center bg-[#EEF2F5] text-[14px] text-ink-3 p-6 text-center">The map couldn’t load. The hub list below has the same information.</div>}
         </div>
     );

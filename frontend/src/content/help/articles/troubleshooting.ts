@@ -43,7 +43,7 @@ export const troubleshooting: Article[] = [
                 'Use the **Set to N** link on the line to set the largest quantity available, or type a smaller quantity.',
                 'If you need more than is in stock, [request a quote](/help/buyers/request-a-quote) or [compare other offers](/help/buyers/compare-offers) for the same barcode.',
             ] },
-            { note: 'Buyers can\'t contact suppliers directly. For stock questions, contact the Atlantis team.', tone: 'info' },
+            { note: 'Buyers can\'t contact suppliers directly. For stock questions, contact the Ali FMCG team.', tone: 'info' },
         ],
         related: ['orders-cart/stock-in-the-cart', 'buyers/compare-offers', 'buyers/request-a-quote'],
     },
@@ -51,7 +51,7 @@ export const troubleshooting: Article[] = [
         slug: 'delivery-country-not-supported',
         category: 'troubleshooting',
         title: '"Delivery to … is not currently supported"',
-        summary: 'The country you chose at checkout isn\'t one Atlantis currently delivers to.',
+        summary: 'The country you chose at checkout isn\'t one Ali FMCG currently delivers to.',
         audience: 'buyer',
         keywords: ['DESTINATION_UNSUPPORTED', 'DESTINATION_REQUIRED', 'country not supported', 'cannot deliver'],
         blocks: [
@@ -201,9 +201,9 @@ export const troubleshooting: Article[] = [
         keywords: ['update file error', 'price update failed', 'atlantis id'],
         blocks: [
             { table: { head: ['Message', 'Fix'], rows: [
-                ['"This Atlantis ID isn\'t one of your products."', 'Don\'t edit the Atlantis ID column. Download your catalog again.'],
+                ['"This Ali FMCG ID isn\'t one of your products."', 'Don\'t edit the Ali FMCG ID column. Download your catalog again.'],
                 ['"No product of yours has this barcode. This file only updates existing products."', 'Create new products with the bulk upload instead.'],
-                ['"Several of your products share this barcode — add the Atlantis ID column to choose one."', 'Keep the Atlantis ID in each row.'],
+                ['"Several of your products share this barcode — add the Ali FMCG ID column to choose one."', 'Keep the Ali FMCG ID in each row.'],
                 ['"Rejected listings can\'t be updated."', 'Remove the row.'],
             ] } },
         ],

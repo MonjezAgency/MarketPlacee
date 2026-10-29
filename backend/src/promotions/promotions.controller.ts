@@ -50,7 +50,7 @@ export class SupplierPromotionsController {
     cancel(@Request() req, @Param('id') id: string, @Body() body: any) { return run(() => this.svc.cancel(actorOf(req), this.scope(req), id, body?.reason)); }
 }
 
-/** Atlantis admins (and the owner, via RolesGuard) — any product; responses carry net and buyer prices. */
+/** Ali FMCG admins (and the owner, via RolesGuard) — any product; responses carry net and buyer prices. */
 @Controller('admin/promotions')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)

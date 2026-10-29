@@ -67,7 +67,7 @@ const CreditCard: React.FC<CreditCardProps> = ({
                     {/* Bottom Info */}
                     <div className="absolute bottom-6 start-6 end-6 flex justify-between items-end text-white">
                         <div className="flex flex-col">
-                            <div className="text-[10px] font-black tracking-widest text-white/40 uppercase">Atlantis Commercial</div>
+                            <div className="text-[10px] font-black tracking-widest text-white/40 uppercase">Ali FMCG Commercial</div>
                             <span className="font-medium tracking-wider text-sm">{cardHolder.toUpperCase()}</span>
                         </div>
                         <div className="flex flex-col items-end">
@@ -95,7 +95,7 @@ const CreditCard: React.FC<CreditCardProps> = ({
 
                     {/* Contact Info */}
                     <div className="absolute bottom-4 start-4 end-16 text-[8px] text-gray-400 text-justify leading-tight">
-                        This card is property of Atlantis Inc. Use subject to terms and conditions. If found, please return to any branch or call support.
+                        This card is property of Ali FMCG Inc. Use subject to terms and conditions. If found, please return to any branch or call support.
                     </div>
                 </div>
             </div>

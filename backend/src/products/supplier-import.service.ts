@@ -11,7 +11,7 @@ import { ImageDiscoveryService } from './image-discovery.service';
 import type { ReviewActor } from './product-review.service';
 
 /**
- * The same import, run by Atlantis staff into the Atlantis Catalog (admin-catalog
+ * The same import, run by Ali FMCG staff into the Ali FMCG Catalog (admin-catalog
  * controller). Rows are owned by the platform account; duplicates are matched
  * against every staff-owned product, never against supplier catalogs, so a
  * supplier's record is never touched. Complete rows are published (the admin
@@ -190,7 +190,7 @@ export class SupplierImportService {
             }
         }
         const where = (it: Item) => `${req.sheets.length > 1 ? `sheet “${it.sheet}” row ${it.built.row}` : `row ${it.built.row}`}${it.page ? ` (page ${it.page})` : ''}`;
-        // Brands: canonical spelling for known ones; brands not on Atlantis are flagged for the supplier to confirm.
+        // Brands: canonical spelling for known ones; brands not on Ali FMCG are flagged for the supplier to confirm.
         const newBrands = applyImportBrands(items.map((it) => it.built), await this.products.brandCatalogFor(supplierId));
 
         // A photo chosen from the barcode search: only for rows without a photo of their own,
@@ -331,7 +331,7 @@ export class SupplierImportService {
             const it = v.built[i];
             const head = { key: r.key, sheet: r.sheet, row: r.row, name: r.name, ean: r.ean, ...(r.page ? { page: r.page } : {}) };
             if (r.state === 'error') { results.push({ ...head, outcome: 'failed', reasons: r.errors.map((e: any) => e.reason) }); continue; }
-            if (r.state === 'skip') { results.push({ ...head, outcome: 'skipped', productId: r.existing?.id, reasons: [catalog ? 'Already in the Atlantis Catalog (you chose to skip these).' : 'Already in your catalog (you chose to skip these).'] }); continue; }
+            if (r.state === 'skip') { results.push({ ...head, outcome: 'skipped', productId: r.existing?.id, reasons: [catalog ? 'Already in the Ali FMCG Catalog (you chose to skip these).' : 'Already in your catalog (you chose to skip these).'] }); continue; }
             if (r.state === 'unchanged') { results.push({ ...head, outcome: 'unchanged', productId: r.existing?.id }); continue; }
             const notes: string[] = [];
             try {

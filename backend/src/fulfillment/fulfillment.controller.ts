@@ -6,7 +6,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { FulfillmentService } from './fulfillment.service';
 
-/** Public: verified Atlantis hubs and the delivery countries (the Warehouses page). */
+/** Public: verified Ali FMCG hubs and the delivery countries (the Warehouses page). */
 @Controller('fulfillment')
 export class FulfillmentPublicController {
     constructor(private readonly svc: FulfillmentService) {}

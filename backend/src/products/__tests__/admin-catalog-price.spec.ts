@@ -2,7 +2,7 @@ import { SupplierUpdatesService, UPDATE_COLUMNS } from '../supplier-updates.serv
 import { AdminCatalogController } from '../admin-catalog.controller';
 
 /**
- * Atlantis Catalog price updates: the same rules as a supplier changing their own
+ * Ali FMCG Catalog price updates: the same rules as a supplier changing their own
  * price (ProductsService.supplierUpdate), applied as the product's staff owner.
  * Supplier products are never touched.
  */
@@ -13,7 +13,7 @@ const CATALOG = [
 const H = UPDATE_COLUMNS.map((c) => c.header);
 const row = (o: Partial<Record<string, string>>) => H.map((h) => o[h] ?? '');
 
-describe('price & stock file, Atlantis Catalog mode', () => {
+describe('price & stock file, Ali FMCG Catalog mode', () => {
     function setup() {
         const prisma: any = { product: { findMany: jest.fn(async ({ where }: any) => CATALOG.filter((p) => (where.supplierId?.in ?? [where.supplierId]).includes(p.supplierId))) } };
         const products: any = { supplierUpdate: jest.fn(async (id: string, _o: string, patch: any) => ({ id, status: 'APPROVED', ...patch })) };
@@ -22,7 +22,7 @@ describe('price & stock file, Atlantis Catalog mode', () => {
     }
     it('matches staff-owned products only and saves each row as its own owner', async () => {
         const { svc, products, notifications } = setup();
-        const out = await svc.commit(['owner-1', 'admin-2'], { headers: H, rows: [row({ 'Atlantis ID': 'c-1', 'New Price per Case': '49.5' }), row({ EAN: '3179730004217', 'New Stock (cases)': '30' }), row({ EAN: '5449000000996', 'New Price per Case': '1' })] });
+        const out = await svc.commit(['owner-1', 'admin-2'], { headers: H, rows: [row({ 'Ali FMCG ID': 'c-1', 'New Price per Case': '49.5' }), row({ EAN: '3179730004217', 'New Stock (cases)': '30' }), row({ EAN: '5449000000996', 'New Price per Case': '1' })] });
         expect(out.summary).toEqual({ total: 3, updated: 2, unchanged: 0, failed: 1 }); // a barcode not in the catalog is never matched elsewhere
         expect(products.supplierUpdate).toHaveBeenCalledWith('c-1', 'owner-1', expect.objectContaining({ supplierCurrency: 'EUR', supplierPrice: 49.5 }), {});
         expect(products.supplierUpdate).toHaveBeenCalledWith('c-2', 'admin-2', expect.objectContaining({ stock: 30 }), {});
@@ -43,7 +43,7 @@ describe('PATCH /admin-catalog/products/:id/price', () => {
     it('sets the net price per case in the chosen currency through the supplier rules; the buyer price comes back from the server', async () => {
         const { ctrl, products } = setup();
         const out = await ctrl.updatePrice('c-1', { price: '49.50', currency: 'eur', basis: 'case' }, req);
-        expect(products.supplierUpdate).toHaveBeenCalledWith('c-1', 'owner-1', { supplierCurrency: 'EUR', supplierPrice: 49.5, changeReason: 'Price updated by Atlantis (admin)' }, {});
+        expect(products.supplierUpdate).toHaveBeenCalledWith('c-1', 'owner-1', { supplierCurrency: 'EUR', supplierPrice: 49.5, changeReason: 'Price updated by Ali FMCG (admin)' }, {});
         expect(out).toMatchObject({ supplierPrice: 49.5, supplierCurrency: 'EUR', buyerPrice: 54.45 });
     });
     it('converts a piece price to the case price with pieces per case', async () => {

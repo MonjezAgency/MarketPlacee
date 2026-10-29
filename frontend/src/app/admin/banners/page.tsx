@@ -58,7 +58,7 @@ export default function HomepageBannerSketchPage() {
                 </div>
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-teal-500">Homepage map</p>
-                    <h1 className="text-3xl font-black tracking-tight">Atlantis Homepage Layout</h1>
+                    <h1 className="text-3xl font-black tracking-tight">Ali FMCG Homepage Layout</h1>
                     <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
                         This is the live sketch of your homepage. Click any section to manage its images —
                         add new ones, reorder them, delete, set static or animated, and control the rotation

@@ -208,7 +208,7 @@ export class ChatService {
   // ─────────────────────────────────────────────────────────────────────────
 
   // Order threads: one per participant (the buyer, or one supplier on the order),
-  // each between that participant and the Atlantis team. A participant only ever
+  // each between that participant and the Ali FMCG team. A participant only ever
   // sees their own thread; staff see every thread. partyId null = the buyer
   // (messages written before supplier threads existed).
 
@@ -245,11 +245,11 @@ export class ChatService {
       include: { sender: { select: { id: true, name: true, role: true } } },
     });
     if (thread.isStaff) {
-      // Atlantis wrote: tell the participant of this thread only.
+      // Ali FMCG wrote: tell the participant of this thread only.
       await this.prisma.notification.create({
         data: {
           userId: thread.partyId,
-          title: thread.kind === 'supplier' ? `Atlantis wrote about order ${ref}` : 'New message about your order',
+          title: thread.kind === 'supplier' ? `Ali FMCG wrote about order ${ref}` : 'New message about your order',
           message: `You have a new message about order ${ref}: "${content.substring(0, 60)}${content.length > 60 ? '…' : ''}"`,
           type: 'INFO',
           data: { orderId, link: thread.kind === 'supplier' ? '/supplier/support?tab=orders' : '/dashboard/support?tab=orders' },

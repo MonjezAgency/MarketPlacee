@@ -35,7 +35,7 @@ function validate(step: number, f: Form): Errors {
         else if (f.confirm !== f.password) e.confirm = 'Passwords don’t match.';
     }
     if (step === 1) {
-        if (!f.role) e.role = 'Choose how you’ll use Atlantis.';
+        if (!f.role) e.role = 'Choose how you’ll use Ali FMCG.';
         if (!f.companyName.trim()) e.companyName = 'Enter your company name.';
         const digits = f.phone.replace(/[\s()-]/g, '');
         if (!/^\d{6,14}$/.test(digits)) e.phone = 'Enter the phone number without the country code (6–14 digits).';
@@ -87,7 +87,7 @@ function RegisterWizard() {
             ...( { businessCity: f.city.trim() || undefined, businessType: f.businessType } as any),
             inviteToken: sp.get('invite') || undefined, locale,
         } as any);
-        if (typeof res === 'string' || !res) { setServerError(typeof res === 'string' ? res : 'We couldn’t reach Atlantis. Check your connection and try again.'); setSubmitting(false); return; }
+        if (typeof res === 'string' || !res) { setServerError(typeof res === 'string' ? res : 'We couldn’t reach Ali FMCG. Check your connection and try again.'); setSubmitting(false); return; }
         // Only now — after the server has issued a code — move to the code screen.
         try { sessionStorage.setItem('atl_verify_email', res.email || f.email.trim().toLowerCase()); } catch { /* ignore */ }
         router.push(`/auth/verify-email?email=${encodeURIComponent(res.email || f.email.trim().toLowerCase())}&sent=${res.deliveryFailed ? 'failed' : '1'}`);
@@ -166,7 +166,7 @@ function RegisterWizard() {
                             <fieldset>
                                 <legend className={authLabel}>Account type</legend>
                                 <div id="f-role" tabIndex={-1} role="radiogroup" aria-describedby="e-role" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 outline-none">
-                                    {([['customer', 'Buyer', 'Source by the pallet or truckload', ShoppingCart], ['supplier', 'Supplier', 'List stock and offers for Atlantis', Warehouse]] as const).map(([v, t, d, Icon]) => (
+                                    {([['customer', 'Buyer', 'Source by the pallet or truckload', ShoppingCart], ['supplier', 'Supplier', 'List stock and offers for Ali FMCG', Warehouse]] as const).map(([v, t, d, Icon]) => (
                                         <label key={v} className={cn('flex items-start gap-3 rounded-xl px-3.5 py-3 ring-1 cursor-pointer transition-colors', f.role === v ? 'ring-2 ring-[#2EC4B6] bg-teal-soft/60' : 'ring-line hover:ring-line-strong')}>
                                             <input type="radio" name="role" value={v} checked={f.role === v} onChange={() => set('role', v)} aria-label={`${t} — ${d}`} className="sr-only" />
                                             <span className={cn('w-9 h-9 shrink-0 rounded-lg flex items-center justify-center', f.role === v ? 'bg-[#0E7C74] text-white' : 'bg-surface-2 text-ink-2')}><Icon size={17} /></span>

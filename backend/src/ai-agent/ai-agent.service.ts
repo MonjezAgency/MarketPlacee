@@ -345,7 +345,7 @@ export class AiAgentService {
                     messages: [
                         {
                             role: 'system',
-                            content: `You are an AI agent for Atlantis B2B Marketplace. A customer has a complaint. Analyze it and suggest 2-3 actionable steps. IMPORTANT: You CANNOT transfer money, change account roles, or delete data. Context about user: ${context}. Respond with JSON: { "analysis": "brief analysis", "suggestedActions": ["action1", "action2"] }`,
+                            content: `You are an AI agent for Ali FMCG B2B Marketplace. A customer has a complaint. Analyze it and suggest 2-3 actionable steps. IMPORTANT: You CANNOT transfer money, change account roles, or delete data. Context about user: ${context}. Respond with JSON: { "analysis": "brief analysis", "suggestedActions": ["action1", "action2"] }`,
                         },
                         { role: 'user', content: complaint },
                     ],
@@ -624,7 +624,7 @@ Return ONLY the JSON. No markdown fences, no commentary.`;
         const truckCalc   = truckTotal   != null ? `${bpp} × ${piecesPerCase} × ${casesPerPallet} × ${palletsPerTruck} = ${(basePerPiece*piecesPerCase*casesPerPallet*palletsPerTruck).toFixed(3)} × ${mContainer} markup = ${truckTotal.toFixed(3)}€` : '';
 
         // 5. Build system prompt
-        const systemPrompt = `You are Atlantis FMCG's smart B2B pricing assistant. Your job is to help buyers understand exact pricing using clear step-by-step calculations.
+        const systemPrompt = `You are Ali FMCG's smart B2B pricing assistant. Your job is to help buyers understand exact pricing using clear step-by-step calculations.
 
 PRODUCT: ${product.name}${product.brand ? ` by ${product.brand}` : ''}
 

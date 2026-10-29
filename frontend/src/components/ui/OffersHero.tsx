@@ -132,7 +132,7 @@ export default function OffersHero() {
                         className="w-full h-full bg-cover bg-center transition-transform duration-[10s] ease-linear scale-100 group-hover:scale-105"
                         style={{ backgroundImage: `url(${slide.image})` }}
                     >
-                        {/* Atlantis Style Overlay */}
+                        {/* Ali FMCG Style Overlay */}
                         <div className="absolute inset-0 bg-gradient-to-r from-[#0A0D12] via-[#0A0D12]/60 to-transparent" />
                         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#0A0D12]" />
                     </div>

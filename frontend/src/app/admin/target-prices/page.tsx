@@ -19,7 +19,7 @@ const TABS = [
 ] as const;
 
 /**
- * Admin → Target prices (/admin/target-prices): the Atlantis sourcing desk's queue.
+ * Admin → Target prices (/admin/target-prices): the Ali FMCG sourcing desk's queue.
  * Data from GET /target-prices (OWNER/ADMIN/MODERATOR/SUPPORT read); answering is
  * PATCH /target-prices/:id/respond (OWNER/ADMIN). Buyer prices only — no supplier price.
  */

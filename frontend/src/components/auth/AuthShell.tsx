@@ -6,13 +6,13 @@ import { Boxes, ShieldCheck, Layers, Sparkles, ListChecks, ChevronDown } from 'l
 import { cn } from '@/lib/utils';
 import { checkPassword } from '@/lib/password-policy';
 
-/** Atlantis wordmark exactly as the storefront header renders it. */
+/** Ali FMCG wordmark exactly as the storefront header renders it. */
 export function AtlantisMark({ className }: { className?: string }) {
     return (
-        <Link href="/" aria-label="Atlantis home" className={cn('inline-flex items-center gap-2.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60', className)}>
+        <Link href="/" aria-label="Ali FMCG home" className={cn('inline-flex items-center gap-2.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60', className)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/atlantis-mark.png" alt="" width={32} height={32} className="w-8 h-8 object-contain rounded-lg" />
-            <span className="text-[18px] font-black tracking-tighter uppercase"><span className="text-heading">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span></span>
+            <span className="text-[18px] font-black tracking-tighter uppercase"><span className="text-heading">ALI&nbsp;</span><span className="text-[#2EC4B6]">FMCG.</span></span>
         </Link>
     );
 }
@@ -34,10 +34,10 @@ export function AuthShell({ children, wide = false }: { children: React.ReactNod
     return (
         <div className="min-h-[100dvh] bg-surface-2 text-start lg:grid lg:grid-cols-[minmax(360px,0.85fr)_minmax(0,1.15fr)] xl:grid-cols-[minmax(420px,0.75fr)_minmax(0,1.25fr)]">
             <aside className="hidden lg:flex flex-col justify-between bg-[#0B1F3A] text-white px-10 xl:px-14 py-10 sticky top-0 h-[100dvh]">
-                <Link href="/" aria-label="Atlantis home" className="inline-flex items-center gap-2.5">
+                <Link href="/" aria-label="Ali FMCG home" className="inline-flex items-center gap-2.5">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/brand/atlantis-mark.png" alt="" width={32} height={32} className="w-8 h-8 object-contain rounded-lg bg-white/95 p-0.5" />
-                    <span className="text-[18px] font-black tracking-tighter uppercase">ATLAN<span className="text-[#2EC4B6]">TIS.</span></span>
+                    <span className="text-[18px] font-black tracking-tighter uppercase">ALI&nbsp;<span className="text-[#2EC4B6]">FMCG.</span></span>
                 </Link>
                 <div className="max-w-[420px]">
                     <p className="text-[13px] font-medium text-[#2EC4B6]">Wholesale FMCG · Europe &amp; Gulf</p>
@@ -51,7 +51,7 @@ export function AuthShell({ children, wide = false }: { children: React.ReactNod
                         ))}
                     </ul>
                 </div>
-                <p className="text-[12px] text-white/45">© {new Date().getFullYear()} Atlantis FMCG · <a href="mailto:Info@atlantisfmcg.com" className="hover:text-white">Info@atlantisfmcg.com</a></p>
+                <p className="text-[12px] text-white/45">© {new Date().getFullYear()} Ali FMCG · <a href="mailto:Info@atlantisfmcg.com" className="hover:text-white">Info@atlantisfmcg.com</a></p>
             </aside>
             <main className="min-h-[100dvh] flex flex-col px-4 sm:px-8 py-6 sm:py-10">
                 <div className="lg:hidden mb-6"><AtlantisMark /></div>

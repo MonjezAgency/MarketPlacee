@@ -20,7 +20,7 @@ export class TwoFaService {
     if (!user) throw new BadRequestException('User not found');
 
     const secret = generateSecret();
-    const otpauthUrl = generateURI({ label: user.email, issuer: 'Atlantis Marketplace', secret });
+    const otpauthUrl = generateURI({ label: user.email, issuer: 'Ali FMCG Marketplace', secret });
     const qrCodeUrl = await QRCode.toDataURL(otpauthUrl);
 
     // Store secret temporarily (not yet enabled — user must verify first)

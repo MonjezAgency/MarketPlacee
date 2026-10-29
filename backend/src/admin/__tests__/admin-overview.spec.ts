@@ -53,7 +53,7 @@ describe('commercial summary', () => {
         const empty = commercialSummary([], range);
         expect(empty.current).toMatchObject({ orderValue: 0, orders: 0, aov: null, margin: null });
     });
-    it('reports the Atlantis margin only when every line has a recorded supplier price', () => {
+    it('reports the Ali FMCG margin only when every line has a recorded supplier price', () => {
         const complete = commercialSummary([order('a', '2026-10-15T00:00:00Z', { totalAmount: 100, lines: [line({ price: 50, quantity: 2, supplierUnitPrice: 40 })] })], range);
         expect(complete.current).toMatchObject({ supplierNet: 80, margin: 20, revenueRecorded: 20, linesWithNet: 1, linesWithoutNet: 0 });
         const partial = commercialSummary([
@@ -102,7 +102,7 @@ describe('payments, refunds and cancellations', () => {
 
 describe('orders requiring action', () => {
     const conf = (supplierId: string, status: string, deadline?: string) => ({ supplierId, termsVersion: 1, status, deadline: deadline ? D(deadline) : null });
-    it('separates what Atlantis must do from what suppliers and buyers still owe', () => {
+    it('separates what Ali FMCG must do from what suppliers and buyers still owe', () => {
         const a = orderAttention([
             { id: 'ready', status: 'PENDING', reviewStatus: 'PENDING_REVIEW', termsVersion: 1, supplierIds: ['s1', 's2'], confirmations: [conf('s1', 'ACCEPTED'), conf('s2', 'ACCEPTED')] },
             { id: 'waiting', status: 'PENDING', reviewStatus: 'PENDING_REVIEW', termsVersion: 1, supplierIds: ['s1'], confirmations: [conf('s1', 'PENDING', '2026-10-25T00:00:00Z')] },
@@ -157,7 +157,7 @@ describe('status breakdown and activity', () => {
         ], 2);
         expect(out.map((x) => x.subject)).toEqual(['B', 'A']);
     });
-    it('carries Atlantis revenue per bucket from covered lines only', () => {
+    it('carries Ali FMCG revenue per bucket from covered lines only', () => {
         const s = commercialSummary([order('a', '2026-10-15T00:00:00Z', { lines: [line({ price: 50, quantity: 2, supplierUnitPrice: 40 }), line({ supplierUnitPrice: null })] })], range);
         expect(s.series.find((b) => b.key === '2026-10-15')).toMatchObject({ revenue: 20, linesWithoutNet: 1 });
     });

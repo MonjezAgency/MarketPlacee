@@ -26,7 +26,7 @@ export const settings: Article[] = [
         slug: 'display-currency',
         category: 'settings',
         title: 'Display currency and brand preferences',
-        summary: 'Show prices in your currency and tell Atlantis which brands you trade.',
+        summary: 'Show prices in your currency and tell Ali FMCG which brands you trade.',
         audience: 'both',
         keywords: ['currency', 'brands', 'preferences', 'personalise'],
         blocks: [
@@ -35,7 +35,7 @@ export const settings: Article[] = [
             { h2: 'Brand preferences' },
             { list: [
                 '**Buyers:** brands you choose are shown first in "New to you" on your Overview.',
-                '**Suppliers:** the brands you supply, saved to your account for the Atlantis team.',
+                '**Suppliers:** the brands you supply, saved to your account for the Ali FMCG team.',
             ] },
         ],
         related: ['payment-invoicing/currencies', 'buyers/find-products'],
@@ -78,7 +78,7 @@ export const settings: Article[] = [
         slug: 'data-downloads',
         category: 'settings',
         title: 'Downloading your data',
-        summary: 'The files you can download from Atlantis: catalog results, your product catalog and invoices.',
+        summary: 'The files you can download from Ali FMCG: catalog results, your product catalog and invoices.',
         audience: 'both',
         keywords: ['export', 'download', 'csv', 'excel', 'data'],
         blocks: [

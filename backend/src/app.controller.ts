@@ -46,7 +46,7 @@ export class AppController {
     }
 
     /**
-     * Tier pricing factors for the storefront. Atlantis staff get the real
+     * Tier pricing factors for the storefront. Ali FMCG staff get the real
      * markups; everyone else gets only the ratio between tiers (case = 1),
      * which together with the buyer case price reproduces buyer prices
      * without revealing the margin. See common/price-privacy.ts.
@@ -105,7 +105,7 @@ export class AppController {
         };
     }
 
-    /** Public contact form — sends an email to the Atlantis team */
+    /** Public contact form — sends an email to the Ali FMCG team */
     @Post('contact')
     @HttpCode(200)
     async contactUs(@Body() dto: ContactDto) {
@@ -115,7 +115,7 @@ export class AppController {
 <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f8fafc;border-radius:12px;">
   <div style="background:#0B1F3A;padding:20px 24px;border-radius:10px 10px 0 0;">
     <h2 style="color:#2EC4B6;margin:0;font-size:18px;">📬 New Contact Form Submission</h2>
-    <p style="color:#94A3B8;margin:4px 0 0;font-size:13px;">Atlantis Marketplace — Contact Request</p>
+    <p style="color:#94A3B8;margin:4px 0 0;font-size:13px;">Ali FMCG Marketplace — Contact Request</p>
   </div>
   <div style="background:#fff;padding:24px;border:1px solid #E5E7EB;border-top:none;border-radius:0 0 10px 10px;">
     <table style="width:100%;border-collapse:collapse;font-size:14px;">

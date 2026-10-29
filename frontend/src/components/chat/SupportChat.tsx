@@ -295,7 +295,7 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
                             )} />
                         </div>
                         <div>
-                            <h3 className="text-sm font-black text-white tracking-tight uppercase">{isSupport ? 'Live Inquirer' : 'Atlantis Support'}</h3>
+                            <h3 className="text-sm font-black text-white tracking-tight uppercase">{isSupport ? 'Live Inquirer' : 'Ali FMCG Support'}</h3>
                         </div>
                     </div>
                     {isSupport && (

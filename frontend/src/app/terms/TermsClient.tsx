@@ -7,7 +7,7 @@ import { FileText, ArrowLeft } from 'lucide-react';
 const SECTIONS = [
     {
         title: '1. Acceptance of Terms',
-        content: `By registering for, accessing, or using the Atlantis platform (the "Platform"), you agree to be bound by these Terms of Service ("Terms"). If you are accepting these Terms on behalf of a company or other legal entity, you represent that you have authority to bind that entity.
+        content: `By registering for, accessing, or using the Ali FMCG platform (the "Platform"), you agree to be bound by these Terms of Service ("Terms"). If you are accepting these Terms on behalf of a company or other legal entity, you represent that you have authority to bind that entity.
 
 If you do not agree to these Terms, you may not access or use the Platform.
 
@@ -15,14 +15,14 @@ These Terms were last updated in April 2026.`,
     },
     {
         title: '2. Platform Description',
-        content: `Atlantis is a B2B wholesale distributor that sells FMCG, beverages and consumer goods directly to business buyers. The Platform facilitates:
+        content: `Ali FMCG is a B2B wholesale distributor that sells FMCG, beverages and consumer goods directly to business buyers. The Platform facilitates:
 
 • Product discovery and sourcing
 • Secure order placement and payment via Stripe escrow
-• Order fulfilment and delivery by Atlantis
+• Order fulfilment and delivery by Ali FMCG
 • Verified business relationships
 
-Atlantis is the seller of record for products listed on the Platform unless otherwise noted on a specific product page.`,
+Ali FMCG is the seller of record for products listed on the Platform unless otherwise noted on a specific product page.`,
     },
     {
         title: '3. Eligibility',
@@ -37,13 +37,13 @@ We reserve the right to refuse access to any entity at our sole discretion.`,
     },
     {
         title: '4. Account Registration and KYC',
-        content: `4.1 All accounts require approval from the Atlantis team before activation.
+        content: `4.1 All accounts require approval from the Ali FMCG team before activation.
 
 4.2 Suppliers must complete full KYC verification (identity documents, business registration, liveness check) before listing products or receiving payments.
 
 4.3 You are responsible for maintaining the security of your account credentials. You must notify us immediately at Info@atlantisfmcg.com if you suspect unauthorized access.
 
-4.4 Atlantis reserves the right to suspend or terminate accounts that provide false information during KYC, violate these Terms, or pose a security or fraud risk.`,
+4.4 Ali FMCG reserves the right to suspend or terminate accounts that provide false information during KYC, violate these Terms, or pose a security or fraud risk.`,
     },
     {
         title: '5. Supplier Obligations',
@@ -57,7 +57,7 @@ We reserve the right to refuse access to any entity at our sole discretion.`,
 • Not list counterfeit, prohibited, or restricted products
 • Keep product listings up to date and remove out-of-stock items promptly
 
-Atlantis reserves the right to remove listings or suspend suppliers that violate these obligations.`,
+Ali FMCG reserves the right to remove listings or suspend suppliers that violate these obligations.`,
     },
     {
         title: '6. Buyer Obligations',
@@ -75,19 +75,19 @@ Atlantis reserves the right to remove listings or suspend suppliers that violate
 
 7.2 When a buyer places an order, payment is held in escrow (Stripe manual capture) until the buyer confirms delivery.
 
-7.3 Upon delivery confirmation, Atlantis releases payment to the Supplier minus the Platform Commission fee.
+7.3 Upon delivery confirmation, Ali FMCG releases payment to the Supplier minus the Platform Commission fee.
 
-7.4 The Platform Commission rate is set by Atlantis and may change with 30 days' notice. The rate applicable at the time of order applies to that order.
+7.4 The Platform Commission rate is set by Ali FMCG and may change with 30 days' notice. The rate applicable at the time of order applies to that order.
 
-7.5 Atlantis does not store card details. All card processing is handled exclusively by Stripe (PCI DSS compliant).
+7.5 Ali FMCG does not store card details. All card processing is handled exclusively by Stripe (PCI DSS compliant).
 
 7.6 Refunds are subject to the outcome of the dispute resolution process (see Section 9).`,
     },
     {
         title: '8. Product Listings and Intellectual Property',
-        content: `8.1 Suppliers retain ownership of their product content but grant Atlantis a worldwide, royalty-free license to display, reproduce, and promote that content on the Platform.
+        content: `8.1 Suppliers retain ownership of their product content but grant Ali FMCG a worldwide, royalty-free license to display, reproduce, and promote that content on the Platform.
 
-8.2 Atlantis retains all intellectual property rights in the Platform itself, including its design, software, and branding.
+8.2 Ali FMCG retains all intellectual property rights in the Platform itself, including its design, software, and branding.
 
 8.3 You may not copy, scrape, or reproduce Platform content without prior written consent.`,
     },
@@ -95,11 +95,11 @@ Atlantis reserves the right to remove listings or suspend suppliers that violate
         title: '9. Disputes',
         content: `9.1 Buyers may open a dispute within 7 days of delivery confirmation if goods are not as described, damaged, or missing.
 
-9.2 Disputes are reviewed by the Atlantis support team. Both parties will be given the opportunity to provide evidence.
+9.2 Disputes are reviewed by the Ali FMCG support team. Both parties will be given the opportunity to provide evidence.
 
-9.3 Atlantis will make a final determination within a reasonable timeframe. This determination may result in a full or partial refund, or release of escrow to the Supplier.
+9.3 Ali FMCG will make a final determination within a reasonable timeframe. This determination may result in a full or partial refund, or release of escrow to the Supplier.
 
-9.4 Atlantis's dispute resolution is a platform service and does not waive any legal rights either party may have.`,
+9.4 Ali FMCG's dispute resolution is a platform service and does not waive any legal rights either party may have.`,
     },
     {
         title: '10. Prohibited Activities',
@@ -116,14 +116,14 @@ Violation of these prohibitions may result in immediate account termination and 
     },
     {
         title: '11. Limitation of Liability',
-        content: `To the maximum extent permitted by applicable law, Atlantis shall not be liable for:
+        content: `To the maximum extent permitted by applicable law, Ali FMCG shall not be liable for:
 
 • Indirect, incidental, or consequential damages arising from use of the Platform
 • Loss of profits, data, or business opportunity
 • Disputes between buyers and suppliers regarding product quality, shipping, or delivery
 • Platform downtime or service interruptions beyond our reasonable control
 
-Our total liability to you shall not exceed the total fees paid by you to Atlantis in the 12 months preceding the claim.
+Our total liability to you shall not exceed the total fees paid by you to Ali FMCG in the 12 months preceding the claim.
 
 Nothing in these Terms excludes liability for death or personal injury caused by negligence, fraud, or any other liability that cannot be excluded under applicable law.`,
     },
@@ -131,7 +131,7 @@ Nothing in these Terms excludes liability for death or personal injury caused by
         title: '12. Termination',
         content: `12.1 You may close your account at any time by contacting Info@atlantisfmcg.com.
 
-12.2 Atlantis may suspend or terminate your account with notice if you violate these Terms, or immediately if we reasonably suspect fraud or illegal activity.
+12.2 Ali FMCG may suspend or terminate your account with notice if you violate these Terms, or immediately if we reasonably suspect fraud or illegal activity.
 
 12.3 Upon termination, your access to the Platform ceases. Outstanding orders and escrow transactions will be handled per these Terms.
 
@@ -149,7 +149,7 @@ EU consumers may also contact the European Online Dispute Resolution platform at
     },
     {
         title: '15. Contact',
-        content: `Atlantis FMCG
+        content: `Ali FMCG
 Email: Info@atlantisfmcg.com
 Platform: marketpl7ce.vercel.app`,
     },
@@ -179,7 +179,7 @@ export default function TermsPage() {
 
                     <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-6 mb-12">
                         <p className="text-sm leading-relaxed">
-                            Please read these Terms of Service carefully before using the Atlantis B2B marketplace. These Terms constitute a legally binding agreement between you and Atlantis FMCG governing your use of the Platform.
+                            Please read these Terms of Service carefully before using the Ali FMCG B2B marketplace. These Terms constitute a legally binding agreement between you and Ali FMCG governing your use of the Platform.
                         </p>
                     </div>
 

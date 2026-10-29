@@ -146,7 +146,7 @@ export class AuthService {
             if (user.status === 'PENDING_APPROVAL') {
                 this.logger.warn(`[AUTH] Login blocked: User ${email} pending approval`);
                 throw new UnauthorizedException(
-                    'Your account is awaiting approval from the Atlantis team — usually within 24 hours. You will receive an email with a link as soon as it goes through. حسابك قيد المراجعة من فريق Atlantis — عادةً خلال 24 ساعة. سيصلك إيميل بمجرد الموافقة.',
+                    'Your account is awaiting approval from the Ali FMCG team — usually within 24 hours. You will receive an email with a link as soon as it goes through. حسابك قيد المراجعة من فريق Ali FMCG — عادةً خلال 24 ساعة. سيصلك إيميل بمجرد الموافقة.',
                 );
             }
             if ((user.status as any) === 'REJECTED') {
@@ -249,7 +249,7 @@ export class AuthService {
         } catch (e: any) {
             // Double submit / race on the unique email: same generic answer.
             if (e?.code === 'P2002' && String(e?.meta?.target || '').includes('email')) return generic;
-            if (e?.code === 'P2002') throw new ConflictException({ code: 'DUPLICATE_FIELD', message: 'That VAT number is already registered. Leave it blank or contact Atlantis.' });
+            if (e?.code === 'P2002') throw new ConflictException({ code: 'DUPLICATE_FIELD', message: 'That VAT number is already registered. Leave it blank or contact Ali FMCG.' });
             throw e;
         }
         this.logger.log(`[AUTH] Sign-up created ${user.id}`);

@@ -7,8 +7,8 @@ import { ArrowLeft, ArrowRight, Shield, Globe, Zap, Users, BarChart3, ShieldChec
 const STATS = [
     { value: 'EUR', label: 'Primary Currency', desc: 'Built for the European market' },
     { value: 'B2B', label: 'Exclusive Focus', desc: 'Business-to-business only' },
-    { value: 'Atlantis', label: 'Direct Seller', desc: 'Sourced & shipped by us' },
-    { value: 'Confirmed', label: 'Before You Pay', desc: 'Supplier-confirmed, Atlantis-approved terms' },
+    { value: 'Ali FMCG', label: 'Direct Seller', desc: 'Sourced & shipped by us' },
+    { value: 'Confirmed', label: 'Before You Pay', desc: 'Supplier-confirmed, Ali FMCG-approved terms' },
 ];
 
 const VALUES = [
@@ -20,8 +20,8 @@ const VALUES = [
     },
     {
         icon: ShieldCheck,
-        title: 'Sourced by Atlantis',
-        desc: 'Every product in our catalog is sourced and quality-checked by the Atlantis team before listing — so you always know what you are buying.',
+        title: 'Sourced by Ali FMCG',
+        desc: 'Every product in our catalog is sourced and quality-checked by the Ali FMCG team before listing — so you always know what you are buying.',
         color: 'text-emerald-500 bg-emerald-500/10',
     },
     {
@@ -65,14 +65,14 @@ export default function AboutPage() {
                             <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
                                 <PackageSearch size={22} className="text-primary" />
                             </div>
-                            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">About Atlantis</p>
+                            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">About Ali FMCG</p>
                         </div>
                         <h1 className="text-4xl md:text-5xl font-black leading-tight mb-6">
                             The B2B Marketplace<br />
                             <span className="text-primary">Built for Trust</span>
                         </h1>
                         <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl">
-                            Atlantis is a B2B wholesale company that sells FMCG, beverages and consumer goods directly to business buyers across Europe and the Gulf. We were founded with a simple belief: business commerce should be as secure and transparent as enterprise banking, and as simple as consumer shopping.
+                            Ali FMCG is a B2B wholesale company that sells FMCG, beverages and consumer goods directly to business buyers across Europe and the Gulf. We were founded with a simple belief: business commerce should be as secure and transparent as enterprise banking, and as simple as consumer shopping.
                         </p>
                     </div>
 
@@ -92,13 +92,13 @@ export default function AboutPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
                             <div>
                                 <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Our Story</p>
-                                <h2 className="text-3xl font-black mb-6">Why We Built Atlantis</h2>
+                                <h2 className="text-3xl font-black mb-6">Why We Built Ali FMCG</h2>
                                 <div className="space-y-4 text-muted-foreground text-sm leading-relaxed">
                                     <p>
                                         Traditional B2B sourcing involves endless email chains, PDF catalogs, wire transfers with no protection, and vendor relationships built on nothing more than hope.
                                     </p>
                                     <p>
-                                        We built Atlantis to change that. Developed by Monjez Company, our platform sells a curated wholesale catalog directly to business buyers in a process where every order is confirmed by the supplier and approved by Atlantis before payment, and every change needs the buyer’s acceptance.
+                                        We built Ali FMCG to change that. Developed by Monjez Company, our platform sells a curated wholesale catalog directly to business buyers in a process where every order is confirmed by the supplier and approved by Ali FMCG before payment, and every change needs the buyer’s acceptance.
                                     </p>
                                     <p>
                                         Headquartered with a focus on Romania and the broader European market, we understand the regulatory requirements, currency considerations, and trust dynamics that make EU B2B commerce unique.
@@ -113,7 +113,7 @@ export default function AboutPage() {
                                 {[
                                     'Buyer places an order request — nothing is charged',
                                     'Supplier explicitly accepts the exact terms',
-                                    'Atlantis approves → buyer receives confirmed terms and payment details',
+                                    'Ali FMCG approves → buyer receives confirmed terms and payment details',
                                     'Goods ship → buyer confirms delivery or reports an issue',
                                     'Dispute? Our team reviews and resolves fairly',
                                 ].map((step, i) => (
@@ -154,7 +154,7 @@ export default function AboutPage() {
                         className="bg-card border border-border/50 rounded-3xl p-12 text-center space-y-6"
                     >
                         <h2 className="text-3xl font-black">Ready to source smarter?</h2>
-                        <p className="text-muted-foreground max-w-md mx-auto">Join verified businesses sourcing FMCG, beverages, and wholesale products on Atlantis.</p>
+                        <p className="text-muted-foreground max-w-md mx-auto">Join verified businesses sourcing FMCG, beverages, and wholesale products on Ali FMCG.</p>
                         <div className="flex items-center justify-center gap-4 flex-wrap">
                             <Link href="/auth/register" className="h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm">
                                 Create Free Account <ArrowRight size={16} />

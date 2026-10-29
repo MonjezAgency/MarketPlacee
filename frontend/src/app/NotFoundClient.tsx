@@ -5,7 +5,7 @@ import { AlertCircle, ArrowLeft, Home } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-// 404 copy must stay professional — Atlantis is a B2B wholesale brand,
+// 404 copy must stay professional — Ali FMCG is a B2B wholesale brand,
 // not a meme account. Bilingual (EN/AR) so it follows the language
 // switcher rather than relying on browser auto-translate.
 export default function NotFound() {

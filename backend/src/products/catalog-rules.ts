@@ -168,8 +168,8 @@ export const REVIEWED_FIELDS = ['name', 'brand', 'category', 'ean', 'images', 'o
 export function statusExplanation(status: string, missing: Missing[], adminNotes?: string | null): string {
     switch (status) {
         case 'DRAFT': return missing.length ? `Draft — not visible to buyers. Still missing: ${missing.map((m) => m.label.toLowerCase()).join(', ')}.` : 'Draft — complete. Submit it for review when ready.';
-        case 'PENDING': return 'Waiting for Atlantis review. Buyers can’t see it yet.';
-        case 'NEEDS_CHANGES': return `Atlantis asked for changes${adminNotes ? `: ${adminNotes}` : '.'} Fix them and resubmit.`;
+        case 'PENDING': return 'Waiting for Ali FMCG review. Buyers can’t see it yet.';
+        case 'NEEDS_CHANGES': return `Ali FMCG asked for changes${adminNotes ? `: ${adminNotes}` : '.'} Fix them and resubmit.`;
         case 'REJECTED': return `Rejected${adminNotes ? `: ${adminNotes}` : '.'} Create a new listing that addresses the reason.`;
         case 'APPROVED': return missing.length ? 'Live, but some required details are missing — update them to keep the listing complete.' : 'Live — buyers can find and order it.';
         default: return status;

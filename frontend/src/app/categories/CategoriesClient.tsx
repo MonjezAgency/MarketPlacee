@@ -274,7 +274,7 @@ function CategoriesContent() {
             apiFetch('/ads?placement=SPONSORED_PRODUCT').then((r) => r.json()),
         ]).then(([b, pr]) => {
             if (b.status === 'fulfilled' && Array.isArray(b.value) && b.value.length) {
-                setSponsoredBrand({ brandName: b.value[0].product?.brand || 'Atlantis', products: b.value.map((d: any) => d.product) });
+                setSponsoredBrand({ brandName: b.value[0].product?.brand || 'Ali FMCG', products: b.value.map((d: any) => d.product) });
             }
             if (pr.status === 'fulfilled' && Array.isArray(pr.value)) setSponsoredProducts(pr.value.map((d: any) => d.product).filter(Boolean));
         });

@@ -272,7 +272,7 @@ export class OrdersService {
                     }
                     throw e;
                 }
-                // Supplier's own price for one ordered unit (no Atlantis margin) — for supplier views only.
+                // Supplier's own price for one ordered unit (no Ali FMCG margin) — for supplier views only.
                 // The supplier funds the discount: their net for the line drops by the same % (applied once).
                 const supplierUnitPrice = round2(basePerCase(p, markups) * offerFactor(applied.percent) * casesInUnit(p, priced.tier));
                 const promotion = applied.source === 'PROMOTION' && promo ? { id: promo.id, discountPercent: promo.discountPercent, endsAt: promo.endsAt } : null;
@@ -370,7 +370,7 @@ export class OrdersService {
             }
         }
 
-        // Destination first: an order to a country Atlantis doesn't deliver to is refused here,
+        // Destination first: an order to a country Ali FMCG doesn't deliver to is refused here,
         // whatever the client did (checkout also checks it before the review step).
         const address = cleanAddress(opts.shippingAddress);
         if (!address) throw new BadRequestException({ code: 'DESTINATION_REQUIRED', message: 'Enter the delivery address (including the country) before placing the order.' });
@@ -411,7 +411,7 @@ export class OrdersService {
                         shippingCompany: shippingCompany ?? null,
                         customerShippingCompany: shippingCompany ?? null,
                         // Freight comes only from the server's fulfilment calculation (all routes priced);
-                        // otherwise Atlantis quotes it after the order. A client figure is never stored.
+                        // otherwise Ali FMCG quotes it after the order. A client figure is never stored.
                         shippingCost: quote.fulfillment?.status === 'priced' ? quote.fulfillment.freightTotal : null,
                         fulfillment: quote.fulfillment ?? undefined,
                         reviewStatus: 'PENDING_REVIEW',
@@ -442,7 +442,7 @@ export class OrdersService {
                 });
                 // Coupon redemption: atomic usage-limit check + per-buyer limit + one record per order (rolls the order back if refused).
                 if (quote.couponApplied) await recordRedemption(tx, quote.couponApplied, created.id, customerId);
-                // Every supplier on the order must explicitly accept these exact terms before Atlantis can approve.
+                // Every supplier on the order must explicitly accept these exact terms before Ali FMCG can approve.
                 const deadline = new Date(Date.now() + (await this.confirmHours()) * 3600_000);
                 const supplierIds = [...new Set(quote.lines.map((l: any) => l.supplierId).filter(Boolean))] as string[];
                 if (supplierIds.length) await tx.orderSupplierConfirmation.createMany({ data: supplierIds.map((supplierId) => ({ orderId: created.id, supplierId, termsVersion: 1, deadline })) });
@@ -767,7 +767,7 @@ export class OrdersService {
 
         return orders.map(order => {
             // Privacy mask: suppliers should NOT see the customer's
-            // real name or full email. Atlantis is the principal in
+            // real name or full email. Ali FMCG is the principal in
             // the transaction; the supplier ships to the warehouse
             // address, not the customer. We surface a redacted form
             // so the supplier can still differentiate orders in the
@@ -779,7 +779,7 @@ export class OrdersService {
                 raw ? raw.replace(/^(.{2}).*@/, '$1***@') : '';
             const allMine = (order as any)._allItems?.every((i: any) => i.product?.supplierId === supplierId && !i.mixedLoadId) ?? false;
             // Supplier views use the supplier's own prices only — never the buyer
-            // price or the order total (which would reveal the Atlantis margin).
+            // price or the order total (which would reveal the Ali FMCG margin).
             const values = order.items.map((i: any) => supplierLineValue(i));
             const subtotal = Math.round(values.reduce((s: number, v) => s + v.total, 0) * 100) / 100;
             const hist = ((order as any).history || []) as any[];
@@ -796,10 +796,10 @@ export class OrdersService {
             // Confirmation workflow, from this supplier's side only.
             workflow: workflowOrder ? {
                 reviewStatus: o.reviewStatus, termsVersion: o.termsVersion, myConfirmation: mine ? { status: mineStatus, deadline: mine.deadline, decidedAt: mine.decidedAt, note: mine.note } : null,
-                label: mineStatus === 'ACCEPTED' && o.reviewStatus === 'PENDING_REVIEW' ? 'Accepted — awaiting Atlantis approval'
+                label: mineStatus === 'ACCEPTED' && o.reviewStatus === 'PENDING_REVIEW' ? 'Accepted — awaiting Ali FMCG approval'
                     : mineStatus === 'PENDING' && o.reviewStatus === 'PENDING_REVIEW' ? 'Your confirmation is needed'
                         : mineStatus === 'EXPIRED' ? 'Confirmation time passed' : mineStatus === 'REJECTED' ? 'You rejected these terms'
-                            : o.reviewStatus === 'APPROVED' ? 'Approved by Atlantis' : o.reviewStatus === 'REJECTED' ? 'Rejected' : null,
+                            : o.reviewStatus === 'APPROVED' ? 'Approved by Ali FMCG' : o.reviewStatus === 'REJECTED' ? 'Rejected' : null,
                 terms: terms ? supplierView({ ...terms, version: o.termsVersion }, supplierId) : null,
             } : null,
             // Value of THIS supplier's lines at the supplier's own prices (EUR).
@@ -893,10 +893,10 @@ export class OrdersService {
             if (prefs.orderUpdates === false || !s.email) continue;
             const mine = lines.filter((l) => l.supplierId === s.id);
             const rows = mine.map((l) => `<tr><td style="padding:6px 0;color:#0F172A">${esc(l.name)}</td><td style="padding:6px 0;text-align:right;color:#334155">${l.quantity} × ${l.tier === 'carton' ? 'case' : esc(l.tier)}</td></tr>`).join('');
-            // No buyer identity in the email — the supplier ships via Atlantis.
+            // No buyer identity in the email — the supplier ships via Ali FMCG.
             const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:28px;color:#0F172A">
                 <h2 style="margin:0 0 8px">New order #${ref}</h2>
-                <p style="color:#475569;line-height:1.6;margin:0 0 16px">A buyer ordered your products. Please confirm or decline it in your Atlantis supplier workspace.</p>
+                <p style="color:#475569;line-height:1.6;margin:0 0 16px">A buyer ordered your products. Please confirm or decline it in your Ali FMCG supplier workspace.</p>
                 <table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table>
                 <p style="margin:24px 0"><a href="${base}/supplier/orders?view=action" style="background:#0B1F3A;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Review order</a></p>
                 <p style="color:#94A3B8;font-size:12px">You can turn off order emails in Settings → Notifications.</p></div>`;
@@ -925,7 +925,7 @@ export class OrdersService {
     /**
      * Supplier rejects the current terms, with a reason. A single-supplier order
      * is cancelled (stock returned); on a shared order the rejection is recorded
-     * and Atlantis decides — amend the order or reject it.
+     * and Ali FMCG decides — amend the order or reject it.
      */
     async supplierReject(orderId: string, supplierId: string, reason: string) {
         const text = String(reason || '').trim();
@@ -936,7 +936,7 @@ export class OrdersService {
         if ((order as any).reviewStatus === 'LEGACY') {
             if (othersOnOrder) {
                 this.notificationsService.notifyAdmins('Supplier can’t fulfil part of an order', `Order #${orderId.slice(-8).toUpperCase()}: a supplier asked to decline their lines. Reason: ${text.slice(0, 300)}`, 'WARNING', { orderId, supplierId, kind: 'ORDER_SUPPLIER_DECLINED_LINES', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, reason: text.slice(0, 300) } }).catch(() => {});
-                throw new ConflictException({ code: 'SHARED_ORDER', message: 'This order also contains other suppliers’ products, so it can’t be declined from here. We’ve told the Atlantis team — they will contact you.' });
+                throw new ConflictException({ code: 'SHARED_ORDER', message: 'This order also contains other suppliers’ products, so it can’t be declined from here. We’ve told the Ali FMCG team — they will contact you.' });
             }
             return this.internalUpdateStatus(orderId, OrderStatus.CANCELLED, supplierId, `Declined by supplier: ${text.slice(0, 500)}`, AWAITING_SUPPLIER);
         }
@@ -1004,13 +1004,13 @@ export class OrdersService {
     /** Record one supplier's decision on the current terms version. */
     private async decide(order: { id: string; status: string; reviewStatus: string; termsVersion: number }, supplierId: string, decision: 'ACCEPTED' | 'REJECTED', note?: string) {
         if (order.reviewStatus !== 'PENDING_REVIEW' || !['PENDING', 'PAID'].includes(order.status)) {
-            throw new ConflictException({ code: 'NOT_AWAITING_SUPPLIER', message: order.reviewStatus === 'APPROVED' ? 'This order is already approved by Atlantis.' : 'This order isn’t waiting for your confirmation.' });
+            throw new ConflictException({ code: 'NOT_AWAITING_SUPPLIER', message: order.reviewStatus === 'APPROVED' ? 'This order is already approved by Ali FMCG.' : 'This order isn’t waiting for your confirmation.' });
         }
         const conf = await this.prisma.orderSupplierConfirmation.findUnique({ where: { orderId_supplierId_termsVersion: { orderId: order.id, supplierId, termsVersion: order.termsVersion } } });
         if (!conf) throw new ConflictException({ code: 'NO_CONFIRMATION', message: 'There is nothing for you to confirm on this order.' });
         if (conf.status === 'PENDING' && conf.deadline && conf.deadline.getTime() < Date.now()) {
             await this.prisma.orderSupplierConfirmation.update({ where: { id: conf.id }, data: { status: 'EXPIRED' } });
-            throw new ConflictException({ code: 'CONFIRMATION_EXPIRED', message: 'The time to confirm this order has passed. Atlantis will contact you if the buyer still wants it.' });
+            throw new ConflictException({ code: 'CONFIRMATION_EXPIRED', message: 'The time to confirm this order has passed. Ali FMCG will contact you if the buyer still wants it.' });
         }
         if (conf.status !== 'PENDING') throw new ConflictException({ code: 'ALREADY_DECIDED', message: `You already ${conf.status === 'ACCEPTED' ? 'accepted' : 'answered'} these terms.` });
         // Only a still-pending row changes: a double click can't decide twice.
@@ -1030,7 +1030,7 @@ export class OrdersService {
     }
 
     /**
-     * Atlantis approves the order. Only possible when every supplier accepted
+     * Ali FMCG approves the order. Only possible when every supplier accepted
      * the current terms in time. The approved terms are frozen; the order
      * becomes Confirmed and the buyer gets the terms and payment instructions.
      */
@@ -1042,18 +1042,18 @@ export class OrdersService {
         const terms = this.termsFromOrder(order);
         const moved = await this.prisma.order.updateMany({ where: { id: orderId, reviewStatus: 'PENDING_REVIEW', termsVersion: order.termsVersion }, data: { reviewStatus: 'APPROVED', reviewedAt: new Date(), reviewedById: adminId, reviewNote: note ? String(note).slice(0, 1000) : null, termsSnapshot: { ...terms, hash: termsHash(terms), approvedAt: new Date().toISOString() } as any } });
         if (!moved.count) throw new ConflictException({ code: 'ORDER_CHANGED', message: 'This order changed while you were reviewing it. Refresh and try again.' });
-        const updated = await this.internalUpdateStatus(orderId, OrderStatus.PROCESSING, adminId, `Approved by Atlantis (terms v${order.termsVersion})${note ? `: ${String(note).slice(0, 300)}` : ''}`, [OrderStatus.PENDING, OrderStatus.PAID], { viaApproval: true });
+        const updated = await this.internalUpdateStatus(orderId, OrderStatus.PROCESSING, adminId, `Approved by Ali FMCG (terms v${order.termsVersion})${note ? `: ${String(note).slice(0, 300)}` : ''}`, [OrderStatus.PENDING, OrderStatus.PAID], { viaApproval: true });
         const needsBuyer = buyerMustAccept({ ...order, reviewStatus: 'APPROVED' });
         if (order.customer?.id) {
             this.notificationsService.create(order.customer.id, `Order #${orderId.slice(-8).toUpperCase()} confirmed`,
                 needsBuyer ? 'The confirmed terms differ from what you submitted (for example the delivery charge). Review and accept them on the order page.'
-                    : 'Every supplier confirmed and Atlantis approved your order. The Atlantis team will send payment details.',
+                    : 'Every supplier confirmed and Ali FMCG approved your order. The Ali FMCG team will send payment details.',
                 'INFO', { orderId, kind: needsBuyer ? 'ORDER_CONFIRMED_ACCEPT' : 'ORDER_CONFIRMED', params: { ref: `#${orderId.slice(-8).toUpperCase()}` } }).catch(() => {});
         }
         return updated;
     }
 
-    /** Atlantis rejects the order (cancelled, stock returned, everyone told). */
+    /** Ali FMCG rejects the order (cancelled, stock returned, everyone told). */
     async rejectOrder(orderId: string, adminId: string, reason: string) {
         const text = String(reason || '').trim();
         if (text.length < 5) throw new BadRequestException({ code: 'REASON_REQUIRED', message: 'Give a reason the buyer and suppliers will see (at least 5 characters).' });
@@ -1062,7 +1062,7 @@ export class OrdersService {
         if (!['PENDING', 'PAID'].includes(order.status)) throw new ConflictException({ code: 'CANNOT_REJECT', message: 'Only orders awaiting confirmation can be rejected; cancel a confirmed order instead.' });
         await this.prisma.order.update({ where: { id: orderId }, data: { reviewStatus: 'REJECTED', reviewedAt: new Date(), reviewedById: adminId, reviewNote: text.slice(0, 1000) } });
         await this.prisma.orderSupplierConfirmation.updateMany({ where: { orderId, status: 'PENDING' }, data: { status: 'SUPERSEDED' } });
-        return this.internalUpdateStatus(orderId, OrderStatus.CANCELLED, adminId, `Rejected by Atlantis: ${text.slice(0, 500)}`);
+        return this.internalUpdateStatus(orderId, OrderStatus.CANCELLED, adminId, `Rejected by Ali FMCG: ${text.slice(0, 500)}`);
     }
 
     /** Ask suppliers again: pending or expired confirmations get a new deadline. */
@@ -1073,12 +1073,12 @@ export class OrdersService {
         const r = await this.prisma.orderSupplierConfirmation.updateMany({ where: { orderId, termsVersion: order.termsVersion, status: { in: ['PENDING', 'EXPIRED'] } }, data: { status: 'PENDING', deadline } });
         const waiting = await this.prisma.orderSupplierConfirmation.findMany({ where: { orderId, termsVersion: order.termsVersion, status: 'PENDING' }, select: { supplierId: true } });
         for (const w of waiting) this.notificationsService.create(w.supplierId, 'Please confirm an order', `Order #${orderId.slice(-8).toUpperCase()} is waiting for your confirmation.`, 'INFO', { orderId, kind: 'ORDER_CONFIRM_REQUEST', params: { ref: `#${orderId.slice(-8).toUpperCase()}` } }).catch(() => {});
-        await this.log(orderId, order.status, adminId, `Atlantis asked ${r.count} supplier${r.count === 1 ? '' : 's'} to confirm again (deadline ${deadline.toISOString().slice(0, 16)}Z)`);
+        await this.log(orderId, order.status, adminId, `Ali FMCG asked ${r.count} supplier${r.count === 1 ? '' : 's'} to confirm again (deadline ${deadline.toISOString().slice(0, 16)}Z)`);
         return { requested: r.count, deadline };
     }
 
     /**
-     * Atlantis changes material terms before approval: a line's quantity (down
+     * Ali FMCG changes material terms before approval: a line's quantity (down
      * only — stock is returned) or buyer unit price. Creates a new terms
      * version that the affected suppliers must accept again.
      */
@@ -1117,7 +1117,7 @@ export class OrdersService {
                     await tx.orderItem.update({ where: { id: it.id }, data });
                     changed = true;
                     // A supplier confirms again only when their part changed (quantity); the buyer
-                    // price includes the Atlantis margin and never changes the supplier's net price.
+                    // price includes the Ali FMCG margin and never changes the supplier's net price.
                     if (data.quantity !== undefined && it.product?.supplierId) affected.add(it.product.supplierId);
                 }
             }
@@ -1137,7 +1137,7 @@ export class OrdersService {
             await tx.orderStatusHistory.create({ data: { orderId, previousStatus: order.status, newStatus: order.status, changedById: adminId, reason: `Terms amended to v${version}: ${reason.slice(0, 500)}` } });
         });
         for (const sid of affected) this.notificationsService.create(sid, 'Order changed — please confirm again', `Order #${orderId.slice(-8).toUpperCase()} was changed: ${reason.slice(0, 200)}`, 'WARNING', { orderId, kind: 'ORDER_CHANGED_SUPPLIER', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, reason: reason.slice(0, 200) } }).catch(() => {});
-        if (order.customer?.id) this.notificationsService.create(order.customer.id, `Order #${orderId.slice(-8).toUpperCase()} changed`, `Atlantis changed your order before confirming it: ${reason.slice(0, 200)}. You’ll be asked to accept the new terms once the supplier confirms.`, 'WARNING', { orderId, kind: 'ORDER_CHANGED_BUYER', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, reason: reason.slice(0, 200) } }).catch(() => {});
+        if (order.customer?.id) this.notificationsService.create(order.customer.id, `Order #${orderId.slice(-8).toUpperCase()} changed`, `Ali FMCG changed your order before confirming it: ${reason.slice(0, 200)}. You’ll be asked to accept the new terms once the supplier confirms.`, 'WARNING', { orderId, kind: 'ORDER_CHANGED_BUYER', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, reason: reason.slice(0, 200) } }).catch(() => {});
         return this.workflowForAdmin(orderId);
     }
 
@@ -1154,7 +1154,7 @@ export class OrdersService {
         return { id: orderId, buyerAcceptedVersion: order.termsVersion };
     }
 
-    /** Mark overdue supplier confirmations expired and tell Atlantis (run hourly; reads also check deadlines). */
+    /** Mark overdue supplier confirmations expired and tell Ali FMCG (run hourly; reads also check deadlines). */
     async expireStaleConfirmations(now = new Date()) {
         const stale = await this.prisma.orderSupplierConfirmation.findMany({ where: { status: 'PENDING', deadline: { lt: now }, order: { reviewStatus: 'PENDING_REVIEW' } }, select: { id: true, orderId: true } });
         if (!stale.length) return 0;
@@ -1201,7 +1201,7 @@ export class OrdersService {
         };
     }
 
-    // ─── Inspections (records of inspections Atlantis actually performed) ───
+    // ─── Inspections (records of inspections Ali FMCG actually performed) ───
 
     private static INSPECTION_STATUSES = ['SCHEDULED', 'PASSED', 'PASSED_WITH_FINDINGS', 'FAILED'];
     private static RESOLUTIONS = ['PENDING', 'ACCEPTED', 'ACCEPTED_WITH_DISCOUNT', 'PARTIALLY_ACCEPTED', 'REJECTED'];
@@ -1344,7 +1344,7 @@ export class OrdersService {
             throw new ConflictException({ code: 'INVALID_TRANSITION', message: `This order is already ${STATUS_LABELS[previousStatus] || previousStatus}.`, status: previousStatus });
         }
         assertTransition(previousStatus, status);
-        // Workflow orders can't skip supplier acceptance, Atlantis approval or the buyer's acceptance of changed terms.
+        // Workflow orders can't skip supplier acceptance, Ali FMCG approval or the buyer's acceptance of changed terms.
         const blocked = workflowBlocker(order as any, status, opts);
         if (blocked) throw new ConflictException({ code: 'APPROVAL_REQUIRED', message: blocked });
 

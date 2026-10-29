@@ -4,7 +4,7 @@ import { PrismaService } from '../common/prisma.service';
 /**
  * Review trail of a product listing (ProductReviewEvent). One row per
  * submission, decision or feedback message, so a supplier can read exactly
- * what Atlantis asked for and Atlantis can see what happened before — even
+ * what Ali FMCG asked for and Ali FMCG can see what happened before — even
  * after `adminNotes` is overwritten or cleared by a resubmission.
  *
  * Writing a row never changes the product; the review lifecycle itself stays
@@ -61,7 +61,7 @@ export class ProductReviewService {
 
     /**
      * Events for one product, oldest first. `viewer` decides how much identity
-     * is shown: staff see who on the team acted; a supplier only sees "Atlantis".
+     * is shown: staff see who on the team acted; a supplier only sees "Ali FMCG".
      */
     async history(productId: string, viewer: 'staff' | 'supplier'): Promise<ReviewEventView[]> {
         const rows = await this.prisma.productReviewEvent.findMany({

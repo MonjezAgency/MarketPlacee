@@ -78,7 +78,7 @@ export default function SupplierOffersPage() {
             // /products/my-products returns ONLY this supplier's listings
             // (any status). We filter client-side to APPROVED — a
             // supplier can only post offers on products they uploaded
-            // AND that have already been approved by Atlantis.
+            // AND that have already been approved by Ali FMCG.
             const [oRes, pRes] = await Promise.all([
                 apiFetch('/offers/mine'),
                 apiFetch('/products/my-products'),

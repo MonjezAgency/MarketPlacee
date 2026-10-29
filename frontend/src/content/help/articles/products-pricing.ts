@@ -46,8 +46,8 @@ export const productsPricing: Article[] = [
             { h2: 'For suppliers' },
             { list: [
                 'You enter your own price per case or per piece, in your currency: EUR, USD, GBP, EGP, AED, SAR, KWD, QAR, TRY, INR or RON.',
-                'Prices in other currencies are converted to EUR with Atlantis\'s conversion table, not live market rates.',
-                'The buyer price includes the Atlantis margin. You always see your own price; buyers never see it.',
+                'Prices in other currencies are converted to EUR with Ali FMCG\'s conversion table, not live market rates.',
+                'The buyer price includes the Ali FMCG margin. You always see your own price; buyers never see it.',
                 'Price changes apply immediately and are recorded in the product history.',
             ] },
         ],
@@ -57,11 +57,11 @@ export const productsPricing: Article[] = [
         slug: 'barcodes',
         category: 'products-pricing',
         title: 'Barcodes (EAN / GTIN)',
-        summary: 'Which barcode formats Atlantis accepts, how they are checked, and why the barcode matters.',
+        summary: 'Which barcode formats Ali FMCG accepts, how they are checked, and why the barcode matters.',
         audience: 'both',
         keywords: ['ean', 'gtin', 'upc', 'barcode', 'check digit', 'link code'],
         blocks: [
-            { p: 'Every product needs a barcode. Atlantis uses it to identify the product, to group offers for the same item, and to find registered photos.' },
+            { p: 'Every product needs a barcode. Ali FMCG uses it to identify the product, to group offers for the same item, and to find registered photos.' },
             { h2: 'Accepted formats' },
             { table: { head: ['Format', 'Digits'], rows: [['EAN-8', '8'], ['UPC-A', '12'], ['EAN-13', '13'], ['GTIN-14', '14']] } },
             { h2: 'Checks' },
@@ -97,7 +97,7 @@ export const productsPricing: Article[] = [
         slug: 'offers-and-deals',
         category: 'products-pricing',
         title: 'Offers, deals and promo codes',
-        summary: 'The kinds of discounts you may see on Atlantis and where they appear.',
+        summary: 'The kinds of discounts you may see on Ali FMCG and where they appear.',
         audience: 'buyer',
         keywords: ['discount', 'offer', 'deal', 'coupon', 'promo', 'sale'],
         blocks: [

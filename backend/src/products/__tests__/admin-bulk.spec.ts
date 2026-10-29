@@ -16,7 +16,7 @@ describe('planBulk', () => {
         expect(why).toEqual({ b: 'ALREADY_APPROVED', c: 'NOT_SUBMITTED', d: 'CLOSED', e: 'ALREADY_CHANGES', f: 'INCOMPLETE', g: 'CLOSED', zz: 'NOT_FOUND' });
         expect(out.skipped.find((s) => s.id === 'f')!.detail).toEqual(['Product image']);
     });
-    it('publishes complete Atlantis Catalog drafts', () => {
+    it('publishes complete Ali FMCG Catalog drafts', () => {
         const draft = { ...cat('d'), status: 'DRAFT' };
         const bare = { ...cat('b'), status: 'DRAFT', product: { ...complete, brand: '' } };
         const out = planBulk('approve', ['d', 'b', 'live'], [draft, bare, cat('live')]);

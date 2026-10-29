@@ -256,7 +256,7 @@ export class ImageLookupService {
         };
     }
 
-    /** Copy an accepted candidate into Atlantis storage. Only lookup-source hosts are allowed. */
+    /** Copy an accepted candidate into Ali FMCG storage. Only lookup-source hosts are allowed. */
     async accept(url: string, fetcher: typeof fetch = fetch): Promise<{ url: string }> {
         let u: URL;
         try { u = new URL(url); } catch { throw new BadRequestException('Invalid image link.'); }

@@ -15,9 +15,9 @@ import { Badge, Button, Card, ConfirmProvider, EmptyState, ErrorState, PRODUCT_S
 import { categoryLabel, statusLabel } from '@/components/supplier/import/types';
 
 /**
- * Admin → Products → Atlantis Catalog (/admin/products/catalog) or Supplier
+ * Admin → Products → Ali FMCG Catalog (/admin/products/catalog) or Supplier
  * Submissions (/admin/products/submissions). One workspace, a fixed scope per
- * route, never mixed: Atlantis Catalog = products owned by staff accounts,
+ * route, never mixed: Ali FMCG Catalog = products owned by staff accounts,
  * Supplier Submissions = everything suppliers created. Counts, facets and pages
  * come from GET /products/admin/list (backend/src/products/catalog-scope.ts).
  * Supplier submissions are reviewed here, never edited (server-enforced).

@@ -94,7 +94,7 @@ export default defineSection('adminCoupons', [
         emptyTitle: 'No coupons yet',
         emptyBody: 'Create a code to give buyers a discount at checkout.',
         resultCount: '{count, plural, one {# coupon shown} other {# coupons shown}}',
-        howItWorks: 'How codes work: the discount comes off the eligible goods after any offer or special-offer discount, once per order, and never more than those goods. It is paid from the Atlantis margin, so supplier net prices don’t change. Delivery charges aren’t discounted. Times are stored in UTC.',
+        howItWorks: 'How codes work: the discount comes off the eligible goods after any offer or special-offer discount, once per order, and never more than those goods. It is paid from the Ali FMCG margin, so supplier net prices don’t change. Delivery charges aren’t discounted. Times are stored in UTC.',
 
         createTitle: 'Create coupon',
         createDesc: 'Set the code, the discount, what it applies to and when it can be used.',
@@ -295,7 +295,7 @@ export default defineSection('adminCoupons', [
         emptyTitle: 'لا توجد قسائم بعد',
         emptyBody: 'أنشئ رمزًا لمنح المشترين خصمًا عند إتمام الطلب.',
         resultCount: '{count, plural, zero {لا قسائم معروضة} one {قسيمة واحدة معروضة} two {قسيمتان معروضتان} few {# قسائم معروضة} many {# قسيمة معروضة} other {# قسيمة معروضة}}',
-        howItWorks: 'كيف تعمل الرموز: يُخصم المبلغ من البضائع المؤهلة بعد أي خصم عرض أو عرض خاص، مرة واحدة لكل طلب، ولا يتجاوز قيمة تلك البضائع أبدًا. يُموَّل من هامش Atlantis، فلا تتغير أسعار المورّد الصافية. رسوم التوصيل لا تُخصم. تُحفظ الأوقات بالتوقيت العالمي (UTC).',
+        howItWorks: 'كيف تعمل الرموز: يُخصم المبلغ من البضائع المؤهلة بعد أي خصم عرض أو عرض خاص، مرة واحدة لكل طلب، ولا يتجاوز قيمة تلك البضائع أبدًا. يُموَّل من هامش Ali FMCG، فلا تتغير أسعار المورّد الصافية. رسوم التوصيل لا تُخصم. تُحفظ الأوقات بالتوقيت العالمي (UTC).',
 
         createTitle: 'إنشاء قسيمة',
         createDesc: 'حدّد الرمز والخصم وما ينطبق عليه ومتى يمكن استخدامه.',
@@ -496,7 +496,7 @@ export default defineSection('adminCoupons', [
         emptyTitle: 'Aucun coupon pour l’instant',
         emptyBody: 'Créez un code pour offrir une remise aux acheteurs lors du paiement.',
         resultCount: '{count, plural, one {# coupon affiché} other {# coupons affichés}}',
-        howItWorks: 'Fonctionnement : la remise s’applique aux marchandises éligibles après toute remise d’offre ou d’offre spéciale, une fois par commande, sans jamais dépasser ces marchandises. Elle est financée par la marge Atlantis : les prix nets des fournisseurs ne changent pas. Les frais de livraison ne sont pas remisés. Les heures sont enregistrées en UTC.',
+        howItWorks: 'Fonctionnement : la remise s’applique aux marchandises éligibles après toute remise d’offre ou d’offre spéciale, une fois par commande, sans jamais dépasser ces marchandises. Elle est financée par la marge Ali FMCG : les prix nets des fournisseurs ne changent pas. Les frais de livraison ne sont pas remisés. Les heures sont enregistrées en UTC.',
 
         createTitle: 'Créer un coupon',
         createDesc: 'Définissez le code, la remise, ce à quoi elle s’applique et quand elle peut être utilisée.',
@@ -697,7 +697,7 @@ export default defineSection('adminCoupons', [
         emptyTitle: 'Încă nu există cupoane',
         emptyBody: 'Creați un cod pentru a oferi cumpărătorilor o reducere la finalizarea comenzii.',
         resultCount: '{count, plural, one {# cupon afișat} few {# cupoane afișate} other {# de cupoane afișate}}',
-        howItWorks: 'Cum funcționează codurile: reducerea se aplică mărfurilor eligibile după orice reducere de ofertă sau ofertă specială, o dată pe comandă, fără a depăși vreodată valoarea acestora. Este suportată din marja Atlantis, deci prețurile nete ale furnizorilor nu se schimbă. Costurile de livrare nu se reduc. Orele sunt salvate în UTC.',
+        howItWorks: 'Cum funcționează codurile: reducerea se aplică mărfurilor eligibile după orice reducere de ofertă sau ofertă specială, o dată pe comandă, fără a depăși vreodată valoarea acestora. Este suportată din marja Ali FMCG, deci prețurile nete ale furnizorilor nu se schimbă. Costurile de livrare nu se reduc. Orele sunt salvate în UTC.',
 
         createTitle: 'Creați un cupon',
         createDesc: 'Stabiliți codul, reducerea, la ce se aplică și când poate fi folosit.',
@@ -898,7 +898,7 @@ export default defineSection('adminCoupons', [
         emptyTitle: 'Ancora nessun coupon',
         emptyBody: 'Crea un codice per offrire agli acquirenti uno sconto al checkout.',
         resultCount: '{count, plural, one {# coupon visualizzato} other {# coupon visualizzati}}',
-        howItWorks: 'Come funzionano i codici: lo sconto si applica alla merce idonea dopo eventuali sconti di offerte o offerte speciali, una volta per ordine, e non supera mai il valore di quella merce. È a carico del margine di Atlantis, quindi i prezzi netti dei fornitori non cambiano. Le spese di consegna non sono scontate. Gli orari sono salvati in UTC.',
+        howItWorks: 'Come funzionano i codici: lo sconto si applica alla merce idonea dopo eventuali sconti di offerte o offerte speciali, una volta per ordine, e non supera mai il valore di quella merce. È a carico del margine di Ali FMCG, quindi i prezzi netti dei fornitori non cambiano. Le spese di consegna non sono scontate. Gli orari sono salvati in UTC.',
 
         createTitle: 'Crea coupon',
         createDesc: 'Imposta il codice, lo sconto, a cosa si applica e quando si può usare.',
@@ -1099,7 +1099,7 @@ export default defineSection('adminCoupons', [
         emptyTitle: 'Aún no hay cupones',
         emptyBody: 'Crea un código para ofrecer a los compradores un descuento al pagar.',
         resultCount: '{count, plural, one {# cupón mostrado} other {# cupones mostrados}}',
-        howItWorks: 'Cómo funcionan los códigos: el descuento se aplica a la mercancía apta después de cualquier descuento de oferta u oferta especial, una vez por pedido, y nunca supera esa mercancía. Lo asume el margen de Atlantis, así que los precios netos de los proveedores no cambian. Los gastos de entrega no se descuentan. Las horas se guardan en UTC.',
+        howItWorks: 'Cómo funcionan los códigos: el descuento se aplica a la mercancía apta después de cualquier descuento de oferta u oferta especial, una vez por pedido, y nunca supera esa mercancía. Lo asume el margen de Ali FMCG, así que los precios netos de los proveedores no cambian. Los gastos de entrega no se descuentan. Las horas se guardan en UTC.',
 
         createTitle: 'Crear cupón',
         createDesc: 'Define el código, el descuento, a qué se aplica y cuándo se puede usar.',
@@ -1300,7 +1300,7 @@ export default defineSection('adminCoupons', [
         emptyTitle: 'Ainda não há cupões',
         emptyBody: 'Crie um código para dar aos compradores um desconto no pagamento.',
         resultCount: '{count, plural, one {# cupão apresentado} other {# cupões apresentados}}',
-        howItWorks: 'Como funcionam os códigos: o desconto aplica-se à mercadoria elegível depois de qualquer desconto de oferta ou oferta especial, uma vez por encomenda, e nunca excede essa mercadoria. É suportado pela margem da Atlantis, pelo que os preços líquidos dos fornecedores não mudam. Os custos de entrega não têm desconto. As horas são guardadas em UTC.',
+        howItWorks: 'Como funcionam os códigos: o desconto aplica-se à mercadoria elegível depois de qualquer desconto de oferta ou oferta especial, uma vez por encomenda, e nunca excede essa mercadoria. É suportado pela margem da Ali FMCG, pelo que os preços líquidos dos fornecedores não mudam. Os custos de entrega não têm desconto. As horas são guardadas em UTC.',
 
         createTitle: 'Criar cupão',
         createDesc: 'Defina o código, o desconto, a que se aplica e quando pode ser utilizado.',

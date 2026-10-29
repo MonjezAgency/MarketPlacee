@@ -11,7 +11,7 @@ import { Trans } from '@/components/i18n/Trans';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
-/** Wording that differs for the Atlantis Catalog (adminProducts dictionary): it updates Atlantis products, not "your catalog". */
+/** Wording that differs for the Ali FMCG Catalog (adminProducts dictionary): it updates Ali FMCG products, not "your catalog". */
 const CATALOG_TEXT: Record<string, string> = { updDescUpload: 'updCatDescUpload', updRecommended: 'updCatRecommended', updStep1: 'updCatStep1', downloadExistingCatalog: 'updCatDownload' };
 
 async function jsonOrThrow(res: Response) {
@@ -25,7 +25,7 @@ async function jsonOrThrow(res: Response) {
  * download the catalog → edit → upload → check every before/after → apply.
  * Nothing is created; empty cells change nothing; each change is logged.
  * `supplier`: the signed-in supplier's products (/supplier-catalog/*).
- * `catalog`: Atlantis Catalog products, staff only (/admin-catalog/*) — same
+ * `catalog`: Ali FMCG Catalog products, staff only (/admin-catalog/*) — same
  * service and rules, matched against platform-owned products only.
  */
 export default function PriceStockUpdateDialog({ open, onClose, target = 'supplier' }: { open: boolean; onClose: () => void; target?: ImportTarget }) {

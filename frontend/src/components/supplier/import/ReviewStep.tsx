@@ -84,7 +84,7 @@ export default function ReviewStep({ target = 'supplier', review, fields, multi,
 
             <PhotoSearchPanel review={review} state={photos} picks={picks} onStart={onFindPhotos} updateExisting={onExisting === 'update'} />
 
-            {/* Brands not on Atlantis yet: importing is the supplier's confirmation (catalogFields section). */}
+            {/* Brands not on Ali FMCG yet: importing is the supplier's confirmation (catalogFields section). */}
             {(s.newBrands?.length ?? 0) > 0 && (
                 <Notice tone="warning" title={t('catalogFields', 'importNewBrandsTitle', { count: s.newBrands!.length })}>
                     {t('catalogFields', 'importNewBrandsBody', { brands: listJoin(s.newBrands!.slice(0, 12).map((b) => `“${b}”`), meta.intl) + (s.newBrands!.length > 12 ? ' …' : '') })}

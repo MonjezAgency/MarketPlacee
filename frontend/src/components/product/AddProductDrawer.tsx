@@ -686,7 +686,7 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                 />
                             </section>
 
-                            {/* Admin: supplier is always Atlantis (the platform itself) — no picker */}
+                            {/* Admin: supplier is always Ali FMCG (the platform itself) — no picker */}
 
                             {/* Admin-only: publish toggle */}
                             {role === 'admin' && (

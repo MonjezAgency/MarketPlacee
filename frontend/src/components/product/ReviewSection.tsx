@@ -192,7 +192,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                             <span className="font-semibold text-ink tabular-nums">{avgRating.toFixed(1)}</span>
                             <span>· {reviews.length} {reviews.length === 1 ? t('reviews', 'review') : t('reviews', 'reviews')}</span>
                         </div>
-                    ) : !loading && <p className="mt-1 text-[13px] text-ink-3">No reviews yet — reviews come from signed-in Atlantis business accounts.</p>}
+                    ) : !loading && <p className="mt-1 text-[13px] text-ink-3">No reviews yet — reviews come from signed-in Ali FMCG business accounts.</p>}
                 </div>
                 {isLoggedIn ? (
                     <button type="button" onClick={() => setShowForm(v => !v)} className="h-9 px-4 rounded-lg ring-1 ring-line-strong hover:ring-ink text-[13px] font-semibold text-ink">

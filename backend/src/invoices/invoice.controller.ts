@@ -7,7 +7,7 @@ import { InvoiceService } from './invoice.service';
 import { INVOICE_READ_ROLES, INVOICE_WRITE_ROLES } from './invoice-access';
 
 /**
- * Atlantis invoices carry the buyer price, so suppliers never reach them
+ * Ali FMCG invoices carry the buyer price, so suppliers never reach them
  * (their own document is the supplier invoice on the order).
  * - Staff (OWNER/ADMIN/SUPPORT) read every invoice; only OWNER/ADMIN
  *   generate or mark paid.

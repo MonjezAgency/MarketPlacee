@@ -65,11 +65,11 @@ export class ProductsController {
     ) { }
 
     /**
-     * Resolve the Atlantis "platform" supplier — the User row that owns
-     * every product Atlantis directly stocks (instead of a third-party
+     * Resolve the Ali FMCG "platform" supplier — the User row that owns
+     * every product Ali FMCG directly stocks (instead of a third-party
      * supplier). When admin creates a product without an explicit
      * `supplierId` in the payload, we attribute it here so the public
-     * PDP credits "Atlantis FMCG" as the brand, not the individual
+     * PDP credits "Ali FMCG" as the brand, not the individual
      * admin who keyed it in.
      *
      * Lookup order: OWNER-role user with the platform email first, then
@@ -104,7 +104,7 @@ export class ProductsController {
      * Supplier-owned product data is edited only by its supplier. Staff review it
      * (approve / reject / request changes) but may not overwrite its fields,
      * override its status or add products under a supplier's account. Enforced
-     * here so a direct API call can't bypass the review UI. Atlantis Catalog
+     * here so a direct API call can't bypass the review UI. Ali FMCG Catalog
      * products (owned by staff accounts) stay editable by staff.
      */
     private async assertStaffMayEdit(productId: string, req: any) {
@@ -125,7 +125,7 @@ export class ProductsController {
     private buildWhiteCatalogPlaceholder(name?: string, ean?: string): string {
         const title = String(name || 'FMCG product').slice(0, 48);
         const code = String(ean || '').slice(0, 20);
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200"><rect width="1200" height="1200" fill="#ffffff"/><rect x="120" y="120" width="960" height="760" rx="32" fill="#f8fafc" stroke="#e2e8f0" stroke-width="6"/><text x="600" y="500" text-anchor="middle" fill="#0f172a" font-family="Arial,sans-serif" font-size="54" font-weight="700">${this.escapeSvg(title)}</text><text x="600" y="590" text-anchor="middle" fill="#64748b" font-family="Arial,sans-serif" font-size="30">${this.escapeSvg(code)}</text><text x="600" y="1010" text-anchor="middle" fill="#94a3b8" font-family="Arial,sans-serif" font-size="24">Atlantis FMCG catalog image</text></svg>`;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200"><rect width="1200" height="1200" fill="#ffffff"/><rect x="120" y="120" width="960" height="760" rx="32" fill="#f8fafc" stroke="#e2e8f0" stroke-width="6"/><text x="600" y="500" text-anchor="middle" fill="#0f172a" font-family="Arial,sans-serif" font-size="54" font-weight="700">${this.escapeSvg(title)}</text><text x="600" y="590" text-anchor="middle" fill="#64748b" font-family="Arial,sans-serif" font-size="30">${this.escapeSvg(code)}</text><text x="600" y="1010" text-anchor="middle" fill="#94a3b8" font-family="Arial,sans-serif" font-size="24">Ali FMCG catalog image</text></svg>`;
         return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     }
 
@@ -142,7 +142,7 @@ export class ProductsController {
         const minPrice = anon ? undefined : req.query.minPrice;
         const maxPrice = anon ? undefined : req.query.maxPrice;
         const sort = anon && /price/.test(String(req.query.sort || '')) ? undefined : req.query.sort;
-        // Only Atlantis staff may list unapproved products; everyone else
+        // Only Ali FMCG staff may list unapproved products; everyone else
         // gets the live catalog no matter what ?status= says.
         const isStaff = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER'].includes(String(req.user?.role || '').toUpperCase());
         const products = await this.productsService.findAll(isStaff ? status : 'APPROVED' as any, { 
@@ -233,7 +233,7 @@ export class ProductsController {
     }
 
     /**
-     * Admin Products page: one scope at a time (Atlantis Catalog or Supplier
+     * Admin Products page: one scope at a time (Ali FMCG Catalog or Supplier
      * Submissions — catalog-scope.ts), paginated and filtered on the server,
      * with the counts of the dataset actually shown.
      */
@@ -250,7 +250,7 @@ export class ProductsController {
      * Bulk review / delete from the admin Products page. The server decides per
      * product what may change (admin-bulk.ts) and returns what was done and why
      * each other product was skipped. Supplier Submissions: approve, reject,
-     * changes. Atlantis Catalog: delete (owners and admins only).
+     * changes. Ali FMCG Catalog: delete (owners and admins only).
      */
     @Post('admin/bulk')
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -452,7 +452,7 @@ export class ProductsController {
 
     /**
      * Review trail of one product (submissions, decisions, feedback). Staff see
-     * who acted; a supplier sees only their own products and "Atlantis".
+     * who acted; a supplier sees only their own products and "Ali FMCG".
      */
     @Get(':id/review-history')
     @UseGuards(JwtAuthGuard)
@@ -489,8 +489,8 @@ export class ProductsController {
         const submit = createProductDto?.submit !== false;
         delete createProductDto?.submit;
         delete createProductDto?.status;
-        // Admin-created products default to the Atlantis platform supplier
-        // (not the admin's personal account) so the PDP credits "Atlantis"
+        // Admin-created products default to the Ali FMCG platform supplier
+        // (not the admin's personal account) so the PDP credits "Ali FMCG"
         // as the brand. Admin can still override with an explicit supplierId
         // in the payload (when re-listing on behalf of a third-party supplier).
         let supplierId: string;
@@ -499,7 +499,7 @@ export class ProductsController {
                 // Only another staff (platform) account; a supplier's catalog is created by the supplier.
                 const owner = await this.prisma.user.findUnique({ where: { id: String(createProductDto.supplierId) }, select: { role: true } });
                 if (!owner) throw new BadRequestException('Unknown owner account.');
-                if (!isStaffRole(owner.role)) throw new ForbiddenException({ code: 'SUPPLIER_OWNED', message: 'Products in a supplier’s catalog are created by that supplier. Add this product to the Atlantis Catalog instead.' });
+                if (!isStaffRole(owner.role)) throw new ForbiddenException({ code: 'SUPPLIER_OWNED', message: 'Products in a supplier’s catalog are created by that supplier. Add this product to the Ali FMCG Catalog instead.' });
                 supplierId = createProductDto.supplierId;
             } else {
                 const platformId = await this.resolvePlatformSupplierId();
@@ -533,7 +533,7 @@ export class ProductsController {
             const state = await this.discovery?.enqueue((product as any).id).catch(() => null);
             return this.productsService.withCompleteness({ ...(product as any), price: (product as any).basePrice ?? null, imageDiscovery: state ?? null });
         }
-        // Atlantis Catalog products too: a product saved without a photo is searched by barcode; staff choose any result.
+        // Ali FMCG Catalog products too: a product saved without a photo is searched by barcode; staff choose any result.
         this.discovery?.trigger((product as any).id);
         return plainToInstance(ProductDto, product);
     }
@@ -828,7 +828,7 @@ export class ProductsController {
     async update(@Param('id') id: string, @Body() updateProductDto: any, @Request() req) {
         // ── Supplier required-fields gate ─────────────────────────
         // Operator rule: a supplier can't save partial product data.
-        // Every required Atlantis field must be present in the
+        // Every required Ali FMCG field must be present in the
         // post-update state, otherwise we reject the PATCH and the
         // supplier sees the exact list of missing fields.
         //
@@ -918,7 +918,7 @@ export class ProductsController {
     /**
      * Owner-only cleanup: re-attribute every product whose current
      * supplierId points to an ADMIN/OWNER user (i.e. it was uploaded
-     * by an admin under their own account) to the canonical Atlantis
+     * by an admin under their own account) to the canonical Ali FMCG
      * platform supplier. Use this once after deploying the new
      * `resolvePlatformSupplierId()` flow to clean up historical rows
      * that were created when admins were auto-assigned as the supplier.
@@ -929,7 +929,7 @@ export class ProductsController {
     async reattributeAdminProductsToPlatform() {
         const platformId = await this.resolvePlatformSupplierId();
         if (!platformId) {
-            throw new BadRequestException('No platform OWNER/Atlantis user found — cannot reattribute.');
+            throw new BadRequestException('No platform OWNER/Ali FMCG user found — cannot reattribute.');
         }
         // Every user with role ADMIN / OWNER except the platform itself
         // is considered a "wrong" supplier for products.
@@ -947,7 +947,7 @@ export class ProductsController {
         });
         this.logger.log(`Re-attributed ${result.count} products from admin accounts → platform supplier ${platformId}`);
         return {
-            message: `Moved ${result.count} products under the Atlantis platform supplier.`,
+            message: `Moved ${result.count} products under the Ali FMCG platform supplier.`,
             moved: result.count,
             platformId,
             fromAdminIds: wrongIds,

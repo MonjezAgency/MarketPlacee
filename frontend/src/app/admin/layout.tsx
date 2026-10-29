@@ -89,12 +89,12 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             {
                 label: 'Products', translationKey: 'allProducts', href: '/admin/products', icon: Package,
                 children: [
-                    { label: 'Atlantis Catalog', translationKey: 'tabCatalog', section: 'adminProducts', href: '/admin/products/catalog', icon: Store },
+                    { label: 'Ali FMCG Catalog', translationKey: 'tabCatalog', section: 'adminProducts', href: '/admin/products/catalog', icon: Store },
                     { label: 'Supplier Submissions', translationKey: 'tabSubmissions', section: 'adminProducts', href: '/admin/products/submissions', icon: Package },
                 ],
             },
             { label: 'Orders', translationKey: 'orders', section: 'adminNav', href: '/admin/orders', icon: ShoppingCart },
-            // One Offers entry: supplier offers to review and Atlantis special offers, as two tabs (/admin/wholesale-offers and /admin/promotions redirect).
+            // One Offers entry: supplier offers to review and Ali FMCG special offers, as two tabs (/admin/wholesale-offers and /admin/promotions redirect).
             {
                 label: 'Offers', translationKey: 'offers', section: 'adminNav', href: '/admin/offers', icon: Tag,
                 children: [
@@ -429,7 +429,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </span>
                         {isOpen && (
                             <span className="font-sans font-black text-[17px] tracking-tighter uppercase leading-none">
-                                <span className="text-white">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>{/* i18n-ignore: wordmark */}
+                                <span className="text-white">ALI&nbsp;</span><span className="text-[#2EC4B6]">FMCG.</span>{/* i18n-ignore: wordmark */}
                             </span>
                         )}
                     </Link>

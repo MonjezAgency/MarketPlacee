@@ -160,7 +160,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 <div className="h-16 flex items-center px-6 border-b border-white/5">
                     <Link href="/" className="flex items-center gap-3 overflow-hidden">
                         <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0">
-                            <img src="/brand/atlantis-mark.png" alt={'Atlantis'} className="w-6 h-6 object-contain" />
+                            <img src="/brand/atlantis-mark.png" alt={'Ali FMCG'} className="w-6 h-6 object-contain" />
                         </div>
                         <AnimatePresence>
                             {isOpen && (

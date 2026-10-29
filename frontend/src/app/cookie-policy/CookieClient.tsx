@@ -57,7 +57,7 @@ export default function CookiePolicyPage() {
 
                     <div className="space-y-6 mb-12 text-sm text-muted-foreground leading-relaxed">
                         <p>
-                            This Cookie Policy explains how Atlantis FMCG uses cookies and similar tracking technologies on our B2B marketplace platform. By accepting cookies in the consent banner, you agree to our use of non-essential cookies as described here.
+                            This Cookie Policy explains how Ali FMCG uses cookies and similar tracking technologies on our B2B marketplace platform. By accepting cookies in the consent banner, you agree to our use of non-essential cookies as described here.
                         </p>
                         <p>
                             A cookie is a small text file placed on your device by a website. Cookies help websites remember your preferences, keep you logged in, and collect analytics data.
@@ -128,7 +128,7 @@ export default function CookiePolicyPage() {
                     <section className="mb-10">
                         <h2 className="text-lg font-black mb-4">Third-Party Cookies</h2>
                         <p className="text-sm text-muted-foreground leading-relaxed">
-                            The Atlantis Platform does not embed third-party advertising cookies or social media tracking pixels. Stripe may set cookies for payment security verification when you complete a checkout. These are governed by <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Stripe's Privacy Policy</a>.
+                            The Ali FMCG Platform does not embed third-party advertising cookies or social media tracking pixels. Stripe may set cookies for payment security verification when you complete a checkout. These are governed by <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Stripe's Privacy Policy</a>.
                         </p>
                     </section>
 

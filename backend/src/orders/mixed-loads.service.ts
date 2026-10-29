@@ -115,7 +115,7 @@ export class MixedLoadsService {
 
     /**
      * "Add Mix" candidates: the other variants of the SAME product (same
-     * SKU — one Product row is one supplier listing on Atlantis) that can
+     * SKU — one Product row is one supplier listing on Ali FMCG) that can
      * still go in this load. Other products, other suppliers and other
      * listings are never offered. Each candidate has room left in the load
      * and stock left after what the load already takes. Buyer prices only.

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { OrdersService } from './orders.service';
 
-/** Marks supplier confirmations that passed their deadline as expired and tells Atlantis. */
+/** Marks supplier confirmations that passed their deadline as expired and tells Ali FMCG. */
 @Injectable()
 export class OrderWorkflowCron {
     private readonly logger = new Logger(OrderWorkflowCron.name);

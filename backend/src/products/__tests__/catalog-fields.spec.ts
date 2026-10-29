@@ -147,7 +147,7 @@ describe('import rows', () => {
         expect(rows[0].notes.brand).toMatch(/written as Prime/);
         expect(rows[0].warnings).toEqual([]);
         expect(rows[1].product.brand).toBe('Primee');
-        expect(rows[1].warnings[0]).toBe('New brand “Primee” — not on Atlantis yet. Importing adds it as a new brand. Did you mean “Prime”?');
+        expect(rows[1].warnings[0]).toBe('New brand “Primee” — not on Ali FMCG yet. Importing adds it as a new brand. Did you mean “Prime”?');
         expect(rows[3].product.brand).toBe('Fresh Farm');
         expect(fresh).toEqual(['Fresh Farm', 'Primee']);
     });

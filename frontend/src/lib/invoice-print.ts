@@ -1,5 +1,5 @@
 /**
- * Printable Atlantis invoice (opened in a new tab and sent to the browser's
+ * Printable Ali FMCG invoice (opened in a new tab and sent to the browser's
  * print dialog). English-only document template — see the gap register
  * (invoice localisation and currency are listed there).
  */
@@ -52,6 +52,6 @@ td{padding:12px;border-bottom:1px solid #F2F4F7;font-size:14px}
   <div class="total-row"><span>Tax</span><span>€${invoice.tax.toFixed(2)}</span></div>
   <div class="total-final"><span>Total</span><span>€${invoice.totalAmount.toFixed(2)}</span></div>
 </div>
-<div class="footer">© 2026 Atlantis Marketplace — atlantisfmcg.com</div>
+<div class="footer">© 2026 Ali FMCG Marketplace — atlantisfmcg.com</div>
 </body></html>`;
 }

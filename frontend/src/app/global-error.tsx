@@ -20,7 +20,7 @@ export default function GlobalError({
     reset: () => void;
 }) {
     React.useEffect(() => {
-        console.error('[Atlantis global error]', error);
+        console.error('[Ali FMCG global error]', error);
     }, [error]);
 
     return (

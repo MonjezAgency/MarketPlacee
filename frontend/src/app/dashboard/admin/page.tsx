@@ -439,7 +439,7 @@ export default function AdminDashboard() {
                                         Allowed Brands configuration
                                     </h3>
                                     <p className="text-sm text-foreground/40 mb-6 max-w-2xl">
-                                        Control which brands are permitted on Atlantis. This list is strictly enforced during catalog imports and product creation.
+                                        Control which brands are permitted on Ali FMCG. This list is strictly enforced during catalog imports and product creation.
                                     </p>
 
                                     <div className="flex items-center gap-4 mb-8">

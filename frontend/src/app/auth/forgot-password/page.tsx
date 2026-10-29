@@ -24,7 +24,7 @@ export default function ForgotPasswordPage() {
             if (res.status === 429) { setError('Too many requests. Wait a minute and try again.'); return; }
             if (!res.ok && res.status >= 500) { setError('Something went wrong on our side. Try again in a moment.'); return; }
             setSent(true); // same outcome whether or not the address has an account
-        } catch { setError('We couldn’t reach Atlantis. Check your connection and try again.'); }
+        } catch { setError('We couldn’t reach Ali FMCG. Check your connection and try again.'); }
         finally { setBusy(false); }
     };
 
@@ -35,7 +35,7 @@ export default function ForgotPasswordPage() {
                 {sent ? (<>
                     <span className="mt-4 w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><MailCheck size={23} /></span>
                     <h1 className="mt-4 text-[22px] leading-tight font-semibold text-heading">Check your email</h1>
-                    <p className="mt-2 text-[14.5px] text-ink-2">If an Atlantis account uses <strong className="text-ink">{email.trim()}</strong>, we’ve sent a link to reset the password. It works once and expires in 60 minutes.</p>
+                    <p className="mt-2 text-[14.5px] text-ink-2">If an Ali FMCG account uses <strong className="text-ink">{email.trim()}</strong>, we’ve sent a link to reset the password. It works once and expires in 60 minutes.</p>
                     <p className="mt-2 text-[13.5px] text-ink-3">Nothing arrived after a few minutes? Check spam, or <button type="button" onClick={() => setSent(false)} className="font-semibold text-teal hover:underline">try again</button>.</p>
                 </>) : (<>
                     <span className="mt-4 w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><KeyRound size={22} /></span>

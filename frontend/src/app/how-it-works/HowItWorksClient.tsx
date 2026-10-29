@@ -6,23 +6,23 @@ import { ArrowRight, UserCheck, Search, Layers, ListChecks, CreditCard, Truck, S
 import { cn } from '@/lib/utils';
 
 /**
- * Buyer journey — every step maps to something Atlantis actually supports:
+ * Buyer journey — every step maps to something Ali FMCG actually supports:
  * account approval (PENDING_APPROVAL flow), catalog search incl. EAN,
  * case/pallet/truck price tiers, cart + /requests, Stripe checkout in EUR
- * request with supplier confirmation and Atlantis approval, tracking + invoices.
+ * request with supplier confirmation and Ali FMCG approval, tracking + invoices.
  */
 const STEPS = [
     { icon: UserCheck, title: 'Create your account', desc: 'Register your business. Our team reviews and activates buyer accounts before trading starts.', href: '/auth/register?role=CUSTOMER', cta: 'Register' },
-    { icon: Search, title: 'Discover products', desc: 'Search FMCG products by name, brand, category or EAN barcode across the Atlantis catalog.', href: '/categories', cta: 'Browse catalog' },
+    { icon: Search, title: 'Discover products', desc: 'Search FMCG products by name, brand, category or EAN barcode across the Ali FMCG catalog.', href: '/categories', cta: 'Browse catalog' },
     { icon: Layers, title: 'Compare price tiers', desc: 'Every listing shows per-case pricing for case, pallet and truck volumes, so you see what volume unlocks.', href: '/categories?sort=newest', cta: 'See new offers' },
     { icon: ListChecks, title: 'Build your buying list', desc: 'Add products at the tier you need, or list items, quantities and packaging in a sourcing request.', href: '/requests', cta: 'Start a list' },
-    { icon: CreditCard, title: 'Order or request a quote', desc: 'Place an order request — nothing is charged. The supplier confirms, Atlantis approves and sends payment details. Or send your list to our desk for a quote.', href: '/requests', cta: 'Request a quote' },
+    { icon: CreditCard, title: 'Order or request a quote', desc: 'Place an order request — nothing is charged. The supplier confirms, Ali FMCG approves and sends payment details. Or send your list to our desk for a quote.', href: '/requests', cta: 'Request a quote' },
     { icon: Truck, title: 'Track your delivery', desc: 'Follow order status from your dashboard and download invoices for your records.', href: '/dashboard/track', cta: 'Track orders' },
 ];
 
 const ASSURANCES = [
-    { icon: PackageCheck, title: 'Sold & shipped by Atlantis', desc: 'Products are listed and sold by Atlantis directly — one counterparty for every order.' },
-    { icon: ShieldCheck, title: 'Confirmed before you pay', desc: 'Suppliers explicitly accept each order and Atlantis approves it before payment. Changed terms need your acceptance.' },
+    { icon: PackageCheck, title: 'Sold & shipped by Ali FMCG', desc: 'Products are listed and sold by Ali FMCG directly — one counterparty for every order.' },
+    { icon: ShieldCheck, title: 'Confirmed before you pay', desc: 'Suppliers explicitly accept each order and Ali FMCG approves it before payment. Changed terms need your acceptance.' },
     { icon: FileText, title: 'Clear paperwork', desc: 'Order history and invoices stay available in your dashboard.' },
 ];
 
@@ -51,7 +51,7 @@ export default function HowItWorksPage() {
                         <span className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6]" /> Buyer journey
                     </p>
                     <h1 className="font-sans mt-5 text-[34px] sm:text-[46px] font-bold tracking-tight text-heading leading-[1.08]">
-                        How Atlantis works
+                        How Ali FMCG works
                     </h1>
                     <p className="mt-4 text-[16px] sm:text-[18px] text-ink-2 leading-relaxed">
                         A B2B marketplace for FMCG wholesale. Find products, buy at the volume you need, and track every order — from first search to delivery.

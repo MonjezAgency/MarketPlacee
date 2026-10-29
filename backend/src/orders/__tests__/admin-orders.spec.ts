@@ -151,7 +151,7 @@ describe('money on one order', () => {
 describe('status options', () => {
     it('lists the transitions the server accepts, with the workflow reason when blocked', () => {
         const pending = statusOptions({ status: 'PENDING', reviewStatus: 'PENDING_REVIEW', termsVersion: 1 }, ORDER_TRANSITIONS as any);
-        expect(pending.find((o) => o.to === 'PROCESSING')!.blocker).toMatch(/Atlantis approval/);
+        expect(pending.find((o) => o.to === 'PROCESSING')!.blocker).toMatch(/Ali FMCG approval/);
         expect(pending.find((o) => o.to === 'CANCELLED')!.blocker).toBeNull();
         const legacy = statusOptions({ status: 'PENDING', reviewStatus: 'LEGACY', termsVersion: 1 }, ORDER_TRANSITIONS as any);
         expect(legacy.every((o) => o.blocker === null)).toBe(true);
@@ -166,7 +166,7 @@ describe('timeline', () => {
         createdAt: '2026-10-01T09:00:00.000Z',
         history: [
             { createdAt: '2026-10-01T09:00:00.100Z', previousStatus: null, newStatus: 'PENDING', reason: 'Order created', actor: 'Buyer Co' },
-            { createdAt: '2026-10-03T12:00:00.000Z', previousStatus: 'PENDING', newStatus: 'PROCESSING', reason: 'Approved by Atlantis', actor: 'Admin' },
+            { createdAt: '2026-10-03T12:00:00.000Z', previousStatus: 'PENDING', newStatus: 'PROCESSING', reason: 'Approved by Ali FMCG', actor: 'Admin' },
             { createdAt: '2026-10-04T08:00:00.000Z', previousStatus: 'PROCESSING', newStatus: 'PROCESSING', reason: 'Inspection recorded: passed', actor: 'Admin' },
         ],
         confirmations: [{ supplier: 'Supplier A', termsVersion: 1, status: 'ACCEPTED', requestedAt: '2026-10-01T09:00:00.200Z', decidedAt: '2026-10-02T10:00:00.000Z', note: null }],

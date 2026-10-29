@@ -10,7 +10,7 @@ import { AdminUsersService } from './admin-users.service';
  * RolesGuard automatically). Only whitelisted, non-sensitive fields are returned
  * (see ./admin-users-query.ts). Account actions use the existing /users endpoints.
  * The account tabs (products, offers, orders, target prices, reviews) are
- * paginated, 14 per page by default; supplier net prices and the Atlantis
+ * paginated, 14 per page by default; supplier net prices and the Ali FMCG
  * margin are only returned to OWNER/ADMIN (./admin-users-activity.ts).
  */
 @Controller('admin/users')

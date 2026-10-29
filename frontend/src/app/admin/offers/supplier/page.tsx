@@ -2,8 +2,8 @@
 
 /**
  * Admin → Offers → Supplier offers (/admin/offers/supplier): wholesale offers that
- * suppliers submit, reviewed by Atlantis (backend Offer, backend/src/offers).
- * Filters live in the URL (status, q, source, id). Atlantis special offers are a
+ * suppliers submit, reviewed by Ali FMCG (backend Offer, backend/src/offers).
+ * Filters live in the URL (status, q, source, id). Ali FMCG special offers are a
  * separate page (/admin/offers/special).
  */
 import * as React from 'react';

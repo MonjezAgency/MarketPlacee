@@ -1,5 +1,5 @@
 /**
- * Who may manage which Atlantis team account. Shared by the Team endpoints
+ * Who may manage which Ali FMCG team account. Shared by the Team endpoints
  * (team.controller.ts / team.service.ts) and the account actions in
  * users.service.ts, so the same rules apply wherever a staff account changes.
  *
@@ -64,7 +64,7 @@ export function checkAccountAction(actor: Actor, target: Target): Denial | null 
 }
 
 export const DENIAL_MESSAGE: Record<Denial, string> = {
-    NOT_ALLOWED: 'Only the owner or an admin can manage the Atlantis team.',
+    NOT_ALLOWED: 'Only the owner or an admin can manage the Ali FMCG team.',
     SELF: 'You can’t change your own role or account status.',
     OWNER_PROTECTED: 'The owner account can’t be changed here.',
     ADMIN_PROTECTED: 'Only the owner can change an admin account.',

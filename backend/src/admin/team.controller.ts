@@ -99,7 +99,7 @@ export class TeamController {
         const emails = [...new Set(raw.map(normEmail).filter((e: string) => EMAIL_RE.test(e)))].slice(0, 20) as string[];
         if (!emails.length) throw new BadRequestException({ code: 'NO_EMAILS', message: 'Enter at least one valid email address.' });
         const base = (process.env.FRONTEND_URL || 'http://localhost:3000').split(',')[0].trim().replace(/\/+$/, '');
-        const senderName = req.user?.name || 'Atlantis';
+        const senderName = req.user?.name || 'Ali FMCG';
         const results = await Promise.all(emails.map(async (email) => {
             const inviteLink = `${base}/auth/register?role=${role}&email=${encodeURIComponent(email)}`;
             try {

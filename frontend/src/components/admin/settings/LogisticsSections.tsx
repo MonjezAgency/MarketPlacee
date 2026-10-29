@@ -39,7 +39,7 @@ function useEur() {
 // ─── Hubs ──────────────────────────────────────────────────────────────
 
 /**
- * Atlantis hubs (POST/PATCH /fulfillment/admin/hubs, OWNER/ADMIN; LOGISTICS may read).
+ * Ali FMCG hubs (POST/PATCH /fulfillment/admin/hubs, OWNER/ADMIN; LOGISTICS may read).
  * Only hubs saved here are listed; a hub is public and offered to suppliers
  * only when verified and active. There is no delete endpoint: deactivate instead.
  */

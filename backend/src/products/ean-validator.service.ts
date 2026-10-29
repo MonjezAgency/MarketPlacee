@@ -163,7 +163,7 @@ export class EanValidatorService {
                     Authorization: `Bearer ${apiKey}`,
                     'Content-Type': 'application/json',
                     'HTTP-Referer': 'https://atlantisfmcg.com',
-                    'X-Title': 'Atlantis EAN Image Validator',
+                    'X-Title': 'Ali FMCG EAN Image Validator',
                 },
             },
         );

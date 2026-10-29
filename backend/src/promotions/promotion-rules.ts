@@ -7,11 +7,11 @@
  *  • A promotion is a percentage off the SUPPLIER NET price (Product.basePrice,
  *    and variant prices in a mixed load). The buyer price is still derived
  *    from that net through the normal tier markup, so the buyer price drops by
- *    the same percentage and the Atlantis markup ratio is untouched. The
+ *    the same percentage and the Ali FMCG markup ratio is untouched. The
  *    supplier funds the discount: the order line's supplierUnitPrice is the
  *    discounted net.
  *  • Suppliers only ever see net prices (original → promotional); buyers only
- *    buyer prices; Atlantis staff see both. The percentage itself is the same
+ *    buyer prices; Ali FMCG staff see both. The percentage itself is the same
  *    on both sides, so nothing about the margin can be derived from it.
  *  • The percentage applies to the price at the moment of the quote/order.
  *    If the supplier changes the product price while a promotion runs, the
@@ -25,7 +25,7 @@
  *    existing wholesale-offer discount has (orders/pricing.ts offerFactor).
  *
  * Lifecycle (derived from time on every request, nothing to schedule):
- *  • CANCELLED  — cancelled by the supplier or Atlantis (the only stored state).
+ *  • CANCELLED  — cancelled by the supplier or Ali FMCG (the only stored state).
  *  • SCHEDULED  — now < startsAt.
  *  • ACTIVE     — startsAt ≤ now < endsAt and the product is approved.
  *  • ON_HOLD    — inside the window but the product isn't approved (not applied).
@@ -51,7 +51,7 @@ export class PromotionError extends Error {
 
 const ms = (d: Date | string) => (d instanceof Date ? d.getTime() : new Date(d).getTime());
 
-/** Time-derived state. `productApproved` = the product is live on Atlantis. */
+/** Time-derived state. `productApproved` = the product is live on Ali FMCG. */
 export function promotionState(p: PromotionWindow, now: Date = new Date(), productApproved = true): PromotionState {
     if (String(p.status || '').toUpperCase() === 'CANCELLED') return 'CANCELLED';
     const t = now.getTime();

@@ -7,7 +7,7 @@
  * Honesty notes:
  *  - "Paid orders" is the sum of Order.totalAmount (goods at buyer prices, EUR)
  *    on orders with paymentStatus PAID (owner.service getDashboardStats). It is
- *    NOT Atlantis revenue; the Founder Overview (/admin) defines that.
+ *    NOT Ali FMCG revenue; the Founder Overview (/admin) defines that.
  *  - The per-member permission ticks are stored (User.permissions) but no
  *    controller uses PermissionsGuard yet, so they grant nothing. The page says so.
  *  - Team KYC is recorded but TeamKycGuard is not applied anywhere, so KYC does

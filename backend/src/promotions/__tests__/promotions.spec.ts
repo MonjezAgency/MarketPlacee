@@ -294,7 +294,7 @@ describe('PromotionsService — create / edit / cancel', () => {
         expect(row).toMatchObject({ status: 'CANCELLED', cancelledById: 'adm-1' });
         expect(row.history.at(-1)).toMatchObject({ action: 'CANCEL', by: 'adm-1', role: 'ADMIN', stateBefore: 'ACTIVE' });
         expect(await code(svc.cancel(ADMIN, adminScope, row.id))).toBe('409:ALREADY_CANCELLED');
-        // The supplier sees that Atlantis cancelled it, not which staff member.
+        // The supplier sees that Ali FMCG cancelled it, not which staff member.
         const sv: any = await svc.get(supScope, row.id);
         expect(sv.cancelledBy).toEqual({ kind: 'ATLANTIS' });
     });

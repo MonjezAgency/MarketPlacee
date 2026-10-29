@@ -9,7 +9,7 @@ import { ReviewTrail } from '@/components/products/ReviewTrail';
 import type { ReviewEvent } from '@/lib/admin-api';
 
 /**
- * Supplier side of product review: Atlantis feedback and the submission
+ * Supplier side of product review: Ali FMCG feedback and the submission
  * history of one product (GET /products/:id/review-history, own products
  * only). Rendered in the editor at #feedback — the destination of the
  * "needs changes" notification. The current request also appears at the top

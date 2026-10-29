@@ -8,8 +8,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Button, ErrorState, Notice, Skeleton } from '@/components/supplier/ui';
 
 /**
- * Admin → Edit product — Atlantis Catalog products only. A supplier's product
- * is reviewed, never edited by Atlantis (the API refuses it with SUPPLIER_OWNED);
+ * Admin → Edit product — Ali FMCG Catalog products only. A supplier's product
+ * is reviewed, never edited by Ali FMCG (the API refuses it with SUPPLIER_OWNED);
  * this page says so and links to the review view instead of showing a form
  * whose save would fail.
  */

@@ -16,7 +16,7 @@ const CONTACT_INFO = [
     {
         icon: Building2,
         label: 'Company',
-        value: 'Atlantis FMCG',
+        value: 'Ali FMCG',
         href: null,
         color: 'text-purple-500 bg-purple-500/10',
     },

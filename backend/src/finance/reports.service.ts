@@ -99,8 +99,8 @@ export class ReportsService {
         });
 
         const subject = type === 'weekly'
-            ? `📊 Atlantis Weekly Report — ${new Date().toLocaleDateString()}`
-            : `📊 Atlantis Monthly Report — ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`;
+            ? `📊 Ali FMCG Weekly Report — ${new Date().toLocaleDateString()}`
+            : `📊 Ali FMCG Monthly Report — ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`;
 
         const html = this.buildReportEmail(report, subject);
 
@@ -142,7 +142,7 @@ export class ReportsService {
     </table>
   </div>
   <div style="background:#0A1A2F;padding:20px;text-align:center">
-    <p style="color:#667085;font-size:11px;margin:0">© 2026 Atlantis Marketplace — auto-generated, do not reply</p>
+    <p style="color:#667085;font-size:11px;margin:0">© 2026 Ali FMCG Marketplace — auto-generated, do not reply</p>
   </div>
 </div>
 </body></html>`;

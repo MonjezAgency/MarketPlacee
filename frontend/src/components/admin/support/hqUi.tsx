@@ -18,7 +18,7 @@ export function useTs(): Ts {
 /** Team names stored in assignedTeam. Unknown values are shown as stored. */
 export const teamLabel = (ts: Ts, team: string) => (['SUPPORT', 'DEVELOPER', 'LOGISTICS'].includes(team) ? ts(`team_${team}`) : team);
 
-/** Buyer / supplier / Atlantis staff, from the account role. */
+/** Buyer / supplier / Ali FMCG staff, from the account role. */
 export function roleKind(role: string | null | undefined, partyKind?: 'buyer' | 'supplier' | null): 'buyer' | 'supplier' | 'staff' | 'unknown' {
     if (partyKind) return partyKind;
     const r = String(role || '').toUpperCase();

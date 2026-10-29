@@ -25,7 +25,7 @@ export default function AccountCta({ audience }: { audience: 'buyer' | 'supplier
         const supplierFirst = audience === 'supplier';
         return (
             <div className="mt-8 rounded-xl ring-1 ring-line px-5 py-4 flex flex-wrap items-center gap-3">
-                <p className="flex-1 min-w-[14rem] text-[14px] text-ink-2">{supplierFirst ? 'Not a supplier on Atlantis yet? Register as a supplier, or sign in to open your supplier dashboard.' : 'Sign in to use these features, or create a business account.'}</p>
+                <p className="flex-1 min-w-[14rem] text-[14px] text-ink-2">{supplierFirst ? 'Not a supplier on Ali FMCG yet? Register as a supplier, or sign in to open your supplier dashboard.' : 'Sign in to use these features, or create a business account.'}</p>
                 <Link href={supplierFirst ? '/auth/register?role=supplier' : '/auth/register'} className={`${btn} bg-heading text-white`}><UserPlus size={15} /> {supplierFirst ? 'Register as a supplier' : 'Create an account'}</Link>
                 <Link href={`/auth/login?redirect=${encodeURIComponent(supplierFirst ? SUPPLIER_DASHBOARD : '/dashboard')}`} className={`${btn} ring-1 ring-line-strong text-heading`}><LogIn size={15} /> Sign in</Link>
             </div>

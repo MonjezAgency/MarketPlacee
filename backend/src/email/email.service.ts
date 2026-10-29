@@ -7,7 +7,7 @@ import * as authTpl from './auth-email-templates';
 @Injectable()
 export class EmailService {
   private transporter;
-  private readonly fromName = 'Atlantis Marketplace';
+  private readonly fromName = 'Ali FMCG Marketplace';
 
   constructor() {
     const host = process.env.EMAIL_HOST || 'smtp.hostinger.com';
@@ -111,7 +111,7 @@ export class EmailService {
         const res = await axios.post(
           'https://api.resend.com/emails',
           {
-            from: `Atlantis FMCG <${resendFrom}>`,
+            from: `Ali FMCG <${resendFrom}>`,
             to: [to],
             reply_to: replyTo,
             subject,
@@ -202,14 +202,14 @@ export class EmailService {
   async sendVerificationEmail(email: string, token: string) {
     const baseUrl = this.getFrontendUrl();
     const url = `${baseUrl}/auth/verify-email?token=${token}`;
-    await this.sendMail(email, 'Verify your email - Atlantis Marketplace', `
+    await this.sendMail(email, 'Verify your email - Ali FMCG Marketplace', `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
         <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
           <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
           <p style="color: #B0BCCF; font-size: 14px; margin: 0;">Enterprise B2B Distribution</p>
         </div>
         <div style="padding: 40px 30px; background: #FFFFFF;">
-          <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Welcome to Atlantis! 👋</h2>
+          <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Welcome to Ali FMCG! 👋</h2>
           <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Please click the button below to verify your email address and activate your account.</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${url}" style="display: inline-block; padding: 16px 40px; background: #1BC7C9; color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Verify Email →</a>
@@ -217,7 +217,7 @@ export class EmailService {
           <p style="margin-top: 20px; font-size: 12px; color: #667085; text-align: center;">If the button doesn't work, copy and paste this link into your browser: <br/> ${url}</p>
         </div>
         <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
         </div>
       </div>
     `);
@@ -269,7 +269,7 @@ export class EmailService {
               <p style="margin: 10px 0 0 0; font-size: 11px; color: #667085;">Please change your password after first login.</p>
             </div>` : '';
     
-    return this.sendMail(email, 'You have been invited to the Atlantis Team', `
+    return this.sendMail(email, 'You have been invited to the Ali FMCG Team', `
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
           <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
             <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
@@ -278,7 +278,7 @@ export class EmailService {
           <div style="padding: 40px 30px; background: #FFFFFF;">
             <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Team Invitation 🤝</h2>
             <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7;">Hello <strong style="color: #0A1A2F;">${name}</strong>,</p>
-            <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7;">You have been invited to join the Atlantis Marketplace team as a <strong style="color: #1BC7C9;">${role}</strong>.</p>
+            <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7;">You have been invited to join the Ali FMCG Marketplace team as a <strong style="color: #1BC7C9;">${role}</strong>.</p>
             ${credentialsBlock}
             <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7;">Please log in to your account to get started.</p>
             <div style="text-align: center; margin: 30px 0;">
@@ -286,7 +286,7 @@ export class EmailService {
             </div>
           </div>
           <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-            <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+            <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
           </div>
         </div>
       `);
@@ -308,7 +308,7 @@ export class EmailService {
       // vague REJECTED badge.
       const result = await this.sendMailDetailed(
         params.recipientEmail,
-        `🎉 Invitation: Join Atlantis as a ${params.role === 'supplier' ? 'Supplier' : 'Strategic Customer'}`,
+        `🎉 Invitation: Join Ali FMCG as a ${params.role === 'supplier' ? 'Supplier' : 'Strategic Customer'}`,
         html,
       );
       return result;
@@ -321,7 +321,7 @@ export class EmailService {
   async sendOrderConfirmationEmail(email: string, name: string, orderId: string, total: number) {
     const frontendUrl = this.getFrontendUrl();
     try {
-      await this.sendMail(email, `✅ Order Confirmed #${orderId.slice(0, 8).toUpperCase()} — Atlantis`, `
+      await this.sendMail(email, `✅ Order Confirmed #${orderId.slice(0, 8).toUpperCase()} — Ali FMCG`, `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
               <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
@@ -339,7 +339,7 @@ export class EmailService {
               </div>
             </div>
             <div style="background:#0A1A2F; padding:20px; text-align:center;">
-              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
             </div>
           </div>
         `);
@@ -353,7 +353,7 @@ export class EmailService {
       PAID: { title: 'Order Confirmed ✅', body: 'Your payment has been received and your order is now confirmed. The supplier is preparing your shipment.', color: '#10B981' },
       PROCESSING: { title: 'Order is Being Processed 🔄', body: 'Your order is now being processed by the supplier.', color: '#F59E0B' },
       SHIPPED: { title: 'Order Shipped 🚚', body: `Great news! Your order has been shipped and is on its way.${trackingUrl ? ' You can track it using the link below.' : ''}`, color: '#3B82F6' },
-      DELIVERED: { title: 'Order Delivered ✅', body: 'Your order has been delivered successfully. Thank you for choosing Atlantis!', color: '#10B981' },
+      DELIVERED: { title: 'Order Delivered ✅', body: 'Your order has been delivered successfully. Thank you for choosing Ali FMCG!', color: '#10B981' },
       CANCELLED: { title: 'Order Cancelled ❌', body: 'Your order has been cancelled. Contact support if you have any questions.', color: '#EF4444' },
     };
     const info = statusMessages[newStatus] || { title: `Order Status Updated`, body: `Your order status changed to ${newStatus}.`, color: '#1BC7C9' };
@@ -379,7 +379,7 @@ export class EmailService {
               ` : ''}
             </div>
             <div style="background:#0A1A2F; padding:20px; text-align:center;">
-              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
             </div>
           </div>
         `);
@@ -391,7 +391,7 @@ export class EmailService {
   async sendKycStatusEmail(email: string, name: string, status: 'VERIFIED' | 'REJECTED' | 'PENDING', adminNotes?: string) {
     if (status === 'PENDING') {
       try {
-        await this.sendMail(email, '⏳ KYC Submitted — Under Review', `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #F59E0B;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#F59E0B;font-size:22px;margin:0 0 16px;">KYC Documents Received ⏳</h2><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Your identity documents have been submitted and are under review. We'll notify you once complete — usually within 24 hours.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p></div></div>`);
+        await this.sendMail(email, '⏳ KYC Submitted — Under Review', `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #F59E0B;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#F59E0B;font-size:22px;margin:0 0 16px;">KYC Documents Received ⏳</h2><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Your identity documents have been submitted and are under review. We'll notify you once complete — usually within 24 hours.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p></div></div>`);
       } catch (err) {
         console.error('ERROR [sendKycStatusEmail PENDING]:', err);
       }
@@ -399,7 +399,7 @@ export class EmailService {
     }
     const isApproved = status === 'VERIFIED';
     try {
-      await this.sendMail(email, isApproved ? '✅ KYC Verified — Atlantis' : '❌ KYC Review Required — Atlantis', `
+      await this.sendMail(email, isApproved ? '✅ KYC Verified — Ali FMCG' : '❌ KYC Review Required — Ali FMCG', `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid ${isApproved ? '#10B981' : '#EF4444'};">
               <h1 style="color:#fff; font-size:28px; margin:0; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
@@ -415,7 +415,7 @@ export class EmailService {
               ${adminNotes ? `<div style="background:#FEF2F2; padding:16px; border-radius:12px; margin:20px 0; border-left:4px solid #EF4444;"><p style="margin:0; font-size:14px; color:#991B1B;"><strong>Notes:</strong> ${adminNotes}</p></div>` : ''}
             </div>
             <div style="background:#0A1A2F; padding:20px; text-align: center;">
-              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
             </div>
           </div>
         `);
@@ -441,10 +441,10 @@ export class EmailService {
       : 'Start Shopping Now →';
 
     const welcomeBody = isSupplier
-      ? 'Excellent news! Our team has verified your business profile. You can now access the full power of the Atlantis supplier hub.'
+      ? 'Excellent news! Our team has verified your business profile. You can now access the full power of the Ali FMCG supplier hub.'
       : 'Excellent news! Your account is active and you can now start sourcing premium products directly from our global partners.';
 
-    await this.sendMail(email, 'Welcome to Atlantis — Your account is approved! 🎉', this.atlantisShell({
+    await this.sendMail(email, 'Welcome to Ali FMCG — Your account is approved! 🎉', this.atlantisShell({
       title: `Welcome, ${name}! 👋`,
       subtitle: 'Your account is ready.',
       iconType: 'success',
@@ -455,8 +455,8 @@ export class EmailService {
   }
 
   /**
-   * Reusable Atlantis email shell — gradient navy header with the
-   * ATLANTIS / FMCG wordmark, a floating icon (success / pending /
+   * Reusable Ali FMCG email shell — gradient navy header with the
+   * ALI FMCG / FMCG wordmark, a floating icon (success / pending /
    * warning / info), the body the caller passes in, an optional
    * primary CTA button, and a clean footer. Mirrors the visual
    * language of the campaign builder so every transactional + every
@@ -494,7 +494,7 @@ export class EmailService {
   <tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 12px 40px rgba(15,23,42,0.08);">
 
-      <!-- Header — Atlantis brand mark on gradient navy. The logo is
+      <!-- Header — Ali FMCG brand mark on gradient navy. The logo is
            the public PNG hosted at /icon.png on the frontend domain;
            email clients can fetch any HTTPS URL but block local data
            so a CDN-style hosted asset is the only reliable option. -->
@@ -502,10 +502,10 @@ export class EmailService {
         <div style="display:inline-block;">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>
             <td style="vertical-align:middle;padding-right:14px;">
-              <img src="${(process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '')}/icon.png" alt="Atlantis" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:12px;background:#ffffff;padding:4px;box-sizing:border-box;" />
+              <img src="${(process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '')}/icon.png" alt="Ali FMCG" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:12px;background:#ffffff;padding:4px;box-sizing:border-box;" />
             </td>
             <td style="vertical-align:middle;text-align:left;">
-              <div style="color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:900;font-size:22px;letter-spacing:0.02em;line-height:1;">ATLANTIS</div>
+              <div style="color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:900;font-size:22px;letter-spacing:0.02em;line-height:1;">ALI FMCG</div>
               <div style="color:#2EC4B6;font-family:Inter,Arial,sans-serif;font-weight:700;font-size:11px;letter-spacing:0.4em;margin-top:4px;line-height:1;">FMCG</div>
             </td>
           </tr></table>
@@ -543,14 +543,14 @@ export class EmailService {
       <tr><td style="background:#F8FAFC;padding:24px 40px;border-top:1px solid #E2E8F0;text-align:center;">
         <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr>
           <td style="vertical-align:middle;padding-right:10px;">
-            <img src="${(process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '')}/icon.png" alt="Atlantis" width="28" height="28" style="display:block;width:28px;height:28px;border-radius:7px;" />
+            <img src="${(process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '')}/icon.png" alt="Ali FMCG" width="28" height="28" style="display:block;width:28px;height:28px;border-radius:7px;" />
           </td>
           <td style="vertical-align:middle;text-align:left;">
-            <span style="color:#0F172A;font-family:Inter,Arial,sans-serif;font-weight:900;font-size:13px;letter-spacing:0.01em;">ATLANTIS</span>
+            <span style="color:#0F172A;font-family:Inter,Arial,sans-serif;font-weight:900;font-size:13px;letter-spacing:0.01em;">ALI FMCG</span>
             <span style="color:#2EC4B6;font-family:Inter,Arial,sans-serif;font-weight:700;font-size:10px;letter-spacing:0.3em;margin-left:6px;">FMCG</span>
           </td>
         </tr></table>
-        <p style="color:#94A3B8;font-family:Inter,Arial,sans-serif;font-size:11px;margin:14px 0 0;">© ${new Date().getFullYear()} Atlantis FMCG · All rights reserved</p>
+        <p style="color:#94A3B8;font-family:Inter,Arial,sans-serif;font-size:11px;margin:14px 0 0;">© ${new Date().getFullYear()} Ali FMCG · All rights reserved</p>
       </td></tr>
     </table>
   </td></tr>
@@ -559,12 +559,12 @@ export class EmailService {
   }
 
   async sendRejectionEmail(email: string, name: string, reason?: string) {
-    await this.sendMail(email, 'Update regarding your Atlantis application', this.atlantisShell({
+    await this.sendMail(email, 'Update regarding your Ali FMCG application', this.atlantisShell({
       title: 'Application Update',
       subtitle: `Hello ${name}`,
       iconType: 'warning',
       body: `
-        <p style="font-size:15px;color:#475569;margin:0 0 18px;line-height:1.65;">Thank you for your interest in Atlantis. After reviewing your application, we are unable to approve your account at this time.</p>
+        <p style="font-size:15px;color:#475569;margin:0 0 18px;line-height:1.65;">Thank you for your interest in Ali FMCG. After reviewing your application, we are unable to approve your account at this time.</p>
         ${reason ? `<div style="background:#FEF2F2;padding:16px 20px;border-radius:14px;margin:20px 0;border-left:4px solid #EF4444;text-align:left;"><p style="margin:0;font-size:13px;color:#991B1B;line-height:1.6;"><strong style="color:#7F1D1D;">Reason:</strong> ${reason}</p></div>` : ''}
         <p style="font-size:13px;color:#94A3B8;margin:18px 0 0;line-height:1.6;">If you believe this is a mistake or have updated documentation, please contact our compliance team at Info@atlantisfmcg.com.</p>
       `,
@@ -580,8 +580,8 @@ export class EmailService {
   async sendRegistrationPendingEmail(email: string, name: string, role: string) {
     const isSupplier = role.toUpperCase() === 'SUPPLIER';
     const subject = isSupplier
-      ? 'Atlantis · Your supplier application is under review'
-      : 'Atlantis · Your account is under review';
+      ? 'Ali FMCG · Your supplier application is under review'
+      : 'Ali FMCG · Your account is under review';
     await this.sendMail(email, subject, this.atlantisShell({
       title: 'Registration Pending',
       subtitle: `Hello ${name}`,
@@ -627,7 +627,7 @@ export class EmailService {
           </div>
         </div>
         <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
         </div>
       </div>
     `);
@@ -648,7 +648,7 @@ export class EmailService {
           </div>
         </div>
         <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
         </div>
       </div>
     `);
@@ -656,7 +656,7 @@ export class EmailService {
 
   async sendPendingReviewEmail(email: string, name: string) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    await this.sendMail(email, 'Atlantis — Your application is under review ⏳', `
+    await this.sendMail(email, 'Ali FMCG — Your application is under review ⏳', `
       <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
         <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
           <h1 style="color: white; font-size: 26px; margin: 0; font-weight: 900;">Thank You, ${name}!</h1>
@@ -668,7 +668,7 @@ export class EmailService {
           </a>
         </div>
         <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
         </div>
       </div>
     `);
@@ -677,7 +677,7 @@ export class EmailService {
   async sendAdminNewUserNotification(userEmail: string, companyName: string) {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@atlantis.com';
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    await this.sendMail(adminEmail, 'Atlantis Admin — New Registration Pending 🔔', `
+    await this.sendMail(adminEmail, 'Ali FMCG Admin — New Registration Pending 🔔', `
       <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
         <div style="background: #0A1A2F; padding: 30px; text-align: center;">
           <h1 style="color: #fff; font-size: 20px; margin: 0;">New User Registration</h1>
@@ -698,7 +698,7 @@ export class EmailService {
   async sendInvoiceEmail(email: string, name: string, invoiceNumber: string, orderId: string, totalAmount: number, dueDate: Date) {
     const frontendUrl = this.getFrontendUrl();
     try {
-      await this.sendMail(email, `🧾 Invoice ${invoiceNumber} — Atlantis Marketplace`, `
+      await this.sendMail(email, `🧾 Invoice ${invoiceNumber} — Ali FMCG Marketplace`, `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid #1BC7C9;">
               <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
@@ -717,7 +717,7 @@ export class EmailService {
               </div>
             </div>
             <div style="background:#0A1A2F; padding:20px; text-align:center;">
-              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
             </div>
           </div>
         `);
@@ -760,7 +760,7 @@ export class EmailService {
     const carrierColor = carrierLogos[shippingCompany] || '#1BC7C9';
 
     try {
-      await this.sendMail(email, `✅ Order Confirmed + Invoice ${invoiceNumber} — ${shippingCompany} | Atlantis`, `
+      await this.sendMail(email, `✅ Order Confirmed + Invoice ${invoiceNumber} — ${shippingCompany} | Ali FMCG`, `
           <div style="font-family:'Segoe UI',Arial,sans-serif; max-width:620px; margin:0 auto; background:#F2F4F7; border-radius:16px; overflow:hidden;">
             <div style="background:#0A1A2F; padding:36px 30px; text-align:center; border-bottom:4px solid #1BC7C9;">
               <h1 style="color:#fff; font-size:30px; margin:0 0 4px; font-weight:900; letter-spacing:-1px;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
@@ -814,7 +814,7 @@ export class EmailService {
               <a href="${frontendUrl}/dashboard/customer" style="display:inline-block; padding:16px 48px; background:#1BC7C9; color:#fff; text-decoration:none; border-radius:12px; font-weight:800; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Track Order →</a>
             </div>
             <div style="background:#0A1A2F; padding:20px 30px; text-align:center;">
-              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
             </div>
           </div>
         `);
@@ -825,7 +825,7 @@ export class EmailService {
 
   async sendEmailOtp(email: string, name: string, code: string) {
     try {
-      await this.sendMail(email, `🔐 Your Atlantis Verification Code: ${code}`, `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #FF9900;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#0A1A2F;font-size:22px;margin:0 0 16px;">Verification Code 🔐</h2><p style="color:#2E2E2E;font-size:15px;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;">Your one-time verification code is:</p><div style="background:#F2F4F7;border-radius:12px;padding:24px;text-align:center;margin:24px 0;"><span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#0A1A2F;font-family:monospace;">${code}</span></div><p style="color:#667085;font-size:13px;">This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p></div></div>`);
+      await this.sendMail(email, `🔐 Your Ali FMCG Verification Code: ${code}`, `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #FF9900;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#0A1A2F;font-size:22px;margin:0 0 16px;">Verification Code 🔐</h2><p style="color:#2E2E2E;font-size:15px;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;">Your one-time verification code is:</p><div style="background:#F2F4F7;border-radius:12px;padding:24px;text-align:center;margin:24px 0;"><span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#0A1A2F;font-family:monospace;">${code}</span></div><p style="color:#667085;font-size:13px;">This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p></div></div>`);
     } catch (err) {
       console.error('ERROR [sendEmailOtp]:', err);
     }
@@ -836,7 +836,7 @@ export class EmailService {
    */
   async sendRegistrationConfirmationEmail(email: string, name: string, locale: string = 'en') {
     const isAr = locale === 'ar';
-    const subject = isAr ? 'تم استلام طلب التسجيل - Atlantis Marketplace Onboarding' : 'Registration Received - Atlantis Marketplace Onboarding';
+    const subject = isAr ? 'تم استلام طلب التسجيل - Ali FMCG Marketplace Onboarding' : 'Registration Received - Ali FMCG Marketplace Onboarding';
     
     try {
       await this.sendMail(email, subject, `
@@ -850,8 +850,8 @@ export class EmailService {
               <p style="font-size: 18px; line-height: 1.6; color: #2E2E2E;">${isAr ? 'مرحباً' : 'Hello'} <strong style="color: #1BC7C9;">${name || (isAr ? 'شريكنا العزيز' : 'Dear Partner')}</strong>،</p>
               <p style="font-size: 16px; line-height: 1.8; color: #2E2E2E;">
                 ${isAr 
-                  ? 'شكراً جزيلاً لتسجيلك في منصة Atlantis. لقد استلمنا طلب انضمامك بنجاح، ويتم الآن مراجعته لضمان أفضل تجربة لك.' 
-                  : 'Thank you for registering with Atlantis. We have successfully received your application, and it is currently being reviewed to ensure the best experience for you.'}
+                  ? 'شكراً جزيلاً لتسجيلك في منصة Ali FMCG. لقد استلمنا طلب انضمامك بنجاح، ويتم الآن مراجعته لضمان أفضل تجربة لك.' 
+                  : 'Thank you for registering with Ali FMCG. We have successfully received your application, and it is currently being reviewed to ensure the best experience for you.'}
               </p>
               
               <div style="background: #F2F4F7; border-${isAr ? 'right' : 'left'}: 4px solid #1BC7C9; padding: 20px; margin: 30px 0; border-radius: 8px;">
@@ -863,13 +863,13 @@ export class EmailService {
               </div>
 
               <p style="font-size: 13px; color: #667085; text-align: center; margin-top: 40px;">
-                ${isAr ? 'فريق Atlantis يتمنى لك يوماً سعيداً!' : 'The Atlantis team wishes you a great day!'}
+                ${isAr ? 'فريق Ali FMCG يتمنى لك يوماً سعيداً!' : 'The Ali FMCG team wishes you a great day!'}
               </p>
             </div>
 
             <div style="background: #0A1A2F; padding: 25px; text-align: center;">
               <p style="color: #FFFFFF; font-size: 16px; font-weight: 900; margin: 0 0 4px;">Atlan<span style="color: #1BC7C9;">tis</span></p>
-              <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+              <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
             </div>
           </div>
         `);
@@ -918,7 +918,7 @@ export class EmailService {
             </div>
           </div>
           <div style="background:#0A1A2F; padding:20px; text-align:center;">
-            <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace</p>
+            <p style="color:#667085; font-size:11px; margin:0;">© 2026 Ali FMCG Marketplace</p>
           </div>
         </div>
       `;

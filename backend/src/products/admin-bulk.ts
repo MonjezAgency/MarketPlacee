@@ -14,7 +14,7 @@ import type { CatalogScope } from './catalog-scope';
  *   Drafts were never submitted, approved products are live and rejected ones are
  *   closed: none of those change in bulk (each can still be opened on its own).
  *
- *  Atlantis Catalog (staff-owned products only)
+ *  Ali FMCG Catalog (staff-owned products only)
  *   • approve  — publish a complete draft or pending catalog product.
  *   • delete   — only products nothing else depends on. Deleting cascades to
  *     target-price requests, special offers and wholesale offers, and detaches
@@ -51,7 +51,7 @@ export function planBulk(action: BulkAction, ids: string[], found: BulkCandidate
         if (action === 'approve') {
             if (s === 'APPROVED') { skip(c, 'ALREADY_APPROVED'); continue; }
             if (s === 'REJECTED') { skip(c, 'CLOSED'); continue; }
-            // A supplier draft was never submitted; an Atlantis draft is ours to publish.
+            // A supplier draft was never submitted; an Ali FMCG draft is ours to publish.
             if (s === 'DRAFT' && c.scope === 'submissions') { skip(c, 'NOT_SUBMITTED'); continue; }
             if (s === 'NEEDS_CHANGES' && c.scope === 'submissions') { skip(c, 'ALREADY_CHANGES'); continue; }
             const missing = missingForPublish(c.product).map((m) => m.label);

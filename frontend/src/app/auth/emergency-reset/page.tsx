@@ -80,7 +80,7 @@ export default function EmergencyResetPage() {
                             <ShieldAlert size={26} />
                         </div>
                         <div>
-                            <p className="text-[11px] font-black uppercase tracking-[0.3em] opacity-80">Atlantis Operator</p>
+                            <p className="text-[11px] font-black uppercase tracking-[0.3em] opacity-80">Ali FMCG Operator</p>
                             <h1 className="text-[24px] font-black">Emergency Password Reset</h1>
                         </div>
                     </div>

@@ -48,7 +48,7 @@ const BENEFITS = [
 ];
 
 export default function MarketingPage() {
-    // Atlantis sells directly. Supplier marketing tools are invite-only and
+    // Ali FMCG sells directly. Supplier marketing tools are invite-only and
     // must NOT be visible to public visitors or to customers — otherwise we
     // leak the existence of a supplier program. Redirect anyone who is not
     // a SUPPLIER / ADMIN / OWNER to the homepage.
@@ -80,10 +80,10 @@ export default function MarketingPage() {
                         </div>
                         <h1 className="text-4xl md:text-5xl font-black leading-tight mb-6">
                             Grow Your Sales<br />
-                            <span className="text-primary">on Atlantis</span>
+                            <span className="text-primary">on Ali FMCG</span>
                         </h1>
                         <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mb-8">
-                            As a verified Atlantis supplier, you have access to powerful placement tools to boost your product visibility and reach more B2B buyers across Europe and the Gulf.
+                            As a verified Ali FMCG supplier, you have access to powerful placement tools to boost your product visibility and reach more B2B buyers across Europe and the Gulf.
                         </p>
                         <div className="flex items-center gap-4 flex-wrap">
                             <Link href="/supplier" className="h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm">
@@ -117,7 +117,7 @@ export default function MarketingPage() {
 
                     {/* Benefits */}
                     <section className="mb-20">
-                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Why Use Atlantis Placements</p>
+                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Why Use Ali FMCG Placements</p>
                         <h2 className="text-3xl font-black mb-8">Built for B2B Results</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {BENEFITS.map((b) => (

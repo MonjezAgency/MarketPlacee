@@ -10,7 +10,7 @@
  *   • mode="supplier" — minimal field set (image · price · stock ·
  *     product details · logistics). No verification badge, no admin
  *     notes, no status override.
- *   • mode="admin" — adds the "Verified by Atlantis" status card with
+ *   • mode="admin" — adds the "Verified by Ali FMCG" status card with
  *     product ID + created date, an Admin Notes textarea, and a Status
  *     dropdown (APPROVED / PENDING / REJECTED / NEEDS_CHANGES).
  *
@@ -71,7 +71,7 @@ interface ProductEditorFormProps {
     backHref: string;
 }
 
-// Unit Type intentionally lists Case first — Atlantis is a wholesale
+// Unit Type intentionally lists Case first — Ali FMCG is a wholesale
 // B2B platform and 90% of supplier listings are case-level, not piece.
 // Operator-requested: don't default to "Piece" — force a deliberate
 // pick or land on Case as the safer default.
@@ -1229,10 +1229,10 @@ export default function ProductEditorForm({
         if (!formData) return;
 
         // ── Required-fields gate ─────────────────────────────────
-        // Operator-mandated: every Atlantis listing MUST carry these
+        // Operator-mandated: every Ali FMCG listing MUST carry these
         // fields before it can be sent for approval. Saving with any
         // of them blank used to silently persist a half-product that
-        // Atlantis would then reject — wasting a review round-trip.
+        // Ali FMCG would then reject — wasting a review round-trip.
         // Now we block the save up-front, list every missing field
         // in one toast, and never even POST the malformed payload.
         const missing: string[] = [];
@@ -1288,7 +1288,7 @@ export default function ProductEditorForm({
         if (formData.brand && looksFake(formData.brand)) fakeWarnings.push('Brand');
         if (fakeWarnings.length > 0) {
             toast.error(
-                `These look like random characters: ${fakeWarnings.join(', ')}. Use the real value or Atlantis will reject the listing.`,
+                `These look like random characters: ${fakeWarnings.join(', ')}. Use the real value or Ali FMCG will reject the listing.`,
                 { duration: 6500 },
             );
             return;
@@ -2042,7 +2042,7 @@ export default function ProductEditorForm({
                                     )}
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-zinc-500 leading-relaxed">
-                                    This product is reviewed and verified by Atlantis.
+                                    This product is reviewed and verified by Ali FMCG.
                                 </p>
 
                                 <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-white/[0.05]">
@@ -2261,7 +2261,7 @@ export default function ProductEditorForm({
                                             <a href="/admin/settings" className="font-bold text-blue-700 dark:text-blue-300 underline">
                                                 /admin/settings
                                             </a>
-                                            . Suppliers don't see this — only Atlantis ops.
+                                            . Suppliers don't see this — only Ali FMCG ops.
                                         </p>
                                     </div>
                                 )}

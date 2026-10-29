@@ -19,7 +19,7 @@
  *
  * The time zone is the supplier account's when the account has one (the User
  * model has none today), otherwise REPORT_TIME_ZONE — UTC, the calendar the
- * rest of Atlantis already uses for dates (ISO day keys, invoices, emails).
+ * rest of Ali FMCG already uses for dates (ISO day keys, invoices, emails).
  */
 export const REPORT_TIME_ZONE = 'UTC';
 export const MAX_CUSTOM_DAYS = 366;

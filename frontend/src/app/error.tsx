@@ -7,7 +7,7 @@
  * a real, visible error message + a Reset button.
  *
  * IMPORTANT: this is intentionally informative even in production
- * — Atlantis is a B2B operator-facing app, not a consumer app, and
+ * — Ali FMCG is a B2B operator-facing app, not a consumer app, and
  * a silent generic error is worse than a verbose one because the
  * operator can't tell us what went wrong.
  */
@@ -23,7 +23,7 @@ export default function GlobalRouteError({
 }) {
     React.useEffect(() => {
         // Loud server-visible log for Vercel logs / Sentry pickup later.
-        console.error('[Atlantis route error]', error);
+        console.error('[Ali FMCG route error]', error);
     }, [error]);
 
     return (

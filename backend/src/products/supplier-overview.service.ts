@@ -17,7 +17,7 @@ import { LEGACY_CONFIRMED, AWAITING_SUPPLIER_STATUSES, attentionCounts, awaiting
  *    never written, Order.supplierId is never set). See ORDER_PAYMENT_REFUND_GAPS §4, §16.
  *  • Outstanding settlements — same dependency.
  *  • Refunds / deductions — no refund or deduction record (§6; REFUND_ISSUED is never written).
- *  • Net earnings — supplier prices are already net (the Atlantis margin is
+ *  • Net earnings — supplier prices are already net (the Ali FMCG margin is
  *    added on top of them for buyers); with no recorded deductions there is no
  *    second figure to show, so it isn't shown separately from gross sales.
  */

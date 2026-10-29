@@ -71,7 +71,7 @@ function mapProduct(item: any): Product {
     return {
         id: item.id,
         name: item.name,
-        brand: item.brandDisplay || item.brand || 'Atlantis',
+        brand: item.brandDisplay || item.brand || 'Ali FMCG',
         price: item.price ?? 0,
         // Set by the API for signed-out visitors: prices were withheld server-side.
         pricesHidden: !!item.pricesHidden,

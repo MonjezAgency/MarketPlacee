@@ -13,7 +13,7 @@ import { loadDeliveryCountries } from '../shipping/delivery-policy';
  * signed-in user ONLY (identity comes from the verified token, never from
  * the client), and only for the topic being asked about. Every query is
  * scoped by ownership: a supplier sees their own products/orders, a buyer
- * their own orders/cart. Buyer prices, Atlantis margins, other users' data
+ * their own orders/cart. Buyer prices, Ali FMCG margins, other users' data
  * and internal admin notes are never included for suppliers; supplier
  * prices are never included for buyers.
  */
@@ -62,7 +62,7 @@ export class SupportContextService {
         const links: SupportLink[] = [];
         if (group === 'supplier') await this.supplier(viewer.id, question, areas, lines, links);
         else if (group === 'buyer') await this.buyer(viewer.id, question, areas, lines, links, opts.cart);
-        else lines.push('The user is Atlantis staff; no account facts are attached in the support assistant.');
+        else lines.push('The user is Ali FMCG staff; no account facts are attached in the support assistant.');
         const seen = new Set<string>();
         return { role: group, areas, facts: lines.join('\n'), links: links.filter((l) => !seen.has(l.href) && seen.add(l.href)).slice(0, 4) };
     }
@@ -90,7 +90,7 @@ export class SupportContextService {
         const describe = async (p: any) => {
             const missing = missingForPublish(p);
             const mv = (await stockMovements(this.prisma, [p.id]))[p.id];
-            out.push(`Product "${p.name}" (Atlantis ID ${p.id}, EAN ${p.ean || 'none'}): status ${p.status}. ${statusExplanation(p.status, missing, p.status === 'NEEDS_CHANGES' || p.status === 'REJECTED' ? p.adminNotes : null)}`
+            out.push(`Product "${p.name}" (Ali FMCG ID ${p.id}, EAN ${p.ean || 'none'}): status ${p.status}. ${statusExplanation(p.status, missing, p.status === 'NEEDS_CHANGES' || p.status === 'REJECTED' ? p.adminNotes : null)}`
                 + `${missing.length ? ` Missing/invalid: ${missing.map((m) => `${m.label} (${m.reason})`).join('; ')}.` : ''}`
                 + ` Stock: ${p.stock ?? 0} cases available${mv ? `, ${mv.reserved} reserved on open orders, ${mv.inTransit} in transit` : ''}.`
                 + ` Your price: ${p.supplierPrice && p.supplierCurrency ? `${p.supplierPrice} ${p.supplierCurrency}` : p.basePrice ? `${p.basePrice} EUR` : 'not set'} per case.`
@@ -116,11 +116,11 @@ export class SupportContextService {
             const zero = live.filter((p) => !(p.stock > 0)).slice(0, 8);
             const low = live.filter((p) => p.stock > 0 && minOrderCases(p) > 0 && p.stock < minOrderCases(p)).slice(0, 8);
             out.push(`Out of stock (live): ${zero.length ? zero.map((p) => `"${p.name}"`).join(', ') : 'none'}. Below one minimum order: ${low.length ? low.map((p) => `"${p.name}" (${p.stock} cases, MOQ ${minOrderCases(p)} cases)`).join(', ') : 'none'}.`);
-            out.push('How stock works on Atlantis: stock is counted in cases; orders take stock when placed and return it if cancelled before dispatch. Suppliers change stock per product (Stock & Reservations → Adjust) or in bulk (Inventory & Products → Update prices & stock).');
+            out.push('How stock works on Ali FMCG: stock is counted in cases; orders take stock when placed and return it if cancelled before dispatch. Suppliers change stock per product (Stock & Reservations → Adjust) or in bulk (Inventory & Products → Update prices & stock).');
             links.push({ label: 'Stock & reservations', href: '/supplier/inventory' });
         }
         if (areas.includes('pricing')) {
-            out.push('How pricing works: the supplier enters their own price per case (in their currency, converted to EUR once). Buyers see a price that includes the Atlantis margin; the margin and buyer prices are not shown to suppliers. Price changes on live products apply immediately and are recorded in the product history.');
+            out.push('How pricing works: the supplier enters their own price per case (in their currency, converted to EUR once). Buyers see a price that includes the Ali FMCG margin; the margin and buyer prices are not shown to suppliers. Price changes on live products apply immediately and are recorded in the product history.');
             if (!focus) out.push(`Your prices (latest 8): ${products.slice(0, 8).map((p) => `"${p.name}" ${p.supplierPrice && p.supplierCurrency ? `${p.supplierPrice} ${p.supplierCurrency}` : p.basePrice ?? 'not set'}`).join('; ') || 'no products'}.`);
             links.push({ label: 'Update prices & stock', href: '/supplier/products' });
         }
@@ -189,7 +189,7 @@ export class SupportContextService {
             const miss = missingProfileFields(me);
             if (me?.onboardingCompleted === false && miss.length) out.push(`Checkout is blocked until the business profile is complete (missing: ${miss.join(', ')}).`);
             const { countries } = await loadDeliveryCountries(this.prisma);
-            out.push(`Delivery: Atlantis delivers to ${countries.length} countries (Europe and the Gulf by default); Egypt ${countries.includes('EG') ? 'is' : 'is not'} supported. Checkout refuses unsupported destinations. Freight is quoted after the order; VAT is added on the invoice.`);
+            out.push(`Delivery: Ali FMCG delivers to ${countries.length} countries (Europe and the Gulf by default); Egypt ${countries.includes('EG') ? 'is' : 'is not'} supported. Checkout refuses unsupported destinations. Freight is quoted after the order; VAT is added on the invoice.`);
             out.push('Checkout rules: every line must meet the product minimum order (shown as progress in the cart) and fit the stock; mixed loads combine variants of the same product.');
             links.push({ label: 'Cart', href: '/cart' });
         }

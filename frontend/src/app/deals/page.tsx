@@ -9,7 +9,7 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 
 /**
  * Deals = only real, verifiable savings:
- *   1. Active coupon codes created by Atlantis admins (/coupons).
+ *   1. Active coupon codes created by Ali FMCG admins (/coupons).
  *   2. Genuine price drops — products whose current price is below their
  *      recorded previous price (/products/price-ticker, delta < 0).
  * Nothing else is labelled a "deal"; if neither exists we say so.
@@ -78,7 +78,7 @@ export default function DealsPage() {
             <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
                 <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-teal">Deals</p>
                 <h1 className="font-sans mt-2 text-[30px] sm:text-[38px] font-bold tracking-tight text-heading">Price drops &amp; promo codes</h1>
-                <p className="mt-2 text-[15px] text-ink-2 max-w-2xl">Only real savings: products whose price has actually been reduced, and active Atlantis promo codes.</p>
+                <p className="mt-2 text-[15px] text-ink-2 max-w-2xl">Only real savings: products whose price has actually been reduced, and active Ali FMCG promo codes.</p>
 
                 {coupons.length > 0 && (
                     <section className="mt-10">

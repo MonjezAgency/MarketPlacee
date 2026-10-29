@@ -1,5 +1,5 @@
 /**
- * Email-safe Atlantis campaign markup (pure). Tables + inline styles, 600 px
+ * Email-safe Ali FMCG campaign markup (pure). Tables + inline styles, 600 px
  * max, one small <style> block only for the mobile fallback, alt text on every
  * image, no web-only CSS (no flex/grid/positioning/custom properties).
  * The exact string returned here is what the preview shows, what a test email
@@ -58,7 +58,7 @@ export function brandFromEnv(env: NodeJS.ProcessEnv = process.env): EmailBrand {
         logoUrl: `${site}/brand/atlantis-mark.png`,
         // Published on the Contact page (frontend/src/app/contact/ContactClient.tsx).
         contactEmail: env.MARKETING_CONTACT_EMAIL || 'Info@atlantisfmcg.com',
-        senderName: env.MARKETING_SENDER_NAME || 'Atlantis',
+        senderName: env.MARKETING_SENDER_NAME || 'Ali FMCG',
         senderAddress: env.MARKETING_SENDER_ADDRESS || null,
     };
 }
@@ -80,7 +80,7 @@ function productRows(products: EmailProduct[], siteUrl: string, showPrices: bool
             ? `<p style="margin:6px 0 0;${FONT}font-size:13px;color:#475569;"><a href="${esc(login)}" style="color:#0E7C74;text-decoration:underline;">Sign in to see the wholesale price</a></p>`
             : p.casePrice !== null && Number.isFinite(p.casePrice)
             ? `<p style="margin:6px 0 0;${FONT}font-size:15px;font-weight:bold;color:#0B1F3A;">${esc(eur(p.casePrice))} <span style="font-weight:normal;font-size:13px;color:#475569;">per case, excl. VAT${p.unitsPerCase ? ` · ${esc(p.unitsPerCase)} units per case` : ''}</span></p>`
-            : `<p style="margin:6px 0 0;${FONT}font-size:13px;color:#475569;">Price shown on Atlantis</p>`;
+            : `<p style="margin:6px 0 0;${FONT}font-size:13px;color:#475569;">Price shown on Ali FMCG</p>`;
         return `<tr><td style="padding:0 0 12px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E2E8F0;border-radius:8px;">
 <tr>
@@ -121,7 +121,7 @@ export function renderCampaignEmail(input: {
     const site = safeUrl(brand.siteUrl) || 'https://www.atlantisfmcg.com';
     const host = site.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-    const eyebrow = template === 'ANNOUNCEMENT' ? 'Announcement' : template === 'PRODUCTS' ? 'From the Atlantis catalog' : '';
+    const eyebrow = template === 'ANNOUNCEMENT' ? 'Announcement' : template === 'PRODUCTS' ? 'From the Ali FMCG catalog' : '';
     const headline = String(content.headline || '').trim();
 
     return `<!DOCTYPE html>
@@ -146,7 +146,7 @@ ${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-h
 <table role="presentation" class="atl-container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;">
 <tr><td class="atl-pad" style="padding:24px 32px;background:#0B1F3A;border-radius:12px 12px 0 0;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-<td valign="middle" style="padding-right:12px;"><a href="${esc(site)}"><img src="${esc(brand.logoUrl)}" width="40" height="40" alt="Atlantis" style="display:block;width:40px;height:40px;border:0;border-radius:8px;background:#FFFFFF;" /></a></td>
+<td valign="middle" style="padding-right:12px;"><a href="${esc(site)}"><img src="${esc(brand.logoUrl)}" width="40" height="40" alt="Ali FMCG" style="display:block;width:40px;height:40px;border:0;border-radius:8px;background:#FFFFFF;" /></a></td>
 <td valign="middle" style="${FONT}font-size:20px;font-weight:bold;letter-spacing:1px;color:#FFFFFF;">ATLAN<span style="color:#2EC4B6;">TIS.</span></td>
 </tr></table>
 </td></tr>
@@ -159,7 +159,7 @@ ${products.length ? `<tr><td class="atl-pad" style="padding:8px 32px 4px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 ${productRows(products, site, showPrices)}
 </table>
-${showPrices ? `<p style="margin:0 0 8px;${FONT}font-size:12px;line-height:1.5;color:#64748B;">Prices are the case prices listed on Atlantis when this email was sent, excluding VAT. Your order request shows the price that applies.</p>` : ''}
+${showPrices ? `<p style="margin:0 0 8px;${FONT}font-size:12px;line-height:1.5;color:#64748B;">Prices are the case prices listed on Ali FMCG when this email was sent, excluding VAT. Your order request shows the price that applies.</p>` : ''}
 </td></tr>` : ''}
 ${cta && ctaLabel ? `<tr><td class="atl-pad" style="padding:16px 32px 8px;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
@@ -172,7 +172,7 @@ ${content.closing ? `<tr><td class="atl-pad" style="padding:16px 32px 0;">${para
 <tr><td style="padding-top:16px;${FONT}font-size:12px;line-height:1.6;color:#64748B;">
 <p style="margin:0 0 6px;">${esc(brand.senderName)} · <a href="${esc(site)}" style="color:#0E7C74;">${esc(host)}</a> · <a href="mailto:${esc(brand.contactEmail)}" style="color:#0E7C74;">${esc(brand.contactEmail)}</a></p>
 ${brand.senderAddress ? `<p style="margin:0 0 6px;">${esc(brand.senderAddress)}</p>` : ''}
-<p style="margin:0 0 6px;">You receive this email because you subscribed to Atlantis updates or switched on marketing emails in your Atlantis account. Order and account emails are separate and not affected.</p>
+<p style="margin:0 0 6px;">You receive this email because you subscribed to Ali FMCG updates or switched on marketing emails in your Ali FMCG account. Order and account emails are separate and not affected.</p>
 <p style="margin:0;"><a href="${unsub === UNSUBSCRIBE_PLACEHOLDER ? unsub : esc(unsub)}" style="color:#334155;text-decoration:underline;">Unsubscribe from marketing emails</a></p>
 </td></tr>
 </table>

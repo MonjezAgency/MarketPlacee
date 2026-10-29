@@ -227,8 +227,8 @@ interface Location { id: string; name: string; address: string; city: string; co
 
 /**
  * Supplier-owned dispatch addresses (GET/POST/DELETE /finance/warehouses).
- * Offers show a product's location as "ships from". These are not Atlantis
- * hubs (Settings → Atlantis hubs) and Atlantis doesn't operate them.
+ * Offers show a product's location as "ships from". These are not Ali FMCG
+ * hubs (Settings → Ali FMCG hubs) and Ali FMCG doesn't operate them.
  */
 export function DispatchLocationsPanel({ canWrite }: { canWrite: boolean }) {
     const tf = useTf();

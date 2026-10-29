@@ -4,8 +4,8 @@ export const account: Article[] = [
     {
         slug: 'create-an-account',
         category: 'account',
-        title: 'Create an Atlantis account',
-        summary: 'Register in three steps (Account, Business, Review), verify your email, and wait for the Atlantis team to approve the account.',
+        title: 'Create an Ali FMCG account',
+        summary: 'Register in three steps (Account, Business, Review), verify your email, and wait for the Ali FMCG team to approve the account.',
         audience: 'both',
         popular: true,
         keywords: ['sign up', 'register', 'registration', 'new account', 'join'],
@@ -31,7 +31,7 @@ export const account: Article[] = [
             { h2: 'Business types' },
             { p: 'Choose the one closest to your business: Wholesaler, Distributor, Importer, Exporter / re-exporter, Import–export trading company, Brand owner / manufacturer, Sourcing or procurement agent, or Other bulk-trading business.' },
             { h2: 'What happens next' },
-            { p: 'After you verify your email, the account waits for approval by the Atlantis team. You will receive an email once it is approved. See [Account approval](/help/account/account-approval).' },
+            { p: 'After you verify your email, the account waits for approval by the Ali FMCG team. You will receive an email once it is approved. See [Account approval](/help/account/account-approval).' },
             { faq: [
                 { q: 'I registered with an email that already has an account. What happens?', a: 'For privacy, the sign-up screen looks the same either way. The owner of that address receives an email saying someone tried to register with it. If it is your address, [reset your password](/help/account/password-and-sign-in) instead.' },
                 { q: 'Can I add my VAT number during sign-up?', a: 'No. The registration form doesn\'t ask for a VAT number.' },
@@ -48,7 +48,7 @@ export const account: Article[] = [
         keywords: ['verification code', 'confirm email', '6-digit', 'code not received'],
         blocks: [
             { steps: [
-                'Look for the email with the subject **"{code} is your Atlantis verification code"**.',
+                'Look for the email with the subject **"{code} is your Ali FMCG verification code"**.',
                 'Enter the code on the [verification page](/auth/verify-email).',
                 'You will receive a second email confirming that your address is verified.',
             ] },
@@ -73,20 +73,20 @@ export const account: Article[] = [
         slug: 'account-approval',
         category: 'account',
         title: 'Account approval',
-        summary: 'Every account created with email and password is reviewed by the Atlantis team before it becomes active. Here is what each account status means.',
+        summary: 'Every account created with email and password is reviewed by the Ali FMCG team before it becomes active. Here is what each account status means.',
         audience: 'both',
         keywords: ['pending', 'approval', 'awaiting approval', 'review', 'rejected', 'blocked', 'activate'],
         blocks: [
-            { p: 'After you verify your email, the Atlantis team is notified and reviews your registration. Until then, signing in shows a message that your account is awaiting approval.' },
+            { p: 'After you verify your email, the Ali FMCG team is notified and reviews your registration. Until then, signing in shows a message that your account is awaiting approval.' },
             { h2: 'Account statuses' },
             { table: { head: ['Status', 'What it means', 'What you can do'], rows: [
-                ['Awaiting approval', 'The Atlantis team hasn\'t reviewed the account yet.', 'Wait for the approval email. Questions: Info@atlantisfmcg.com'],
+                ['Awaiting approval', 'The Ali FMCG team hasn\'t reviewed the account yet.', 'Wait for the approval email. Questions: Info@atlantisfmcg.com'],
                 ['Active', 'Approved. You can sign in and use the platform.', 'Buyers start in the catalog; suppliers in their [supplier dashboard](/supplier).'],
                 ['Rejected', 'The application wasn\'t accepted.', 'You receive an email. Contact Info@atlantisfmcg.com to discuss it.'],
                 ['Blocked', 'Access has been suspended.', 'Contact Info@atlantisfmcg.com.'],
             ] } },
             { h2: 'When you are approved' },
-            { p: 'You receive the email **"Welcome to Atlantis — Your account is approved!"**. Its button takes suppliers to the Supplier Hub and buyers to the homepage.' },
+            { p: 'You receive the email **"Welcome to Ali FMCG — Your account is approved!"**. Its button takes suppliers to the Supplier Hub and buyers to the homepage.' },
             { note: 'Accounts created with **Sign in with Google** are buyer accounts and are active immediately. See [Sign in with Google](/help/account/sign-in-with-google).', tone: 'info' },
         ],
         related: ['account/create-an-account', 'account/verify-your-email', 'troubleshooting/cant-sign-in'],
@@ -99,14 +99,14 @@ export const account: Article[] = [
         audience: 'both',
         keywords: ['google', 'oauth', 'social login', 'gmail'],
         blocks: [
-            { h2: 'New to Atlantis' },
+            { h2: 'New to Ali FMCG' },
             { list: [
                 'Signing up with Google creates a **buyer** account that is active straight away. Your email counts as verified.',
                 'You then [complete your business profile](/help/account/complete-your-business-profile) (company, business type, country and phone) before you can place an order.',
                 'Supplier accounts can\'t be created with Google. Register as a supplier with your email and a password.',
             ] },
             { h2: 'Already have an account' },
-            { p: 'You can sign in with Google if the Google address matches your Atlantis sign-in email. Google sign-in is not available when:' },
+            { p: 'You can sign in with Google if the Google address matches your Ali FMCG sign-in email. Google sign-in is not available when:' },
             { list: [
                 '**Two-step verification is on.** Sign in with your email and password, then your authenticator code.',
                 'The account is awaiting approval, rejected or blocked.',
@@ -122,7 +122,7 @@ export const account: Article[] = [
         audience: 'buyer',
         keywords: ['profile', 'company details', 'onboarding', 'incomplete profile', 'business profile'],
         blocks: [
-            { p: 'Atlantis needs five details to process an order: your name, company name, business type, country and phone number. Accounts registered with email and password provide them during sign-up. Accounts created with Google add them afterwards.' },
+            { p: 'Ali FMCG needs five details to process an order: your name, company name, business type, country and phone number. Accounts registered with email and password provide them during sign-up. Accounts created with Google add them afterwards.' },
             { steps: [
                 'Open [Complete your profile](/auth/complete-profile).',
                 'Enter your company name, business type, country and business phone.',
@@ -145,7 +145,7 @@ export const account: Article[] = [
             { h2: 'Reset a forgotten password' },
             { steps: [
                 'Open [Forgot password](/auth/forgot-password) and enter your sign-in email.',
-                'Open the email **"Reset your Atlantis password"**. The link is valid for 1 hour.',
+                'Open the email **"Reset your Ali FMCG password"**. The link is valid for 1 hour.',
                 'Choose a new password that follows the [password rules](/help/account/create-an-account).',
             ] },
             { p: 'For privacy, the page always says "If that email exists, a reset link was sent.", whether or not the address has an account.' },
@@ -168,7 +168,7 @@ export const account: Article[] = [
             { h2: 'Turn it on' },
             { steps: [
                 'Open [Security](/dashboard/security).',
-                'Scan the QR code with your authenticator app. The entry appears as **Atlantis Marketplace**.',
+                'Scan the QR code with your authenticator app. The entry appears as **Ali FMCG Marketplace**.',
                 'Enter the 6-digit code from the app to confirm.',
                 'Save the **8 backup codes** somewhere safe, such as a password manager.',
             ] },
@@ -192,20 +192,20 @@ export const account: Article[] = [
         slug: 'identity-verification',
         category: 'account',
         title: 'Verification status',
-        summary: 'What the verification status in your settings means, and how it relates to buying and selling on Atlantis.',
+        summary: 'What the verification status in your settings means, and how it relates to buying and selling on Ali FMCG.',
         audience: 'both',
         keywords: ['kyc', 'verification', 'identity', 'verified supplier', 'documents'],
         blocks: [
             { p: 'Your settings show a verification status for your account. Suppliers also see it as a badge in the Supplier Hub header.' },
             { table: { head: ['Status', 'Meaning'], rows: [
                 ['Not submitted / Not verified yet', 'No verification has been completed for this account.'],
-                ['Submitted — under review', 'The Atlantis team is reviewing the documents.'],
-                ['Verified', 'The Atlantis team has verified the account. Verified suppliers are flagged as verified when offers are compared.'],
+                ['Submitted — under review', 'The Ali FMCG team is reviewing the documents.'],
+                ['Verified', 'The Ali FMCG team has verified the account. Verified suppliers are flagged as verified when offers are compared.'],
                 ['Rejected — resubmit', 'The review didn\'t pass. You receive an email explaining that the review needs attention.'],
             ] } },
             { h2: 'Does it limit what I can do?' },
             { p: 'No. Buying, listing products and receiving orders don\'t currently depend on verification status. Account approval is a separate step, covered in [Account approval](/help/account/account-approval).' },
-            { note: 'If the Atlantis team needs identity documents from you, they will contact you directly with instructions. Questions: Info@atlantisfmcg.com.', tone: 'info' },
+            { note: 'If the Ali FMCG team needs identity documents from you, they will contact you directly with instructions. Questions: Info@atlantisfmcg.com.', tone: 'info' },
         ],
         related: ['account/account-approval', 'buyers/compare-offers', 'settings/notifications-and-emails'],
     },

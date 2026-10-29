@@ -5,7 +5,7 @@ import type { DeliveryQuote } from '@/lib/wholesale';
  * Order confirmation workflow, as the server records it. The browser never
  * decides a status: every action below is checked again on the server.
  *
- *   submitted → every supplier accepts the exact terms → Atlantis approves
+ *   submitted → every supplier accepts the exact terms → Ali FMCG approves
  *   → (buyer accepts, only if the terms changed) → fulfilment → inspection
  */
 export type ReviewStatus = 'LEGACY' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
@@ -60,7 +60,7 @@ export interface SupplierWorkflow {
     label: string | null; terms: SupplierTerms | null;
 }
 
-// Atlantis staff
+// Ali FMCG staff
 export interface AdminWorkflow {
     reviewStatus: ReviewStatus; termsVersion: number; reviewedAt: string | null; reviewNote: string | null;
     buyerMustAccept: boolean; buyerAcceptedVersion: number | null; buyerAcceptedAt: string | null;

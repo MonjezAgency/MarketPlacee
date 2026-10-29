@@ -1,10 +1,10 @@
-# Atlantis translation glossary
+# Ali FMCG translation glossary
 
-One term per concept, used everywhere. Atlantis is a B2B FMCG wholesale marketplace
+One term per concept, used everywhere. Ali FMCG is a B2B FMCG wholesale marketplace
 (business buyers, suppliers, cases/cartons, pallets, truckloads). Keep the tone clear,
 professional and concise — short UI labels, no marketing fluff.
 
-Never translate: Atlantis, Monjez, Stripe, EAN, EXW, SKU, MOQ, email addresses, URLs,
+Never translate: Ali FMCG, Monjez, Stripe, EAN, EXW, SKU, MOQ, email addresses, URLs,
 {placeholders}, <tags>, product names, order ids, currency codes.
 
 Register: fr = vous · ro = formal (imperative plural: „Introduceți”, „dumneavoastră”) ·
@@ -26,7 +26,7 @@ pt = European Portuguese (pt-PT), formal third person („a sua conta”), never
 | dispute | litige | dispută | contestazione | reclamación | litígio |
 | refund | remboursement | rambursare | rimborso | reembolso | reembolso |
 | returns & refunds | Retours et remboursements | Retururi și rambursări | Resi e rimborsi | Devoluciones y reembolsos | Devoluções e reembolsos |
-| Atlantis hub | hub Atlantis | hub Atlantis | hub Atlantis | centro logístico de Atlantis | centro logístico da Atlantis |
+| Ali FMCG hub | hub Ali FMCG | hub Ali FMCG | hub Ali FMCG | centro logístico de Ali FMCG | centro logístico da Ali FMCG |
 | VAT | TVA | TVA | IVA | IVA | IVA |
 | cart | panier | coș | carrello | carrito | carrinho |
 | sign in / sign out | se connecter / se déconnecter | conectare / deconectare | accedi / esci | iniciar sesión / cerrar sesión | iniciar sessão / terminar sessão |

@@ -9,7 +9,7 @@ export default function HelpShell({ crumbs, children, aside }: { crumbs: { label
         <main className="bg-surface text-start">
             <div className="border-b border-line bg-surface-2/60">
                 <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
-                    <Link href="/help" className="text-[15px] font-bold text-heading shrink-0">Atlantis Help Center</Link>
+                    <Link href="/help" className="text-[15px] font-bold text-heading shrink-0">Ali FMCG Help Center</Link>
                     <div className="sm:ms-auto sm:w-[420px]"><HelpSearch /></div>
                 </div>
             </div>

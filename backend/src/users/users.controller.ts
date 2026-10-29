@@ -346,7 +346,7 @@ export class UsersController {
                         email: adminEmail,
                         password: hashedPassword,
                         name: 'Ali Dawara',
-                        companyName: 'Atlantis FMCG',
+                        companyName: 'Ali FMCG',
                         role: Role.OWNER,
                         status: 'ACTIVE',
                         emailVerified: true,

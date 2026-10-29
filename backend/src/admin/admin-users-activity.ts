@@ -8,7 +8,7 @@ import { saleRecognizedAt } from '../products/supplier-metrics';
  * MONEY DEFINITIONS (the only figures the account page shows)
  *
  *  Counted orders — orders that count as sales (supplier-metrics.ts
- *    saleRecognizedAt): workflow orders approved by Atlantis and not
+ *    saleRecognizedAt): workflow orders approved by Ali FMCG and not
  *    cancelled, and legacy orders confirmed with the status controls.
  *    Requests still waiting, rejected requests and cancelled orders are never counted.
  *  Gross order value (buyer prices)
@@ -20,7 +20,7 @@ import { saleRecognizedAt } from '../products/supplier-metrics';
  *    Σ OrderItem.supplierUnitPrice × quantity over this supplier's lines,
  *    counted only where the supplier price was recorded; `linesWithoutNet`
  *    says how many lines lack one (the figure is then partial).
- *  Atlantis margin (OWNER/ADMIN only)
+ *  Ali FMCG margin (OWNER/ADMIN only)
  *    Σ (OrderItem.price − supplierUnitPrice) × quantity over the same lines
  *    with a recorded supplier price. Partial under the same rule.
  *  Money received is NOT shown: the only payment records are Stripe escrow
@@ -29,7 +29,7 @@ import { saleRecognizedAt } from '../products/supplier-metrics';
 
 export const TAB_LIMIT = 14;
 export const TAB_MAX_LIMIT = 50;
-/** Staff who may see supplier net prices and the Atlantis margin. */
+/** Staff who may see supplier net prices and the Ali FMCG margin. */
 export const NET_ROLES = ['OWNER', 'ADMIN'] as const;
 export const canSeeNet = (role: unknown) => (NET_ROLES as readonly string[]).includes(String(role ?? ''));
 

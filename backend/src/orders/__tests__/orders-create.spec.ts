@@ -95,7 +95,7 @@ describe('OrdersService.create — server-side pricing', () => {
         expect(db.state.products.get('prime').stock).toBe(500 - 264);
         expect(order.items[0].stockCases).toBe(264);
     });
-    it('a new order waits for supplier acceptance and Atlantis approval — the buyer’s submit confirms nothing', async () => {
+    it('a new order waits for supplier acceptance and Ali FMCG approval — the buyer’s submit confirms nothing', async () => {
         const db = makeDb(), svc = makeService(db);
         db.state.products.get('prime').stock = 500;
         const order: any = await svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 1 }]);

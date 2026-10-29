@@ -2,7 +2,7 @@
 
 /**
  * Special offers management (backend: Promotion) for suppliers (own products,
- * net prices only) and Atlantis admins (any product, net and buyer prices).
+ * net prices only) and Ali FMCG admins (any product, net and buyer prices).
  * Every rule is enforced by the server; this page previews prices with the
  * same formula and always shows the values the server returns after saving.
  * Times are entered and shown in UTC.

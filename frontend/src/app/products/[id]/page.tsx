@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
     if (!product) {
         return {
-            title: 'Product Not Found | Atlantis Marketplace',
+            title: 'Product Not Found | Ali FMCG Marketplace',
             description: 'The product you are looking for is no longer available. Browse the wholesale catalogue.',
             robots: { index: false, follow: false },
         };
@@ -54,10 +54,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
     const brand = product.brand ? `${product.brand} ` : '';
     const titleBase = `${brand}${product.name}`.trim();
-    const title = `${titleBase} — Wholesale Bulk | Atlantis`;
+    const title = `${titleBase} — Wholesale Bulk | Ali FMCG`;
 
     const desc = product.description?.replace(/\s+/g, ' ').trim().slice(0, 155)
-        || `Buy ${titleBase} wholesale direct from Atlantis. Supplier-confirmed orders, EUR pricing. Order by carton, pallet, or full truck.`;
+        || `Buy ${titleBase} wholesale direct from Ali FMCG. Supplier-confirmed orders, EUR pricing. Order by carton, pallet, or full truck.`;
 
     const ogImage = (product.images || []).find(u => u && u.startsWith('http')) || `${SITE_URL}/og-image.png`;
 
@@ -105,7 +105,7 @@ export default async function ProductPage({ params }: { params: { id: string } }
                 ? 'https://schema.org/InStock'
                 : 'https://schema.org/OutOfStock',
             url: `${SITE_URL}/products/${product.id}`,
-            seller: { '@type': 'Organization', name: 'Atlantis Marketplace' },
+            seller: { '@type': 'Organization', name: 'Ali FMCG Marketplace' },
         } } : {}),
     } : null;
 

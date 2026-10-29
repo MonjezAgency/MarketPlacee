@@ -13,7 +13,7 @@ import { fetchMyDisputes, disputeReasonKey, type BuyerDispute } from '@/lib/disp
 import { call } from '@/lib/wholesale';
 import { cn } from '@/lib/utils';
 
-/** An Atlantis invoice as GET /invoices/my returns it (only these fields are shown). */
+/** An Ali FMCG invoice as GET /invoices/my returns it (only these fields are shown). */
 interface BuyerInvoice { id: string; invoiceNumber: string; orderId: string | null; amount: number; tax: number; totalAmount: number; currency: string | null; status: string; dueDate: string | null; paidAt: string | null; createdAt: string }
 
 const INVOICE_TONE: Record<string, string> = {
@@ -55,7 +55,7 @@ function Section({ id, title, icon: Icon, lead, children }: { id: string; title:
 
 /**
  * Payments & invoices — a read-only view of what the server records: each
- * order's payment status, Atlantis invoices and the buyer's disputes. Nothing
+ * order's payment status, Ali FMCG invoices and the buyer's disputes. Nothing
  * here pays, refunds or changes an order.
  */
 export default function PaymentsPage() {

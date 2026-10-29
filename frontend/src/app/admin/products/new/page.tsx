@@ -96,7 +96,7 @@ export default function AdminAddProductWorkspace() {
     // see their inbox full of products they never uploaded ("Admin
     // ضاف عند Supplier"). We now leave supplierId BLANK from the
     // frontend; the backend's `resolvePlatformSupplierId()` in
-    // products.controller.ts assigns it to the Atlantis OWNER user
+    // products.controller.ts assigns it to the Ali FMCG OWNER user
     // (Info@atlantisfmcg.com) automatically. That gives every admin-
     // keyed product a single canonical "supplier" — the platform
     // itself — instead of leaking the admin's personal account.
@@ -249,7 +249,7 @@ export default function AdminAddProductWorkspace() {
                 images: formData.images,
                 // Only send supplierId if the admin explicitly chose one via a
                 // picker (currently no picker). Sending undefined lets the
-                // backend assign the Atlantis platform supplier instead of
+                // backend assign the Ali FMCG platform supplier instead of
                 // the admin's own user.id.
                 supplierId: formData.supplierId || undefined,
                 // Compose the weight as "<value><unit>" so storage stays
@@ -305,7 +305,7 @@ export default function AdminAddProductWorkspace() {
                             <h1 className="text-[24px] font-semibold leading-[32px] tracking-tight text-teal-600">Admin Product Catalog</h1>
                             <div className="flex items-center gap-2 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-[#14B8A6] animate-pulse" />
-                                <span className="text-[12px] font-medium text-[#6B7280] uppercase tracking-wider">Atlantis Catalog product</span>
+                                <span className="text-[12px] font-medium text-[#6B7280] uppercase tracking-wider">Ali FMCG Catalog product</span>
                             </div>
                         </div>
                     </div>
@@ -458,7 +458,7 @@ export default function AdminAddProductWorkspace() {
                             </div>
                         </div>
 
-                        {/* Supplier picker removed — admin IS the supplier (Atlantis). */}
+                        {/* Supplier picker removed — admin IS the supplier (Ali FMCG). */}
 
                         {/* CARD 3: LOGISTICS & COMPLIANCE */}
                         <div className="bg-white border border-[#E5E7EB] rounded-[14px] p-5 shadow-sm space-y-5">
@@ -756,7 +756,7 @@ export default function AdminAddProductWorkspace() {
                             <div className="mt-3 p-3 bg-teal-50 border border-teal-100 rounded-xl flex items-center gap-2">
                                 <Store size={14} className="text-teal-600" />
                                 <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider">
-                                    Atlantis Platform Inventory
+                                    Ali FMCG Platform Inventory
                                 </span>
                             </div>
                         </div>
@@ -791,7 +791,7 @@ export default function AdminAddProductWorkspace() {
                         <div className="space-y-2">
                             <div className="h-[40px] px-3 bg-teal-50 border border-teal-100 rounded-[10px] flex items-center gap-2 text-teal-700">
                                 <Store size={16} />
-                                <span className="text-[13px] font-medium">Source: Atlantis (platform inventory)</span>
+                                <span className="text-[13px] font-medium">Source: Ali FMCG (platform inventory)</span>
                             </div>
                             <div className="h-[40px] px-3 bg-[#F59E0B]/5 border border-[#F59E0B]/10 rounded-[10px] flex items-center gap-2 text-[#F59E0B]">
                                 <Info size={16} />

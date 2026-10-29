@@ -98,7 +98,7 @@ export default function LogisticsOrdersPage() {
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Carrier Portal</p>
                         <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">My Assigned Orders</h1>
                         <p className="text-sm text-slate-500 mt-1">
-                            Every Atlantis order where you've been listed as the shipping carrier.
+                            Every Ali FMCG order where you've been listed as the shipping carrier.
                         </p>
                     </div>
                 </div>
@@ -153,7 +153,7 @@ export default function LogisticsOrdersPage() {
                         <Package size={36} className="text-slate-200 mx-auto mb-3" />
                         <p className="text-sm font-bold text-slate-500">No orders assigned to your company yet.</p>
                         <p className="text-xs text-slate-400 mt-1">
-                            When an Atlantis admin chooses your company as the shipping carrier, the order appears here automatically.
+                            When an Ali FMCG admin chooses your company as the shipping carrier, the order appears here automatically.
                         </p>
                     </div>
                 ) : (

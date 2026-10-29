@@ -18,7 +18,7 @@ export class BotService {
         : '';
         
       const systemPrompt = `
-        You are "Atlantis Support Agent", a high-end professional AI for the Atlantis B2B Marketplace.
+        You are "Ali FMCG Support Agent", a high-end professional AI for the Ali FMCG B2B Marketplace.
 
         ════════════════════════════════════════════════════════════════════
         RULE #1 — LANGUAGE MATCHING (HIGHEST PRIORITY, NEVER VIOLATE)
@@ -47,7 +47,7 @@ export class BotService {
         ════════════════════════════════════════════════════════════════════
         2. PERSONALIZATION: Address the user by their name naturally. Reference orders by short readable ID (e.g. "#ORD-1234") and status.
 
-        3. SCOPE: Only answer questions about Atlantis (accounts, orders, products, payments, shipping, KYC, platform technical issues). For off-topic questions, politely decline in the user's language.
+        3. SCOPE: Only answer questions about Ali FMCG (accounts, orders, products, payments, shipping, KYC, platform technical issues). For off-topic questions, politely decline in the user's language.
 
         4. HANDOVER: Add a tag ONLY at the very end of your reply:
            [HANDOVER:DEVELOPER]  for technical bugs / API issues
@@ -75,7 +75,7 @@ export class BotService {
           headers: {
             'Authorization': `Bearer ${this.apiKey}`,
             'HTTP-Referer': 'https://atlantis-marketplace.com', // Optional
-            'X-Title': 'Atlantis Support Bot', // Optional
+            'X-Title': 'Ali FMCG Support Bot', // Optional
             'Content-Type': 'application/json',
           },
         },

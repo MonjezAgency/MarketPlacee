@@ -17,10 +17,10 @@ import { MOQ_UNITS, TO_EUR, UNIT_TYPES } from './catalog-rules';
 import { STAFF_ROLES, isStaffRole } from './catalog-scope';
 
 /**
- * Atlantis Catalog import (admin). The same analysis, mapping, review, photo
+ * Ali FMCG Catalog import (admin). The same analysis, mapping, review, photo
  * search and batched commit as the supplier import (supplier-catalog
  * controller), with one difference in destination: rows are created under the
- * Atlantis platform account and matched against staff-owned products only —
+ * Ali FMCG platform account and matched against staff-owned products only —
  * never imported into, or matched against, a supplier's catalog.
  */
 @Controller('admin-catalog')
@@ -29,7 +29,7 @@ import { STAFF_ROLES, isStaffRole } from './catalog-scope';
 export class AdminCatalogController {
     constructor(private readonly importer: SupplierImportService, private readonly enrich: ImportEnrichmentService, private readonly prisma: PrismaService, private readonly updates: SupplierUpdatesService, private readonly products: ProductsService) {}
 
-    /** The account that owns Atlantis Catalog products (same lookup as single-product create), and every staff account. */
+    /** The account that owns Ali FMCG Catalog products (same lookup as single-product create), and every staff account. */
     private async mode(req: any): Promise<{ owner: string; mode: ImportMode }> {
         const staff = await this.prisma.user.findMany({ where: { role: { in: [...STAFF_ROLES] as any } }, select: { id: true, role: true, email: true } });
         const email = (process.env.PLATFORM_OWNER_EMAIL || 'Info@atlantisfmcg.com').toLowerCase();
@@ -96,7 +96,7 @@ export class AdminCatalogController {
         return this.enrich.status(req.user.sub, id);
     }
 
-    // ─── Price & stock updates of existing Atlantis Catalog products (the supplier tool, catalog owners) ───
+    // ─── Price & stock updates of existing Ali FMCG Catalog products (the supplier tool, catalog owners) ───
 
     private async staffIds(): Promise<string[]> {
         return (await this.prisma.user.findMany({ where: { role: { in: [...STAFF_ROLES] as any } }, select: { id: true } })).map((u) => u.id);
@@ -134,7 +134,7 @@ export class AdminCatalogController {
     }
 
     /**
-     * Update the net price of ONE Atlantis Catalog product. The price is the
+     * Update the net price of ONE Ali FMCG Catalog product. The price is the
      * listing's own price per case in the listing currency (supplierPrice /
      * supplierCurrency → basePrice in EUR); the buyer price follows through the
      * markup on save. Same rules as a supplier changing their price
@@ -156,7 +156,7 @@ export class AdminCatalogController {
             if (!p.unitsPerCase || p.unitsPerCase <= 0) throw new BadRequestException({ code: 'NO_PACK', message: 'Pieces per case isn’t set on this product, so a piece price can’t be converted. Enter the case price, or set pieces per case first.' });
             perCase = n * p.unitsPerCase;
         }
-        const saved: any = await this.products.supplierUpdate(id, p.supplierId, { supplierCurrency: currency, supplierPrice: Math.round(perCase * 10000) / 10000, changeReason: `Price updated by Atlantis (${String(req.user?.role || 'staff').toLowerCase()})` }, {});
+        const saved: any = await this.products.supplierUpdate(id, p.supplierId, { supplierCurrency: currency, supplierPrice: Math.round(perCase * 10000) / 10000, changeReason: `Price updated by Ali FMCG (${String(req.user?.role || 'staff').toLowerCase()})` }, {});
         return { id: saved.id, status: saved.status, supplierCurrency: saved.supplierCurrency, supplierPrice: saved.supplierPrice, basePrice: saved.basePrice, buyerPrice: (await this.prisma.product.findUnique({ where: { id }, select: { price: true } }))?.price ?? null, unitsPerCase: p.unitsPerCase };
     }
 }

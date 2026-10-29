@@ -251,7 +251,7 @@ export class ExcelService {
             // ── price ─────────────────────────────────────────────────────────
             'price': 'price', 'cost': 'price', 'rate': 'price', 'amount': 'price',
             'unitprice': 'price', 'saleprice': 'price', 'sellingprice': 'price', 'baseprice': 'price',
-            // Per-piece price variants — operator's Atlantis CSV uses
+            // Per-piece price variants — operator's Ali FMCG CSV uses
             // "Price per Piece (USD)" which used to fall through.
             'priceperpiece': 'price', 'priceperpieceusd': 'price',
             'priceperpieceeur': 'price', 'priceperpiecegbp': 'price',
@@ -383,9 +383,9 @@ export class ExcelService {
             'shipmenttype': 'moqUnit', 'loadtype': 'moqUnit', 'fulfillmentmode': 'moqUnit',
             // ── brand ─────────────────────────────────────────────────────────
             // NOTE: do NOT map "Brand Status" here. That's a verification
-            // flag ("Verified by Atlantis" / "Unverified"), not the brand
+            // flag ("Verified by Ali FMCG" / "Unverified"), not the brand
             // name. It used to partial-match "brand" and overwrite the
-            // brand field with the literal string "Verified by Atlantis".
+            // brand field with the literal string "Verified by Ali FMCG".
             // The "brandstatus" alias below is explicitly dropped so the
             // column is left unmapped.
             'brand': 'brand', 'make': 'brand', 'manufacturer': 'brand',
@@ -409,7 +409,7 @@ export class ExcelService {
             'lotnumber': 'shelfLife', 'batchnumberexpirydate': 'shelfLife',
             'bbd': 'shelfLife', 'bestbeforedate': 'shelfLife',
             // ── origin (country of manufacture / origin) ─────────────────────
-            // Atlantis FMCG catalog uses "Country of Origin", other
+            // Ali FMCG catalog uses "Country of Origin", other
             // suppliers shorten to "Origin" or "Made in". This is
             // distinct from EXW location (where goods physically sit
             // today vs where they were manufactured).
@@ -420,7 +420,7 @@ export class ExcelService {
             'بلدالمنشأ': 'origin', 'منشأ': 'origin', 'المنشأ': 'origin',
             'بلدالصنع': 'origin', 'صنعفي': 'origin',
             // ── EXW (Ex Works location — where the goods physically sit) ─────
-            // Atlantis logistics uses this to quote transport from origin to
+            // Ali FMCG logistics uses this to quote transport from origin to
             // the buyer. We accept many phrasings because suppliers write it
             // a dozen different ways: "EXW", "Ex Works", "EXW Origin",
             // "Origin Warehouse", "Stock Location", "Currently Located in",
@@ -486,7 +486,7 @@ export class ExcelService {
                 // overwrite the real field with garbage. "Brand Status"
                 // is the canonical example — it used to partial-match
                 // "brand" and set the brand to the literal string
-                // "Verified by Atlantis".
+                // "Verified by Ali FMCG".
                 const DENY = new Set<string>([
                     'brandstatus',     // verification flag, not a brand
                     'productstatus',
@@ -520,7 +520,7 @@ export class ExcelService {
         // After matching, resolve same-target conflicts by keeping the
         // highest-confidence column per target field. When two columns
         // tie on confidence, we apply a semantic tiebreak using the
-        // original header text — needed for cases like the Atlantis
+        // original header text — needed for cases like the Ali FMCG
         // CSV which has BOTH "Pallet per Truck" (truck capacity) AND
         // "Pallets in Shipment" (actual count). Both alias-match to
         // palletsPerShipment, but the "shipment" header is the one we
@@ -1474,7 +1474,7 @@ export class ExcelService {
 
         // 1. Summary Sheet
         const summaryRows = [
-            ['Atlantis Financial Statement'],
+            ['Ali FMCG Financial Statement'],
             ['Generated At', new Date().toLocaleString()],
             ['Period', summary.period],
             [],

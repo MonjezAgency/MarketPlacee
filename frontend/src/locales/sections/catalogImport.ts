@@ -72,7 +72,7 @@ export default defineSection('catalogImport', [
         flagNoHeader: 'This page has no header row; the columns of page {page} were used.',
 
         photoTitle: 'Find missing photos by barcode (optional)',
-        photoDesc: 'Products without a photo are saved as drafts. Atlantis can look for a photo of each one in open product databases, by its barcode.',
+        photoDesc: 'Products without a photo are saved as drafts. Ali FMCG can look for a photo of each one in open product databases, by its barcode.',
         photoStart: 'Find photos for {count, plural, one {# product} other {# products}}',
         photoHow1: 'Only the barcode is sent: Open Food Facts for food and drinks; Open Beauty Facts, Open Products Facts and Open Pet Food Facts for other products. Nothing from your file is shared or added to those databases.',
         photoHow2: 'A photo is pre-selected only when the barcode, the name or brand and the pack size all match. For cleaning and personal-care products a photo is never pre-selected. Check every photo before you import.',
@@ -167,7 +167,7 @@ export default defineSection('catalogImport', [
         flagNoHeader: 'لا يوجد صف عناوين في هذه الصفحة، فاستُخدمت أعمدة الصفحة {page}.',
 
         photoTitle: 'البحث عن الصور الناقصة بالباركود (اختياري)',
-        photoDesc: 'تُحفَظ المنتجات التي بلا صورة كمسودات. يمكن لـ Atlantis البحث عن صورة لكل منتج في قواعد بيانات منتجات مفتوحة، باستخدام الباركود.',
+        photoDesc: 'تُحفَظ المنتجات التي بلا صورة كمسودات. يمكن لـ Ali FMCG البحث عن صورة لكل منتج في قواعد بيانات منتجات مفتوحة، باستخدام الباركود.',
         photoStart: 'البحث عن صور {count, plural, zero {لا منتجات} one {لمنتج واحد} two {لمنتجين} few {لـ # منتجات} many {لـ # منتجًا} other {لـ # منتج}}',
         photoHow1: 'لا يُرسَل سوى الباركود: إلى Open Food Facts للأغذية والمشروبات، وإلى Open Beauty Facts وOpen Products Facts وOpen Pet Food Facts للمنتجات الأخرى. لا يُشارَك أي شيء من ملفك ولا يُضاف إلى تلك القواعد.',
         photoHow2: 'لا تُحدَّد الصورة مسبقًا إلا إذا تطابق الباركود والاسم أو العلامة التجارية وحجم العبوة. أما منتجات التنظيف والعناية الشخصية فلا تُحدَّد صورها مسبقًا أبدًا. راجِع كل صورة قبل الاستيراد.',
@@ -262,7 +262,7 @@ export default defineSection('catalogImport', [
         flagNoHeader: 'Cette page n’a pas de ligne d’en-tête ; les colonnes de la page {page} ont été utilisées.',
 
         photoTitle: 'Trouver les photos manquantes par code-barres (facultatif)',
-        photoDesc: 'Les produits sans photo sont enregistrés comme brouillons. Atlantis peut chercher une photo de chacun dans des bases de données produits ouvertes, grâce à son code-barres.',
+        photoDesc: 'Les produits sans photo sont enregistrés comme brouillons. Ali FMCG peut chercher une photo de chacun dans des bases de données produits ouvertes, grâce à son code-barres.',
         photoStart: 'Trouver des photos pour {count, plural, one {# produit} other {# produits}}',
         photoHow1: 'Seul le code-barres est envoyé : à Open Food Facts pour l’alimentaire et les boissons ; à Open Beauty Facts, Open Products Facts et Open Pet Food Facts pour les autres produits. Rien de votre fichier n’est partagé ni ajouté à ces bases.',
         photoHow2: 'Une photo n’est présélectionnée que si le code-barres, le nom ou la marque et le format correspondent. Pour les produits d’entretien et d’hygiène, aucune photo n’est jamais présélectionnée. Vérifiez chaque photo avant d’importer.',
@@ -357,7 +357,7 @@ export default defineSection('catalogImport', [
         flagNoHeader: 'Această pagină nu are rând de antet; s-au folosit coloanele paginii {page}.',
 
         photoTitle: 'Găsiți fotografiile lipsă după codul de bare (opțional)',
-        photoDesc: 'Produsele fără fotografie sunt salvate ca ciorne. Atlantis poate căuta o fotografie pentru fiecare în baze de date deschise de produse, după codul de bare.',
+        photoDesc: 'Produsele fără fotografie sunt salvate ca ciorne. Ali FMCG poate căuta o fotografie pentru fiecare în baze de date deschise de produse, după codul de bare.',
         photoStart: 'Găsiți fotografii pentru {count, plural, one {# produs} few {# produse} other {# de produse}}',
         photoHow1: 'Se trimite doar codul de bare: către Open Food Facts pentru alimente și băuturi; către Open Beauty Facts, Open Products Facts și Open Pet Food Facts pentru alte produse. Nimic din fișierul dvs. nu este partajat sau adăugat în aceste baze.',
         photoHow2: 'O fotografie este preselectată doar dacă se potrivesc codul de bare, denumirea sau marca și dimensiunea ambalajului. Pentru produsele de curățenie și îngrijire personală nu se preselectează niciodată. Verificați fiecare fotografie înainte de import.',
@@ -452,7 +452,7 @@ export default defineSection('catalogImport', [
         flagNoHeader: 'Questa pagina non ha una riga di intestazione; sono state usate le colonne della pagina {page}.',
 
         photoTitle: 'Trova le foto mancanti con il codice a barre (facoltativo)',
-        photoDesc: 'I prodotti senza foto vengono salvati come bozze. Atlantis può cercare una foto di ciascuno in database aperti di prodotti, tramite il codice a barre.',
+        photoDesc: 'I prodotti senza foto vengono salvati come bozze. Ali FMCG può cercare una foto di ciascuno in database aperti di prodotti, tramite il codice a barre.',
         photoStart: 'Trova foto per {count, plural, one {# prodotto} other {# prodotti}}',
         photoHow1: 'Viene inviato solo il codice a barre: a Open Food Facts per alimenti e bevande; a Open Beauty Facts, Open Products Facts e Open Pet Food Facts per gli altri prodotti. Nulla del tuo file viene condiviso o aggiunto a quei database.',
         photoHow2: 'Una foto viene preselezionata solo se codice a barre, nome o marca e formato corrispondono. Per i prodotti per la pulizia e la cura della persona non viene mai preselezionata. Controlla ogni foto prima di importare.',
@@ -547,7 +547,7 @@ export default defineSection('catalogImport', [
         flagNoHeader: 'Esta página no tiene fila de encabezado; se han usado las columnas de la página {page}.',
 
         photoTitle: 'Buscar las fotos que faltan por código de barras (opcional)',
-        photoDesc: 'Los productos sin foto se guardan como borradores. Atlantis puede buscar una foto de cada uno en bases de datos abiertas de productos, por su código de barras.',
+        photoDesc: 'Los productos sin foto se guardan como borradores. Ali FMCG puede buscar una foto de cada uno en bases de datos abiertas de productos, por su código de barras.',
         photoStart: 'Buscar fotos para {count, plural, one {# producto} other {# productos}}',
         photoHow1: 'Solo se envía el código de barras: a Open Food Facts para alimentos y bebidas; a Open Beauty Facts, Open Products Facts y Open Pet Food Facts para otros productos. Nada de tu archivo se comparte ni se añade a esas bases.',
         photoHow2: 'Una foto solo se preselecciona si coinciden el código de barras, el nombre o la marca y el formato. En productos de limpieza y cuidado personal nunca se preselecciona. Revisa cada foto antes de importar.',
@@ -642,7 +642,7 @@ export default defineSection('catalogImport', [
         flagNoHeader: 'Esta página não tem linha de cabeçalho; foram usadas as colunas da página {page}.',
 
         photoTitle: 'Procurar as fotografias em falta pelo código de barras (opcional)',
-        photoDesc: 'Os produtos sem fotografia são guardados como rascunhos. A Atlantis pode procurar uma fotografia de cada um em bases de dados abertas de produtos, através do código de barras.',
+        photoDesc: 'Os produtos sem fotografia são guardados como rascunhos. A Ali FMCG pode procurar uma fotografia de cada um em bases de dados abertas de produtos, através do código de barras.',
         photoStart: 'Procurar fotografias para {count, plural, one {# produto} other {# produtos}}',
         photoHow1: 'Só é enviado o código de barras: para o Open Food Facts, no caso de alimentos e bebidas; para o Open Beauty Facts, o Open Products Facts e o Open Pet Food Facts, no caso de outros produtos. Nada do seu ficheiro é partilhado nem acrescentado a essas bases.',
         photoHow2: 'Uma fotografia só é pré-selecionada se o código de barras, o nome ou a marca e o formato coincidirem. Nos produtos de limpeza e de higiene pessoal nunca é pré-selecionada. Verifique cada fotografia antes de importar.',

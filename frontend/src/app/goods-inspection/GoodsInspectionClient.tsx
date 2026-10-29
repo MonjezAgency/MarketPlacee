@@ -181,7 +181,7 @@ export default function GoodsInspectionClient() {
                     <Reveal hero delay={0.08}>
                         <Eyebrow pill>Goods inspection</Eyebrow>
                         <h1 className="mt-5 font-sans text-display-sm sm:text-display text-heading">Checking every box</h1>
-                        <p className="mt-5 max-w-xl text-body sm:text-lead text-ink-2">When Atlantis arranges an inspection for your order, the goods are checked against the confirmed order — quantity, barcodes, dates and condition — and documented before the order moves on.</p>
+                        <p className="mt-5 max-w-xl text-body sm:text-lead text-ink-2">When Ali FMCG arranges an inspection for your order, the goods are checked against the confirmed order — quantity, barcodes, dates and condition — and documented before the order moves on.</p>
                         <div className="mt-8 flex flex-wrap gap-3">
                             <ButtonLink href="#sample-report" arrow={false}>See a sample report</ButtonLink>
                             <ButtonLink href="/contact" variant="secondary">Ask about an inspection</ButtonLink>
@@ -192,7 +192,7 @@ export default function GoodsInspectionClient() {
                     <ul className="grid gap-8 sm:grid-cols-3">
                         {[
                             { t: 'Checked against your order', d: 'Barcodes, quantities, dates and condition — against the confirmed terms, line by line.' },
-                            { t: 'Clear outcomes', d: 'If something doesn’t match, you decide with Atlantis: accept, adjust or reject. Nothing is decided for you.' },
+                            { t: 'Clear outcomes', d: 'If something doesn’t match, you decide with Ali FMCG: accept, adjust or reject. Nothing is decided for you.' },
                             { t: 'Everything documented', d: 'Findings, photos, the date and the inspector are recorded on the order itself.' },
                         ].map((b, i) => (
                             <Reveal as="li" key={b.t} delay={i * 0.08} className="text-center">
@@ -241,7 +241,7 @@ export default function GoodsInspectionClient() {
             {/* Outcomes */}
             <Section tone="muted" labelledBy="outcomes-title">
                 <Container size="content">
-                    <SectionHeader id="outcomes-title" eyebrow="Resolution" title="Accept, adjust or reject" lead="If an order doesn’t match what you confirmed, you choose how to resolve it with Atlantis and the supplier. The outcome is recorded on the order; refunds and adjustments are arranged by the team, not automatically." />
+                    <SectionHeader id="outcomes-title" eyebrow="Resolution" title="Accept, adjust or reject" lead="If an order doesn’t match what you confirmed, you choose how to resolve it with Ali FMCG and the supplier. The outcome is recorded on the order; refunds and adjustments are arranged by the team, not automatically." />
                     <Outcomes />
                 </Container>
             </Section>
@@ -278,7 +278,7 @@ export default function GoodsInspectionClient() {
                     <Reveal>
                         <p className="text-small text-ink-3 italic">FMCG <span className="not-italic">/ˌɛf ɛm siː ˈdʒiː/</span></p>
                         <h2 id="report-title" className="mt-2 font-sans text-title-sm sm:text-title text-heading">Fast-moving, <mark className="bg-[#2EC4B6]/25 text-heading rounded px-1">checked</mark> goods.</h2>
-                        <p className="mt-4 max-w-xl text-body sm:text-lead text-ink-2">The report sits on the order itself, so you, the supplier and Atlantis work from the same facts. You get a notification when it’s added.</p>
+                        <p className="mt-4 max-w-xl text-body sm:text-lead text-ink-2">The report sits on the order itself, so you, the supplier and Ali FMCG work from the same facts. You get a notification when it’s added.</p>
                         <ul className="mt-6 space-y-2.5 text-body text-ink-2">
                             {['Ordered and received quantity for every line', 'Each finding by type — barcode, quantity, date or condition', 'Photos, the inspection date and who inspected', 'The agreed outcome and a note explaining it'].map((t) => (
                                 <li key={t} className="flex gap-2.5"><Check size={17} className="text-teal shrink-0 mt-1" aria-hidden /> {t}</li>
@@ -298,8 +298,8 @@ export default function GoodsInspectionClient() {
                     <SectionHeader id="faq-title" align="center" title="Questions about inspection" />
                     <Faq className="mt-10" items={[
                         { q: 'Is every order inspected?', a: 'No. An inspection is arranged for an order when you ask for it and the team confirms it can be done for that route. Orders without one show no report.' },
-                        { q: 'Who carries out the inspection?', a: 'The inspector’s name is recorded on the report. Whether it is the Atlantis team or an inspection partner is confirmed with you when it is arranged.' },
-                        { q: 'Where does it happen?', a: <>It’s agreed per order — for example at the supplier’s dispatch location before collection, or at an Atlantis hub that offers inspection. See <Link href="/warehouses" className="font-medium text-teal hover:underline">Warehouses</Link>.</> },
+                        { q: 'Who carries out the inspection?', a: 'The inspector’s name is recorded on the report. Whether it is the Ali FMCG team or an inspection partner is confirmed with you when it is arranged.' },
+                        { q: 'Where does it happen?', a: <>It’s agreed per order — for example at the supplier’s dispatch location before collection, or at an Ali FMCG hub that offers inspection. See <Link href="/warehouses" className="font-medium text-teal hover:underline">Warehouses</Link>.</> },
                         { q: 'What does it cost?', a: 'If an inspection has a cost, it is agreed with you before it is booked. It is never added to an order without your agreement.' },
                         { q: 'Does an inspection guarantee every unit?', a: 'No. It records what was checked on the day, usually on sampled cartons. It is the evidence for resolving an issue, not a guarantee.' },
                         { q: 'I found a problem and there was no inspection. What now?', a: <>Don’t confirm delivery; report the issue with photos from your order page or via <Link href="/contact" className="font-medium text-teal hover:underline">Contact</Link>, and the team works it out with the supplier.</> },

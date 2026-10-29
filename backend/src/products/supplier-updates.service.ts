@@ -8,7 +8,7 @@ import { normaliseHeader, MAX_IMPORT_ROWS } from './product-import';
 
 /**
  * Bulk PRICE and STOCK updates for products the supplier already has.
- * Update-only: rows are matched to the supplier's own products by Atlantis
+ * Update-only: rows are matched to the supplier's own products by Ali FMCG
  * ID or barcode; nothing is ever created. Blank cells mean "no change".
  * Prices are the supplier's own case price in the product's own currency
  * (a price update never changes the currency or the price basis).
@@ -19,7 +19,7 @@ import { normaliseHeader, MAX_IMPORT_ROWS } from './product-import';
  */
 type UpdField = 'id' | 'ean' | 'price' | 'currency' | 'stock' | 'name' | 'ref';
 const UPD_ALIASES: Record<UpdField, string[]> = {
-    id: ['atlantis id', 'product id', 'atlantis product id', 'id'],
+    id: ['ali fmcg id', 'ali fmcg product id', 'atlantis id', 'product id', 'atlantis product id', 'id'],
     ean: ['ean', 'barcode', 'ean code', 'gtin', 'upc', 'الباركود'],
     // "Price per Case" / "Stock (cases)" are the column names of the earlier file; still accepted.
     price: ['new price per case', 'price per case', 'case price', 'سعر الكرتونة الجديد', 'سعر الكرتونة'],
@@ -30,8 +30,8 @@ const UPD_ALIASES: Record<UpdField, string[]> = {
     ref: ['current price per case', 'current stock (cases)', 'current stock', 'price basis', 'currency (reference)'],
 };
 export const UPDATE_COLUMNS = [
-    { header: 'Atlantis ID', role: 'Do not change', width: 38, note: 'Matches the row to your product. Keep it exactly as downloaded.' },
-    { header: 'EAN', role: 'Do not change', width: 16, note: 'Used to match the row when the Atlantis ID is empty.' },
+    { header: 'Ali FMCG ID', role: 'Do not change', width: 38, note: 'Matches the row to your product. Keep it exactly as downloaded.' },
+    { header: 'EAN', role: 'Do not change', width: 16, note: 'Used to match the row when the Ali FMCG ID is empty.' },
     { header: 'Product Name', role: 'Reference', width: 44, note: 'For your reference — not changed by this file.' },
     { header: 'Currency (reference)', role: 'Reference', width: 12, note: 'Your listing’s currency. Prices are read in this currency; it can’t be changed here.' },
     { header: 'Current Price per Case', role: 'Reference', width: 18, note: 'Your current price for one case. Not applied.' },
@@ -44,7 +44,7 @@ const AMBIGUOUS = new Set(['price', 'cost', 'unit price', 'quantity', 'qty', 'ا
 
 export interface UpdateRequest { headers: string[]; rows: string[][]; firstRow?: number; fileName?: string }
 
-/** One owner, or any of several (the Atlantis Catalog is owned by staff accounts). */
+/** One owner, or any of several (the Ali FMCG Catalog is owned by staff accounts). */
 const owners = (id: string | string[]) => (Array.isArray(id) ? { in: id } : id);
 
 @Injectable()
@@ -72,9 +72,9 @@ export class SupplierUpdatesService {
             ...UPDATE_COLUMNS.map((c) => [c.header, c.role, c.note]),
             [],
             ['Recommended: download your catalog, type new values in “New Price per Case” (and, if needed, “New Stock (cases)”), then upload the same file.'],
-            ['Keep “Atlantis ID” and “EAN” unchanged so every row updates the right product. Rows are never created from this file.'],
+            ['Keep “Ali FMCG ID” and “EAN” unchanged so every row updates the right product. Rows are never created from this file.'],
             ['Empty cells change nothing. Price is per case, in your listing’s currency. Stock is whole cases.'],
-            ['You can also start from the blank template: add the Atlantis ID (or EAN) and the new values of only the products you want to change.'],
+            ['You can also start from the blank template: add the Ali FMCG ID (or EAN) and the new values of only the products you want to change.'],
             ['Row 2 (Do not change / Reference / Edit / Optional) is a guide row and is skipped on upload.'],
         ]);
         help['!cols'] = [{ wch: 24 }, { wch: 14 }, { wch: 90 }];
@@ -94,7 +94,7 @@ export class SupplierUpdatesService {
             if (map[f] !== undefined) problems.push(`Two columns mean ${f === 'price' ? 'Price per Case' : f}: “${headers[map[f]!]}” and “${h}”. Keep one.`);
             else map[f] = i;
         });
-        if (map.id === undefined && map.ean === undefined) problems.push('Add an “Atlantis ID” or “EAN” column so rows can be matched to your products.');
+        if (map.id === undefined && map.ean === undefined) problems.push('Add an “Ali FMCG ID” or “EAN” column so rows can be matched to your products.');
         if (map.price === undefined && map.stock === undefined) problems.push('Add a “New Price per Case” and/or “New Stock (cases)” column — there is nothing to update.');
         return { map, problems };
     }
@@ -119,13 +119,13 @@ export class SupplierUpdatesService {
             const errors: string[] = [];
             let product: any = null;
             const id = cell(r, 'id'), ean = normaliseBarcode(cell(r, 'ean'));
-            if (id) { product = byId.get(id) ?? null; if (!product) errors.push('This Atlantis ID isn’t one of your products.'); }
+            if (id) { product = byId.get(id) ?? null; if (!product) errors.push('This Ali FMCG ID isn’t one of your products.'); }
             else if (ean) {
                 const hits = byEan.get(ean) || [];
                 if (!hits.length) errors.push('No product of yours has this barcode. This file only updates existing products.');
-                else if (hits.length > 1) errors.push('Several of your products share this barcode — add the Atlantis ID column to choose one.');
+                else if (hits.length > 1) errors.push('Several of your products share this barcode — add the Ali FMCG ID column to choose one.');
                 else product = hits[0];
-            } else errors.push('Row has no Atlantis ID or EAN.');
+            } else errors.push('Row has no Ali FMCG ID or EAN.');
             if (product?.status === 'REJECTED') errors.push('Rejected listings can’t be updated.');
             if (product) { if (seen.has(product.id)) errors.push(`Same product as row ${seen.get(product.id)}.`); else seen.set(product.id, row); }
 
@@ -159,7 +159,7 @@ export class SupplierUpdatesService {
     }
 
     /**
-     * `supplierId` is the supplier (their own catalog) or, for the Atlantis Catalog, the list of
+     * `supplierId` is the supplier (their own catalog) or, for the Ali FMCG Catalog, the list of
      * staff accounts; each row is then saved as its own owner through the same rules (supplierUpdate).
      */
     async commit(supplierId: string | string[], req: UpdateRequest) {

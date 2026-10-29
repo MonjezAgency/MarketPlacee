@@ -105,7 +105,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             window.location.href = '/auth/login?redirect=' + encodeURIComponent(`/products/${product.id}`);
             return;
         }
-        // Tier matters — Atlantis enforces tier-locked carts (Truck /
+        // Tier matters — Ali FMCG enforces tier-locked carts (Truck /
         // Pallet / Case). The card can't add directly because we don't
         // know which tier the buyer wants. Route them to the PDP where
         // the tier picker is, so the right markup is applied and the

@@ -17,7 +17,7 @@ const field = 'w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text
 const btn = 'h-10 px-4 inline-flex items-center gap-1.5 rounded-xl text-[13px] font-semibold transition-colors disabled:opacity-50';
 
 /**
- * Atlantis staff controls for the confirmation workflow. Buttons mirror what
+ * Ali FMCG staff controls for the confirmation workflow. Buttons mirror what
  * the server allows; the server checks every action again (approval is refused
  * until every supplier accepted the current terms version).
  */

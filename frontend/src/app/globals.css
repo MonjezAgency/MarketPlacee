@@ -103,7 +103,7 @@
         --popover: 0 0% 100%;
         --popover-foreground: 222 47% 11%;
 
-        /* Primary: Navy Blue #0A1A2F (ATLANTIS Master) */
+        /* Primary: Navy Blue #0A1A2F (ALI FMCG Master) */
         --primary: 215 65% 11%;
         --primary-foreground: 210 40% 98%;
 
@@ -111,7 +111,7 @@
         --sidebar: 215 65% 11%;
         --sidebar-foreground: 210 40% 98%;
 
-        /* Secondary: Aqua #1BC7C9 (ATLANTIS Highlight) */
+        /* Secondary: Aqua #1BC7C9 (ALI FMCG Highlight) */
         --secondary: 181 76% 45%;
         --secondary-foreground: 215 65% 11%;
 
@@ -133,7 +133,7 @@
     }
 
     .dark {
-        /* Atlantis Official Palette - Dark Mode */
+        /* Ali FMCG Official Palette - Dark Mode */
         --background: 216 60% 5%;    /* #050B14 Deep Base */
         --foreground: 210 40% 98%;   /* #E6EDF3 Primary Text */
         --card: 215 59% 13%;         /* #0E1F36 Surface */

@@ -33,7 +33,7 @@ function flatten(obj: Dict, prefix = ''): Record<string, unknown> {
 }
 
 /** Values that are legitimately the same in every language. */
-const TOKENS = new Set(['atlantis', 'monjez', 'ean', 'exw', 'sku', 'moq', 'b2b', 'fmcg', 'stripe', 'ok', 'pdf', 'csv', 'url', 'id', 'gps', 'https', 'eur', 'usd', 'kyc', 'api', 'iban', 'swift', 'bic', 'logo', 'email', 'e-mail', 'atlan', 'tis', 'vat', 'tva', 'iva', 'cta', 'seo', 'faq']);
+const TOKENS = new Set(['atlantis', 'monjez', 'ean', 'exw', 'sku', 'moq', 'b2b', 'fmcg', 'stripe', 'ok', 'pdf', 'csv', 'url', 'id', 'gps', 'https', 'eur', 'usd', 'kyc', 'api', 'iban', 'swift', 'bic', 'logo', 'email', 'e-mail', 'atlan', 'tis', 'ali', 'vat', 'tva', 'iva', 'cta', 'seo', 'faq']);
 function isTokenOnly(v: string) {
     const words = v.replace(/\{[^}]*\}/g, ' ').replace(/<\/?\w+>/g, ' ').toLowerCase().match(/[a-zà-ÿăâîșțşţ]+/gi) || [];
     return words.every((w) => TOKENS.has(w.toLowerCase()));
@@ -157,7 +157,7 @@ async function main() {
         'src/app/dashboard/customer/orders/[id]/track/page.tsx',
     ];
     for (const sec of SECTIONS) for (const f of sec.files) if (!SCOPE.includes(f)) SCOPE.push(f);
-    const ALLOWED_TEXT = /^(ATLAN|TIS\.|·|—|–|\/|\+|×|#|Info@atlantisfmcg\.com|\d+\/\d+)$/;
+    const ALLOWED_TEXT = /^(ATLAN|TIS\.|ALI(&nbsp;)?|FMCG\.|·|—|–|\/|\+|×|#|Info@atlantisfmcg\.com|\d+\/\d+)$/;
     for (const rel of SCOPE) {
         const file = path.join(__dirname, '..', rel);
         const lines = fs.readFileSync(file, 'utf8').split('\n');

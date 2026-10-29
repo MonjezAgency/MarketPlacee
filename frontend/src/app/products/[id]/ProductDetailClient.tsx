@@ -106,7 +106,7 @@ export default function ProductDetailClient() {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
     // ── Tier pricing memo ─────────────────────────────────────────────────────
-    // Atlantis pricing rule: the headline number on every tier button AND in
+    // Ali FMCG pricing rule: the headline number on every tier button AND in
     // the main pricing block is always a PER-CASE price. What changes between
     // tiers is the markup multiplier — Truck applies the lowest (container)
     // markup, Pallet the middle one, Case the highest (piece). The buyer's
@@ -169,7 +169,7 @@ export default function ProductDetailClient() {
 
         // Role-aware markup multipliers.
         //   - Supplier viewing OWN product → raw prices (1.0) so they
-        //     never reverse-engineer the spread Atlantis charges buyers.
+        //     never reverse-engineer the spread Ali FMCG charges buyers.
         //   - Admin → sees CUSTOMER prices (with full markup) on the
         //     tier ladder so they can verify exactly what shoppers see,
         //     plus the admin-only formula panel below for the breakdown.
@@ -609,7 +609,7 @@ export default function ProductDetailClient() {
                 id: cartLineId,
                 productId: product.id,
                 name: `${product.name} (Mixed ${tierData.activeLabel})`,
-                brand: product.brand || 'Atlantis Premium',
+                brand: product.brand || 'Ali FMCG Premium',
                 price: mixSummary.totalWithMarkup,
                 image: product.image || '',
                 unit: tierData.activeLabel,
@@ -639,7 +639,7 @@ export default function ProductDetailClient() {
             id: cartLineId,
             productId: product.id,
             name: product.name,
-            brand: product.brand || 'Atlantis Premium',
+            brand: product.brand || 'Ali FMCG Premium',
             price: tierData.perUnitTotal,
             image: product.image || '',
             unit: tierData.activeLabel,
@@ -1060,7 +1060,7 @@ export default function ProductDetailClient() {
                                             : isMixing ? <><ShoppingCart size={16} /> {tp('addMixed', { tier: tierLc(tierData.activeKey) })}</>
                                             : <><ShoppingCart size={16} /> {tp('addToCart')}</>}
                                     </button>
-                                    {/* Buyers propose the price they'd pay; reviewed by the Atlantis sourcing desk. */}
+                                    {/* Buyers propose the price they'd pay; reviewed by the Ali FMCG sourcing desk. */}
                                     {!isSupplierOwner && (
                                         <button type="button"
                                             onClick={() => { if (!isLoggedIn) { router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname)); return; } setTargetOpen(true); }}

@@ -7,7 +7,7 @@ import { Shield, ArrowLeft } from 'lucide-react';
 const SECTIONS = [
     {
         title: '1. Who We Are',
-        content: `Atlantis FMCG ("Atlantis", "we", "our", "us") operates a B2B wholesale marketplace platform available at marketpl7ce.vercel.app. Our registered address is in Romania, and we serve businesses across Europe and the Gulf region.
+        content: `Ali FMCG ("Ali FMCG", "we", "our", "us") operates a B2B wholesale marketplace platform available at marketpl7ce.vercel.app. Our registered address is in Romania, and we serve businesses across Europe and the Gulf region.
 
 For privacy-related questions, contact us at: Info@atlantisfmcg.com`,
     },
@@ -116,7 +116,7 @@ Last updated: April 2026`,
 
 Email: Info@atlantisfmcg.com
 Platform: marketpl7ce.vercel.app
-Data Controller: Atlantis FMCG`,
+Data Controller: Ali FMCG`,
     },
 ];
 
@@ -144,7 +144,7 @@ export default function PrivacyPolicyPage() {
 
                     <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 mb-12">
                         <p className="text-sm leading-relaxed">
-                            This Privacy Policy explains how Atlantis FMCG collects, uses, and protects your personal data when you use our B2B marketplace platform. We are committed to protecting your privacy and complying with the General Data Protection Regulation (GDPR) and applicable European data protection law.
+                            This Privacy Policy explains how Ali FMCG collects, uses, and protects your personal data when you use our B2B marketplace platform. We are committed to protecting your privacy and complying with the General Data Protection Regulation (GDPR) and applicable European data protection law.
                         </p>
                     </div>
 

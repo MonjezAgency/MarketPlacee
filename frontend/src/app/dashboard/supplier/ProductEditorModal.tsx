@@ -17,7 +17,7 @@
  *   • mode="supplier" (default) — no verification badge, no admin
  *     metadata. Supplier types raw price; backend stores it as
  *     `basePrice` and re-applies markup for `price`.
- *   • mode="admin" — shows the "Verified by Atlantis" status card
+ *   • mode="admin" — shows the "Verified by Ali FMCG" status card
  *     with product ID + created date.
  *
  * Currency conversion: the modal works in `activeCurrency` (read
@@ -65,7 +65,7 @@ interface ProductEditorModalProps {
     product?: Product | null;
     onSave: (data: Product) => void;
     /**
-     * When "admin" the modal shows the Verified-by-Atlantis status
+     * When "admin" the modal shows the Verified-by-Ali FMCG status
      * card and the product ID / created date. Defaults to "supplier".
      */
     mode?: 'admin' | 'supplier';

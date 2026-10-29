@@ -8,7 +8,7 @@ import { ButtonLink, Container, CtaBand, Eyebrow, Faq, Pill, Reveal, Section, Se
 
 /**
  * Every step on this page is enforced by the order workflow on the server
- * (backend/src/orders/order-workflow.ts). Atlantis does not hold buyer funds,
+ * (backend/src/orders/order-workflow.ts). Ali FMCG does not hold buyer funds,
  * and the page says so plainly.
  */
 
@@ -30,8 +30,8 @@ function OrderStack() {
             <Card title="Supplier confirmation" meta="Today">
                 <div className="mt-2.5 flex items-center justify-between"><span className="text-small text-ink-3">2 / 2 suppliers accepted</span><Pill tone="success" icon={<Check size={12} aria-hidden />} className="h-6">Accepted</Pill></div>
             </Card>
-            <Link_>Atlantis review</Link_>
-            <Card title="Terms confirmed" meta="Version 1"><p className="mt-2 text-small text-ink-3">Approved by Atlantis · payment details sent</p></Card>
+            <Link_>Ali FMCG review</Link_>
+            <Card title="Terms confirmed" meta="Version 1"><p className="mt-2 text-small text-ink-3">Approved by Ali FMCG · payment details sent</p></Card>
             <Link_>Before anything ships</Link_>
             <Card title="Goods inspection" meta="Where arranged">
                 <div className="mt-2.5 flex items-center justify-between"><span className="text-small text-ink-3">12 / 12 pallets checked</span><Pill tone="success" icon={<Check size={12} aria-hidden />} className="h-6">Pass</Pill></div>
@@ -53,26 +53,26 @@ function OrderStack() {
 
 const JOURNEY = [
     { icon: Send, title: 'You send the order request', who: 'You', status: 'Waiting for supplier confirmation', desc: 'Your cart becomes a request with the exact lines, quantities and prices you saw. Nothing is charged and nothing is confirmed yet.' },
-    { icon: ClipboardList, title: 'Atlantis asks every supplier', who: 'Atlantis', status: 'Waiting for supplier confirmation', desc: 'Each supplier on the order is asked to confirm their own part before a deadline (72 hours unless Atlantis sets another). Atlantis can correct or reject the request at any point.' },
-    { icon: Handshake, title: 'Each supplier explicitly accepts or rejects', who: 'Supplier', status: 'Supplier confirmed — Atlantis is approving', desc: 'Availability, quantities, their price and dispatch within the listed lead time — or a rejection with a reason. Silence is never treated as a yes; an expired request has to be asked again.' },
-    { icon: FileCheck2, title: 'Atlantis approves the confirmed terms', who: 'Atlantis, then you', status: 'Confirmed', desc: 'Approval is possible only after every supplier accepted. The terms are frozen as a numbered version and the Atlantis team sends you payment details. If they differ from what you submitted, you accept them first.' },
-    { icon: Truck, title: 'Fulfilment and, where arranged, inspection', who: 'Atlantis & supplier', status: 'Shipped', desc: 'Goods move under the confirmed delivery method. An order can’t be marked shipped before approval, or while changed terms are waiting for your acceptance.' },
-    { icon: Scale, title: 'Settlement under the terms', who: 'Atlantis', status: 'Delivered', desc: 'Payment is settled according to the confirmed terms and any inspection outcome, such as a price adjustment or partial acceptance. Refunds, where due, are arranged by the team.' },
+    { icon: ClipboardList, title: 'Ali FMCG asks every supplier', who: 'Ali FMCG', status: 'Waiting for supplier confirmation', desc: 'Each supplier on the order is asked to confirm their own part before a deadline (72 hours unless Ali FMCG sets another). Ali FMCG can correct or reject the request at any point.' },
+    { icon: Handshake, title: 'Each supplier explicitly accepts or rejects', who: 'Supplier', status: 'Supplier confirmed — Ali FMCG is approving', desc: 'Availability, quantities, their price and dispatch within the listed lead time — or a rejection with a reason. Silence is never treated as a yes; an expired request has to be asked again.' },
+    { icon: FileCheck2, title: 'Ali FMCG approves the confirmed terms', who: 'Ali FMCG, then you', status: 'Confirmed', desc: 'Approval is possible only after every supplier accepted. The terms are frozen as a numbered version and the Ali FMCG team sends you payment details. If they differ from what you submitted, you accept them first.' },
+    { icon: Truck, title: 'Fulfilment and, where arranged, inspection', who: 'Ali FMCG & supplier', status: 'Shipped', desc: 'Goods move under the confirmed delivery method. An order can’t be marked shipped before approval, or while changed terms are waiting for your acceptance.' },
+    { icon: Scale, title: 'Settlement under the terms', who: 'Ali FMCG', status: 'Delivered', desc: 'Payment is settled according to the confirmed terms and any inspection outcome, such as a price adjustment or partial acceptance. Refunds, where due, are arranged by the team.' },
 ];
 
 const COMPARE = [
-    { row: 'Who confirms the order', usual: 'Often the seller’s word in an email', atl: 'Every supplier on it, explicitly — then Atlantis approves' },
+    { row: 'Who confirms the order', usual: 'Often the seller’s word in an email', atl: 'Every supplier on it, explicitly — then Ali FMCG approves' },
     { row: 'When you pay', usual: 'Often up front, on a pro forma', atl: 'After the terms are confirmed and payment details are sent' },
     { row: 'If quantities, prices or freight change', usual: 'A new invoice arrives', atl: 'A new terms version you see side by side and accept before shipping' },
     { row: 'Proof when it matters', usual: 'Email threads', atl: 'Numbered terms on the order, plus the inspection report where one was done' },
-    { row: 'Where your money sits', usual: 'With the seller', atl: 'Atlantis doesn’t hold funds — you pay under the confirmed terms' },
+    { row: 'Where your money sits', usual: 'With the seller', atl: 'Ali FMCG doesn’t hold funds — you pay under the confirmed terms' },
 ];
 
 const STATUSES = [
     { you: 'Waiting for supplier confirmation', supplier: 'Your confirmation is needed', means: 'The request is with the supplier(s). Nothing is confirmed.' },
-    { you: 'Supplier confirmed — Atlantis is approving', supplier: 'Accepted — awaiting Atlantis approval', means: 'Every supplier accepted the exact terms; Atlantis does a final review.' },
-    { you: 'Being reviewed by Atlantis', supplier: 'You rejected these terms', means: 'A supplier couldn’t supply as requested. Atlantis proposes changed terms or cancels.' },
-    { you: 'Confirmed', supplier: 'Approved by Atlantis', means: 'Terms are fixed; payment details are sent and goods are prepared.' },
+    { you: 'Supplier confirmed — Ali FMCG is approving', supplier: 'Accepted — awaiting Ali FMCG approval', means: 'Every supplier accepted the exact terms; Ali FMCG does a final review.' },
+    { you: 'Being reviewed by Ali FMCG', supplier: 'You rejected these terms', means: 'A supplier couldn’t supply as requested. Ali FMCG proposes changed terms or cancels.' },
+    { you: 'Confirmed', supplier: 'Approved by Ali FMCG', means: 'Terms are fixed; payment details are sent and goods are prepared.' },
     { you: 'Your acceptance needed', supplier: 'Approved — waiting for the buyer', means: 'The terms changed (for example a delivery charge was set). Nothing ships until you accept.' },
     { you: 'Shipped · Delivered', supplier: 'Shipped · Delivered', means: 'On the way · arrived and confirmed.' },
     { you: 'Cancelled', supplier: 'Cancelled', means: 'Rejected or cancelled; reserved stock is released.' },
@@ -90,7 +90,7 @@ export default function ProtectedPaymentsClient() {
                     <Reveal hero delay={0.1} className="mt-8 text-center max-w-2xl mx-auto">
                         <Eyebrow pill>Protected payments</Eyebrow>
                         <h1 className="mt-5 font-sans text-display-sm sm:text-display text-heading">Trade with greater confidence</h1>
-                        <p className="mt-5 text-body sm:text-lead text-ink-2">Know what happens before money moves. An Atlantis order is confirmed only when every supplier has accepted the exact terms and Atlantis has approved them — and you see each step.</p>
+                        <p className="mt-5 text-body sm:text-lead text-ink-2">Know what happens before money moves. An Ali FMCG order is confirmed only when every supplier has accepted the exact terms and Ali FMCG has approved them — and you see each step.</p>
                         <div className="mt-8 flex flex-wrap justify-center gap-3">
                             <ButtonLink href="/categories">Start sourcing</ButtonLink>
                             <ButtonLink href="#journey" variant="secondary">See how an order moves</ButtonLink>
@@ -133,10 +133,10 @@ export default function ProtectedPaymentsClient() {
                     <Reveal className="rounded-3xl bg-heading text-white p-6 sm:p-10">
                         <p className="text-eyebrow uppercase text-[#7FE3D9]">Plainly</p>
                         <h2 id="compare-title" className="mt-3 font-sans text-title-sm sm:text-title">Where the risk sits, compared</h2>
-                        <p className="mt-3 max-w-2xl text-body sm:text-lead text-white/75">Wholesale trade often runs on trust and pro formas. Atlantis puts confirmation in the process instead — and is clear about what it doesn’t do.</p>
+                        <p className="mt-3 max-w-2xl text-body sm:text-lead text-white/75">Wholesale trade often runs on trust and pro formas. Ali FMCG puts confirmation in the process instead — and is clear about what it doesn’t do.</p>
                         <div className="mt-8 overflow-x-auto -mx-2 px-2">
                             <table className="w-full min-w-[620px] text-[14.5px]">
-                                <thead><tr className="text-small text-white/60"><th className="text-start font-medium py-3 pe-4 w-[28%]"><span className="sr-only">Question</span></th><th className="text-start font-medium py-3 pe-4">Typical direct trade</th><th className="text-start font-medium py-3">Atlantis today</th></tr></thead>
+                                <thead><tr className="text-small text-white/60"><th className="text-start font-medium py-3 pe-4 w-[28%]"><span className="sr-only">Question</span></th><th className="text-start font-medium py-3 pe-4">Typical direct trade</th><th className="text-start font-medium py-3">Ali FMCG today</th></tr></thead>
                                 <tbody>
                                     {COMPARE.map((c) => (
                                         <tr key={c.row} className="border-t border-white/10 align-top">
@@ -198,10 +198,10 @@ export default function ProtectedPaymentsClient() {
                     <SectionHeader id="changes-title" eyebrow="When something changes" title="Rejections, deadlines and new terms" />
                     <ul className="mt-10 grid gap-4 sm:grid-cols-2">
                         {[
-                            { t: 'A supplier rejects', d: 'You’re told why. A single-supplier order is cancelled and its stock released; on a shared order Atlantis proposes changed terms or cancels.' },
-                            { t: 'A supplier doesn’t answer', d: 'After the deadline the confirmation expires. Atlantis asks again with a new deadline, or cancels the request.' },
+                            { t: 'A supplier rejects', d: 'You’re told why. A single-supplier order is cancelled and its stock released; on a shared order Ali FMCG proposes changed terms or cancels.' },
+                            { t: 'A supplier doesn’t answer', d: 'After the deadline the confirmation expires. Ali FMCG asks again with a new deadline, or cancels the request.' },
                             { t: 'Quantities or prices change', d: 'A new terms version is created. Suppliers whose part changed confirm again, and you accept before anything ships.' },
-                            { t: 'A delivery charge is set', d: 'When Atlantis quotes freight after the order, it becomes a new version you accept before shipping.' },
+                            { t: 'A delivery charge is set', d: 'When Ali FMCG quotes freight after the order, it becomes a new version you accept before shipping.' },
                         ].map((c, i) => (
                             <Reveal as="li" key={c.t} delay={i * 0.06} className="rounded-2xl ring-1 ring-line p-6">
                                 <h3 className="font-sans text-subtitle text-heading">{c.t}</h3>
@@ -234,9 +234,9 @@ export default function ProtectedPaymentsClient() {
                 <Container>
                     <SectionHeader id="faq-title" align="center" title="Questions about payments" />
                     <Faq className="mt-10" items={[
-                        { q: 'Does Atlantis hold my payment until delivery?', a: 'No. Atlantis doesn’t hold buyer funds in escrow or a holding account. The protection is in the process: you pay only after every supplier confirmed and Atlantis approved the terms, and any change needs your acceptance.' },
-                        { q: 'When do I pay?', a: 'After approval. The Atlantis team sends payment details with the confirmed terms. Placing an order charges nothing.' },
-                        { q: 'Is my order confirmed when I place it?', a: 'No. Placing an order sends a request. It becomes “Confirmed” only after every supplier on it accepted and Atlantis approved.' },
+                        { q: 'Does Ali FMCG hold my payment until delivery?', a: 'No. Ali FMCG doesn’t hold buyer funds in escrow or a holding account. The protection is in the process: you pay only after every supplier confirmed and Ali FMCG approved the terms, and any change needs your acceptance.' },
+                        { q: 'When do I pay?', a: 'After approval. The Ali FMCG team sends payment details with the confirmed terms. Placing an order charges nothing.' },
+                        { q: 'Is my order confirmed when I place it?', a: 'No. Placing an order sends a request. It becomes “Confirmed” only after every supplier on it accepted and Ali FMCG approved.' },
                         { q: 'Can the price change after I order?', a: 'Only through a new terms version, shown side by side with what you submitted — and nothing ships until you accept it.' },
                         { q: 'What if the goods aren’t right?', a: <>Don’t confirm delivery; report it from your order page. Where an inspection took place, its report is the basis for the outcome. See <Link href="/goods-inspection" className="font-medium text-teal hover:underline">Goods Inspection</Link>.</> },
                         { q: 'How is VAT handled?', a: 'Prices are shown excluding VAT. VAT is calculated on the invoice.' },
@@ -244,7 +244,7 @@ export default function ProtectedPaymentsClient() {
                 </Container>
             </Section>
 
-            <CtaBand eyebrow="Confirmed before you pay" title="Order with terms you can see" lead="Place a request, watch the supplier and Atlantis confirm it, and pay only under the confirmed terms.">
+            <CtaBand eyebrow="Confirmed before you pay" title="Order with terms you can see" lead="Place a request, watch the supplier and Ali FMCG confirm it, and pay only under the confirmed terms.">
                 <ButtonLink href="/auth/register?role=customer">Open a buyer account</ButtonLink>
                 <ButtonLink href="/categories" variant="secondary">Browse the catalog</ButtonLink>
             </CtaBand>

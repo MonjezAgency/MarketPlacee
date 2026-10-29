@@ -7,7 +7,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { COUNTRY_NAMES, DEFAULT_DELIVERY_COUNTRIES, DELIVERY_COUNTRIES_KEY, checkDestination, countryName, loadDeliveryCountries, parseCountryList } from './delivery-policy';
 
-/** Public: where Atlantis delivers, and a per-destination check for checkout. */
+/** Public: where Ali FMCG delivers, and a per-destination check for checkout. */
 @Controller('shipping')
 export class DeliveryPolicyController {
     constructor(private readonly prisma: PrismaService) {}
@@ -18,7 +18,7 @@ export class DeliveryPolicyController {
         const allowed = new Set(countries);
         return {
             countries: Object.keys(COUNTRY_NAMES).map((code) => ({ code, name: countryName(code), supported: allowed.has(code) })).sort((a, b) => a.name.localeCompare(b.name)),
-            note: 'Delivery is available to the countries marked as supported. Freight is quoted by Atlantis after the order is confirmed.',
+            note: 'Delivery is available to the countries marked as supported. Freight is quoted by Ali FMCG after the order is confirmed.',
         };
     }
 

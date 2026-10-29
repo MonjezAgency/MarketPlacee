@@ -84,7 +84,7 @@ export function DayDivider({ label }: { label: string }) {
     );
 }
 
-/** Atlantis side: the assistant (plain, with mark) or a person from the team (teal accent). */
+/** Ali FMCG side: the assistant (plain, with mark) or a person from the team (teal accent). */
 export function IncomingMessage({ from, name, text, at, imageUrl }: { from: 'assistant' | 'team'; name?: string; text: string; at?: string; imageUrl?: string | null }) {
     const { t } = useLanguage();
     const { clock } = useWhen();

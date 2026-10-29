@@ -12,7 +12,7 @@ type Policy = { countries: string[]; configured: boolean; defaultCountries: stri
 type Status = { tone: 'success' | 'danger'; text: string } | null;
 
 /**
- * Where Atlantis delivers (GET/PUT /admin/delivery-policy, OWNER/ADMIN). The
+ * Where Ali FMCG delivers (GET/PUT /admin/delivery-policy, OWNER/ADMIN). The
  * country list and its validation are the server's (shipping/delivery-policy.ts).
  * Checkout checks a destination against it and the server re-checks when the
  * order is placed; saving only changes the stored list, never existing orders.

@@ -10,7 +10,7 @@ import { AtlanticMap, PreviewBadge, type Focus, type MapPoint, type MapRoute } f
 import { HUB_SERVICE_LABEL, getPublicHubs, type PublicHub } from '@/lib/fulfillment';
 
 /**
- * Atlantis hubs in Europe and the Americas. Only hubs the server returns —
+ * Ali FMCG hubs in Europe and the Americas. Only hubs the server returns —
  * verified (who/when recorded) and active — are plotted. Delivery countries
  * are a service area and are drawn as such, never as warehouses.
  */
@@ -66,8 +66,8 @@ function Warehouses() {
                 <Container size="prose" className="relative text-center">
                     <Reveal hero>
                         <Eyebrow pill>Warehouses</Eyebrow>
-                        <h1 className="mt-6 font-sans text-display-sm sm:text-display text-heading">Where Atlantis handles your goods</h1>
-                        <p className="mt-5 text-body sm:text-lead text-ink-2">Atlantis works with FMCG buyers and suppliers across Europe, the UK and North America. Verified Atlantis hubs — where goods can be received, consolidated or inspected — appear here only once confirmed.</p>
+                        <h1 className="mt-6 font-sans text-display-sm sm:text-display text-heading">Where Ali FMCG handles your goods</h1>
+                        <p className="mt-5 text-body sm:text-lead text-ink-2">Ali FMCG works with FMCG buyers and suppliers across Europe, the UK and North America. Verified Ali FMCG hubs — where goods can be received, consolidated or inspected — appear here only once confirmed.</p>
                         <div className="mt-8 flex flex-wrap justify-center gap-3">
                             <ButtonLink href="#hub-maps" arrow={false}>See the maps</ButtonLink>
                             <ButtonLink href="/contact" variant="secondary">Ask about a lane</ButtonLink>
@@ -78,7 +78,7 @@ function Warehouses() {
 
             <Section id="hub-maps" labelledBy="maps-title">
                 <Container>
-                    <SectionHeader id="maps-title" eyebrow="Hub map" title="North America and Europe, one map" lead="Tinted countries are Atlantis’s target markets — where we work with buyers and suppliers — not places where we have warehouses. Hubs appear as markers only once verified." />
+                    <SectionHeader id="maps-title" eyebrow="Hub map" title="North America and Europe, one map" lead="Tinted countries are Ali FMCG’s target markets — where we work with buyers and suppliers — not places where we have warehouses. Hubs appear as markers only once verified." />
                     {preview && <p className="mt-6"><PreviewBadge /></p>}
 
                 </Container>
@@ -91,7 +91,7 @@ function Warehouses() {
                     {!loading && !error && hubs.length === 0 && !preview && (
                         <p className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden sm:block max-w-[16rem] rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-card px-4 py-3 text-center text-small text-ink-2">
                             <span className="block text-[14px] font-semibold text-heading">No verified hubs yet</span>
-                            Verified Atlantis hubs will appear here once confirmed.
+                            Verified Ali FMCG hubs will appear here once confirmed.
                         </p>
                     )}
                     {/* Focus tabs */}
@@ -111,11 +111,11 @@ function Warehouses() {
 
                     <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_minmax(0,22rem)] items-start">
                         <ul aria-label="Map key" className="flex flex-wrap gap-x-6 gap-y-2 text-small text-ink-2">
-                            <li className="flex items-center gap-2"><span aria-hidden className="w-3.5 h-3.5 rounded-full bg-[#2EC4B6] ring-[3px] ring-white shadow-card" /> Verified Atlantis hub</li>
+                            <li className="flex items-center gap-2"><span aria-hidden className="w-3.5 h-3.5 rounded-full bg-[#2EC4B6] ring-[3px] ring-white shadow-card" /> Verified Ali FMCG hub</li>
                             <li className="flex items-center gap-2"><span aria-hidden className="w-4 h-3 rounded-sm bg-teal-soft ring-1 ring-teal/40" /> Target market (Europe, UK, North America)</li>
                             <li className="flex items-center gap-2"><span aria-hidden className="w-5 border-t-2 border-dotted border-teal" /> Supported route (shown once confirmed)</li>
                             {preview && <li className="flex items-center gap-2"><span aria-hidden className="w-3.5 h-3.5 rounded-full border-2 border-dashed border-ink-3" /> Design-preview sample</li>}
-                            <li className="w-full text-ink-3">Supplier dispatch locations aren’t plotted — they belong to suppliers, not Atlantis.</li>
+                            <li className="w-full text-ink-3">Supplier dispatch locations aren’t plotted — they belong to suppliers, not Ali FMCG.</li>
                         </ul>
                         <div aria-live="polite">
                             {previewPoint ? (
@@ -130,7 +130,7 @@ function Warehouses() {
                                 <div className="rounded-2xl ring-1 ring-line bg-surface shadow-card p-5">
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
-                                            <Pill tone="success" icon={<ShieldCheck size={13} aria-hidden />}>Verified Atlantis hub</Pill>
+                                            <Pill tone="success" icon={<ShieldCheck size={13} aria-hidden />}>Verified Ali FMCG hub</Pill>
                                             <h3 className="font-sans mt-3 text-subtitle text-heading">{hub.name}</h3>
                                             <p className="text-body text-ink-2">{hub.city}, {hub.countryName}</p>
                                         </div>
@@ -152,7 +152,7 @@ function Warehouses() {
                                     ))}
                                 </ul>
                             ) : data ? (
-                                <p className="rounded-2xl ring-1 ring-line p-5 text-body text-ink-2">Atlantis hasn’t opened a verified hub yet. Today, orders are collected from the supplier’s dispatch location and delivered to you — not every order needs to pass through a hub.</p>
+                                <p className="rounded-2xl ring-1 ring-line p-5 text-body text-ink-2">Ali FMCG hasn’t opened a verified hub yet. Today, orders are collected from the supplier’s dispatch location and delivered to you — not every order needs to pass through a hub.</p>
                             ) : null}
                         </div>
                     </div>
@@ -164,9 +164,9 @@ function Warehouses() {
                     <SectionHeader id="types-title" align="center" eyebrow="Know the difference" title="Hubs, supplier locations and delivery areas" lead="Three different things that are easy to mix up — and that we never mix up on this page." />
                     <ul className="mt-10 sm:mt-12 grid gap-4 md:grid-cols-3">
                         {[
-                            { icon: Warehouse, t: 'Atlantis hub', d: 'A physical location Atlantis has verified, with the services it actually offers (for example consolidation or inspection). Shown as a marker.', tag: 'On the map' },
-                            { icon: Factory, t: 'Supplier dispatch location', d: 'Where a supplier’s goods leave from — the EXW location on each product page. It belongs to the supplier, not Atlantis.', tag: 'On product pages' },
-                            { icon: Globe2, t: 'Target market and delivery country', d: 'Target markets are where Atlantis works with buyers and suppliers; delivery countries are checked at checkout. Neither means there is a warehouse there.', tag: 'Tinted on the map' },
+                            { icon: Warehouse, t: 'Ali FMCG hub', d: 'A physical location Ali FMCG has verified, with the services it actually offers (for example consolidation or inspection). Shown as a marker.', tag: 'On the map' },
+                            { icon: Factory, t: 'Supplier dispatch location', d: 'Where a supplier’s goods leave from — the EXW location on each product page. It belongs to the supplier, not Ali FMCG.', tag: 'On product pages' },
+                            { icon: Globe2, t: 'Target market and delivery country', d: 'Target markets are where Ali FMCG works with buyers and suppliers; delivery countries are checked at checkout. Neither means there is a warehouse there.', tag: 'Tinted on the map' },
                         ].map((c, i) => (
                             <Reveal as="li" key={c.t} delay={i * 0.08} className="rounded-2xl bg-surface ring-1 ring-line p-6">
                                 <span className="w-11 h-11 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><c.icon size={20} aria-hidden /></span>
@@ -181,7 +181,7 @@ function Warehouses() {
 
             <Section labelledBy="delivery-title" size="md">
                 <Container size="content">
-                    <SectionHeader id="delivery-title" eyebrow="Service area" title="Where Atlantis delivers" lead={<>Your delivery country is checked at checkout, and delivery is priced from configured rates or quoted after the order. See the <Link href="/shipping" className="font-medium text-teal hover:underline">shipping policy</Link>.</>} />
+                    <SectionHeader id="delivery-title" eyebrow="Service area" title="Where Ali FMCG delivers" lead={<>Your delivery country is checked at checkout, and delivery is priced from configured rates or quoted after the order. See the <Link href="/shipping" className="font-medium text-teal hover:underline">shipping policy</Link>.</>} />
                     <Reveal className="mt-8">
                         {data?.deliveryCountries?.length ? (
                             <ul className="flex flex-wrap gap-2" aria-label="Delivery countries">
@@ -196,17 +196,17 @@ function Warehouses() {
                 <Container>
                     <SectionHeader id="faq-title" align="center" title="Questions about hubs" />
                     <Faq className="mt-10" items={[
-                        { q: 'Does my order go through a hub?', a: 'Only if the supplier’s delivery method uses one. Your order page shows the delivery method; “Atlantis arranges collection” goes straight from the supplier’s dispatch location to you.' },
-                        { q: 'Why isn’t a location I know shown?', a: 'Only hubs Atlantis has verified are shown. Supplier warehouses and partner sites that aren’t verified Atlantis hubs are never presented as Atlantis warehouses.' },
-                        { q: 'Why are there no markers yet?', a: 'A marker appears only for a hub Atlantis has verified. Until then the map shows target markets, not facilities, rather than suggesting coverage that doesn’t exist.' },
-                        { q: 'Does every order pass through an Atlantis hub?', a: 'No. Fulfilment depends on where the supplier ships from and where you are — a buyer in London and a buyer in Milan may get different options. Many orders go straight from the supplier’s dispatch location.' },
+                        { q: 'Does my order go through a hub?', a: 'Only if the supplier’s delivery method uses one. Your order page shows the delivery method; “Ali FMCG arranges collection” goes straight from the supplier’s dispatch location to you.' },
+                        { q: 'Why isn’t a location I know shown?', a: 'Only hubs Ali FMCG has verified are shown. Supplier warehouses and partner sites that aren’t verified Ali FMCG hubs are never presented as Ali FMCG warehouses.' },
+                        { q: 'Why are there no markers yet?', a: 'A marker appears only for a hub Ali FMCG has verified. Until then the map shows target markets, not facilities, rather than suggesting coverage that doesn’t exist.' },
+                        { q: 'Does every order pass through an Ali FMCG hub?', a: 'No. Fulfilment depends on where the supplier ships from and where you are — a buyer in London and a buyer in Milan may get different options. Many orders go straight from the supplier’s dispatch location.' },
                         { q: 'Can a supplier deliver to a hub?', a: 'Yes, once a verified hub exists. Suppliers choose this in Shipping & Fulfilment; their net price stays the same and their freight to the hub is shown separately.' },
                         { q: 'Can goods be inspected at a hub?', a: <>Where a hub lists inspection as a service. See <Link href="/goods-inspection" className="font-medium text-teal hover:underline">Goods Inspection</Link>.</> },
                     ]} />
                 </Container>
             </Section>
 
-            <CtaBand eyebrow="Plan a lane" title="Shipping between Europe and the Americas?" lead="Tell us your origin and delivery countries. We’ll tell you plainly what Atlantis can handle today.">
+            <CtaBand eyebrow="Plan a lane" title="Shipping between Europe and the Americas?" lead="Tell us your origin and delivery countries. We’ll tell you plainly what Ali FMCG can handle today.">
                 <ButtonLink href="/contact">Contact the team</ButtonLink>
                 <ButtonLink href="/protected-payments" variant="secondary">How orders are confirmed</ButtonLink>
             </CtaBand>

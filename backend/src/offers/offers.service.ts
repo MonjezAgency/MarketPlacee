@@ -11,7 +11,7 @@ import { MarketingConsentService } from '../newsletter/marketing-consent.service
 import { maskEmail } from '../newsletter/marketing-consent';
 
 /**
- * Admin read model: marks offers posted by a staff account (Atlantis's own,
+ * Admin read model: marks offers posted by a staff account (Ali FMCG's own,
  * auto-approved at creation) with the same staff rule as the Products scopes
  * (products/catalog-scope.ts), so the admin page never guesses from a name.
  */
@@ -120,7 +120,7 @@ export class OffersService {
         const product = await this.resolveProduct(input.productId, input.productName, restrict);
         if (!product) {
             throw new BadRequestException(
-                `No matching product found in YOUR catalog for "${input.productName || input.productId}". You can only post offers on products you have already uploaded AND that have been approved by Atlantis. Check /supplier/products to see your approved listings.`,
+                `No matching product found in YOUR catalog for "${input.productName || input.productId}". You can only post offers on products you have already uploaded AND that have been approved by Ali FMCG. Check /supplier/products to see your approved listings.`,
             );
         }
         if (!input.pricePerUnit || input.pricePerUnit <= 0) {
@@ -171,8 +171,8 @@ export class OffersService {
             required('Product picture',    offerImageUrl);
         }
 
-        // Atlantis own-catalog offers auto-approve. Operator rule:
-        // when ADMIN / OWNER posts an offer (Atlantis IS the platform —
+        // Ali FMCG own-catalog offers auto-approve. Operator rule:
+        // when ADMIN / OWNER posts an offer (Ali FMCG IS the platform —
         // there's no third party to approve their own listing), we
         // skip the PENDING state, stamp APPROVED immediately, and
         // fire the email blast inline. Supplier-submitted offers
@@ -216,7 +216,7 @@ export class OffersService {
         });
 
         if (isAdmin) {
-            // Auto-blast for Atlantis-authored offers. Same path the
+            // Auto-blast for Ali FMCG-authored offers. Same path the
             // manual approve flow runs.
             try {
                 await this.blastApprovedOffer(created.id);
@@ -425,7 +425,7 @@ export class OffersService {
         const audience = await this.marketingConsent.eligibleRecipients({ audience: 'ALL' });
         const recipients = audience.recipients;
 
-        const subject = `New Atlantis offer: ${product.name}`;
+        const subject = `New Ali FMCG offer: ${product.name}`;
         const html = this.renderOfferEmail(offer, product, supplier);
 
         let successCount = 0;
@@ -530,10 +530,10 @@ export class OffersService {
                 exwLocation: offer.exwLocation,
                 shelfLife: offer.bbd,
             };
-            supplier = { name: 'Atlantis FMCG', companyName: 'Atlantis FMCG SRL', email: 'info@atlantisfmcg.com' };
+            supplier = { name: 'Ali FMCG', companyName: 'Atlantis FMCG SRL', email: 'info@atlantisfmcg.com' };
         }
 
-        const subject = `[TEST] Atlantis offer: ${product.name}`;
+        const subject = `[TEST] Ali FMCG offer: ${product.name}`;
         const html = this.renderOfferEmail(offer, product, supplier);
 
         try {
@@ -557,7 +557,7 @@ export class OffersService {
     }
 
     /**
-     * Atlantis offer email — pixel-faithful reproduction of the
+     * Ali FMCG offer email — pixel-faithful reproduction of the
      * KitKat sample the operator referenced. One email per offer
      * (even rows from a 20-product bulk sheet upload). Image,
      * product name, EXW, EAN, units-per-case and cases-per-pallet
@@ -569,7 +569,7 @@ export class OffersService {
      *      left, Info@ / www. on right).
      *   2. Two-column intro: "Hello, …" copy on the left,
      *      product photo on the right.
-     *   3. "Best regards, The Atlantis Team".
+     *   3. "Best regards, The Ali FMCG Team".
      *   4. PRODUCT INFORMATION dark navy bar.
      *   5. Card: bold product name + 4 icon-rows (Trade Terms,
      *      EAN, Units per case, Cases per pallet) on the left,
@@ -648,10 +648,10 @@ export class OffersService {
                     <table role="presentation" cellpadding="0" cellspacing="0">
                         <tr>
                             <td style="vertical-align:middle;padding-right:14px;">
-                                <img src="${logoUrl}" alt="Atlantis" width="46" height="46" style="display:block;width:46px;height:46px;border-radius:10px;background:#ffffff;padding:3px;box-sizing:border-box;" />
+                                <img src="${logoUrl}" alt="Ali FMCG" width="46" height="46" style="display:block;width:46px;height:46px;border-radius:10px;background:#ffffff;padding:3px;box-sizing:border-box;" />
                             </td>
                             <td style="vertical-align:middle;">
-                                <div style="color:#ffffff;font-weight:900;font-size:26px;letter-spacing:0.04em;line-height:1;">ATLANTIS</div>
+                                <div style="color:#ffffff;font-weight:900;font-size:26px;letter-spacing:0.04em;line-height:1;">ALI FMCG</div>
                                 <div style="color:#2EC4B6;font-weight:700;font-size:11px;letter-spacing:0.55em;margin-top:4px;line-height:1;">FMCG</div>
                             </td>
                         </tr>
@@ -674,14 +674,14 @@ export class OffersService {
                 <td style="vertical-align:top;width:60%;padding-right:20px;">
                     <h1 style="color:#0F172A;font-size:30px;font-weight:900;margin:0 0 18px;">Hello,</h1>
                     <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 14px;">
-                        Thank you for your interest in our products. Below is one of the items currently available from the <span style="color:#2EC4B6;font-weight:800;">Atlantis</span> catalog.
+                        Thank you for your interest in our products. Below is one of the items currently available from the <span style="color:#2EC4B6;font-weight:800;">Ali FMCG</span> catalog.
                     </p>
                     <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 18px;">
                         We source quality FMCG products and ship them worldwide to make trade simple and reliable.
                     </p>
                     <p style="color:#475569;font-size:15px;line-height:1.7;margin:0;">
                         Best regards,<br/>
-                        The <span style="color:#2EC4B6;font-weight:800;">Atlantis</span> Team
+                        The <span style="color:#2EC4B6;font-weight:800;">Ali FMCG</span> Team
                     </p>
                 </td>
                 <td style="vertical-align:middle;width:40%;text-align:center;">
@@ -696,7 +696,7 @@ export class OffersService {
     <!-- 3. PRODUCT INFORMATION card -->
     <tr><td style="padding:28px 40px 24px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:24px;overflow:hidden;border:1px solid #E2E8F0;">
-            <!-- Dark navy bar with title + Atlantis micro-logo -->
+            <!-- Dark navy bar with title + Ali FMCG micro-logo -->
             <tr><td style="background:#0B1F3A;padding:18px 24px;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
@@ -705,7 +705,7 @@ export class OffersService {
                             <span style="vertical-align:middle;">Product Information</span>
                         </td>
                         <td align="right" style="vertical-align:middle;color:#ffffff;font-size:11px;font-weight:900;letter-spacing:0.04em;border-left:1px solid rgba(255,255,255,0.15);padding-left:14px;">
-                            ATLANTIS <span style="color:#2EC4B6;font-size:9px;letter-spacing:0.4em;">FMCG</span>
+                            ALI FMCG <span style="color:#2EC4B6;font-size:9px;letter-spacing:0.4em;">FMCG</span>
                         </td>
                     </tr>
                 </table>
@@ -733,7 +733,7 @@ export class OffersService {
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:18px;">
                                 <tr><td style="padding:18px;">
                                     <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🛡 Quality Guaranteed</p>
-                                    <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 14px;">Every product in our catalog is sourced and quality-checked by the Atlantis team.</p>
+                                    <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 14px;">Every product in our catalog is sourced and quality-checked by the Ali FMCG team.</p>
                                     <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🌐 Global Distribution</p>
                                     <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 14px;">We ship FMCG products to buyers across Europe and beyond.</p>
                                     <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🤝 Secure Transactions</p>
@@ -799,8 +799,8 @@ export class OffersService {
     <!-- 6. Caption -->
     <tr><td style="background:#0B1F3A;padding:0 40px 22px;text-align:center;color:#94A3B8;font-size:11px;">
         <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;">
-            This email is an example of a product listing on the Atlantis marketplace.<br/>
-            © ${new Date().getFullYear()} Atlantis FMCG. All rights reserved · Offer ref ${escape(String(offer.id).slice(0, 8))}
+            This email is an example of a product listing on the Ali FMCG marketplace.<br/>
+            © ${new Date().getFullYear()} Ali FMCG. All rights reserved · Offer ref ${escape(String(offer.id).slice(0, 8))}
         </div>
     </td></tr>
 </table>

@@ -1,5 +1,5 @@
 /**
- * Delivery destinations — the backend source of truth for where Atlantis
+ * Delivery destinations — the backend source of truth for where Ali FMCG
  * delivers. Checkout asks this before the buyer gets to the order review,
  * and order creation re-checks it, so the rule can't be bypassed.
  *

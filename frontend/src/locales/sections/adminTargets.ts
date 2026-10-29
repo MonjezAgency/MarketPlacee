@@ -1,13 +1,13 @@
 import { defineSection } from './define';
 
-/** Admin → Target prices: the Atlantis sourcing desk's queue, detail, negotiation history and answer form. */
+/** Admin → Target prices: the Ali FMCG sourcing desk's queue, detail, negotiation history and answer form. */
 export default defineSection('adminTargets', [
     'src/app/admin/target-prices/page.tsx',
     'src/app/admin/target-prices/TargetDetailDialog.tsx',
 ], {
     en: {
         title: 'Target prices',
-        lead: 'Prices buyers asked for on product pages, answered by the Atlantis sourcing desk. Answering notifies the buyer. It never changes the listed price or creates an order, and checkout doesn’t apply agreed prices yet.',
+        lead: 'Prices buyers asked for on product pages, answered by the Ali FMCG sourcing desk. Answering notifies the buyer. It never changes the listed price or creates an order, and checkout doesn’t apply agreed prices yet.',
         readOnly: 'You can read target prices. Only owners and admins can answer them.',
         tabsAria: 'Filter by status',
         tab_OPEN: 'To answer', tab_COUNTER_OFFERED: 'Waiting for buyer', tab_RESPONDED: 'Answered', tab_ACCEPTED: 'Agreed', tab_DECLINED: 'Declined', tab_WITHDRAWN: 'Withdrawn', tab_ALL: 'All',
@@ -51,7 +51,7 @@ export default defineSection('adminTargets', [
     },
     ar: {
         title: 'الأسعار المستهدفة',
-        lead: 'أسعار طلبها المشترون من صفحات المنتجات، ويرد عليها فريق التوريد في Atlantis. يصل الرد إلى المشتري كإشعار. لا يغيّر السعر المعروض ولا يُنشئ طلبًا، ولا تُطبَّق الأسعار المتفق عليها عند الدفع بعد.',
+        lead: 'أسعار طلبها المشترون من صفحات المنتجات، ويرد عليها فريق التوريد في Ali FMCG. يصل الرد إلى المشتري كإشعار. لا يغيّر السعر المعروض ولا يُنشئ طلبًا، ولا تُطبَّق الأسعار المتفق عليها عند الدفع بعد.',
         readOnly: 'يمكنك الاطلاع على الأسعار المستهدفة. الرد عليها متاح للمالكين والمسؤولين فقط.',
         tabsAria: 'التصفية حسب الحالة',
         tab_OPEN: 'بانتظار الرد', tab_COUNTER_OFFERED: 'بانتظار المشتري', tab_RESPONDED: 'تم الرد', tab_ACCEPTED: 'متفق عليه', tab_DECLINED: 'مرفوض', tab_WITHDRAWN: 'مسحوب', tab_ALL: 'الكل',
@@ -97,7 +97,7 @@ export default defineSection('adminTargets', [
     },
     fr: {
         title: 'Prix cibles',
-        lead: 'Les prix demandés par les acheteurs sur les fiches produits, traités par le service sourcing d’Atlantis. Chaque réponse est notifiée à l’acheteur. Elle ne modifie jamais le prix affiché et ne crée pas de commande, et le paiement n’applique pas encore les prix convenus.',
+        lead: 'Les prix demandés par les acheteurs sur les fiches produits, traités par le service sourcing d’Ali FMCG. Chaque réponse est notifiée à l’acheteur. Elle ne modifie jamais le prix affiché et ne crée pas de commande, et le paiement n’applique pas encore les prix convenus.',
         readOnly: 'Vous pouvez consulter les prix cibles. Seuls les propriétaires et les administrateurs peuvent y répondre.',
         tabsAria: 'Filtrer par statut',
         tab_OPEN: 'À traiter', tab_COUNTER_OFFERED: 'En attente de l’acheteur', tab_RESPONDED: 'Répondus', tab_ACCEPTED: 'Convenus', tab_DECLINED: 'Refusés', tab_WITHDRAWN: 'Retirés', tab_ALL: 'Tous',
@@ -141,7 +141,7 @@ export default defineSection('adminTargets', [
     },
     ro: {
         title: 'Prețuri țintă',
-        lead: 'Prețurile cerute de cumpărători pe paginile produselor, la care răspunde echipa de aprovizionare Atlantis. Fiecare răspuns este notificat cumpărătorului. Nu schimbă niciodată prețul listat și nu creează comenzi, iar plata nu aplică încă prețurile convenite.',
+        lead: 'Prețurile cerute de cumpărători pe paginile produselor, la care răspunde echipa de aprovizionare Ali FMCG. Fiecare răspuns este notificat cumpărătorului. Nu schimbă niciodată prețul listat și nu creează comenzi, iar plata nu aplică încă prețurile convenite.',
         readOnly: 'Puteți vedea prețurile țintă. Doar proprietarii și administratorii pot răspunde.',
         tabsAria: 'Filtrați după stare',
         tab_OPEN: 'De răspuns', tab_COUNTER_OFFERED: 'Așteaptă cumpărătorul', tab_RESPONDED: 'Cu răspuns', tab_ACCEPTED: 'Convenite', tab_DECLINED: 'Refuzate', tab_WITHDRAWN: 'Retrase', tab_ALL: 'Toate',
@@ -185,7 +185,7 @@ export default defineSection('adminTargets', [
     },
     it: {
         title: 'Prezzi obiettivo',
-        lead: 'I prezzi chiesti dagli acquirenti nelle pagine prodotto, a cui risponde il team acquisti di Atlantis. Ogni risposta viene notificata all’acquirente. Non cambia mai il prezzo di listino né crea ordini, e il checkout non applica ancora i prezzi concordati.',
+        lead: 'I prezzi chiesti dagli acquirenti nelle pagine prodotto, a cui risponde il team acquisti di Ali FMCG. Ogni risposta viene notificata all’acquirente. Non cambia mai il prezzo di listino né crea ordini, e il checkout non applica ancora i prezzi concordati.',
         readOnly: 'Puoi consultare i prezzi obiettivo. Solo proprietari e amministratori possono rispondere.',
         tabsAria: 'Filtra per stato',
         tab_OPEN: 'Da gestire', tab_COUNTER_OFFERED: 'In attesa dell’acquirente', tab_RESPONDED: 'Con risposta', tab_ACCEPTED: 'Concordati', tab_DECLINED: 'Rifiutati', tab_WITHDRAWN: 'Ritirati', tab_ALL: 'Tutti',
@@ -229,7 +229,7 @@ export default defineSection('adminTargets', [
     },
     es: {
         title: 'Precios objetivo',
-        lead: 'Los precios que piden los compradores en las fichas de producto, a los que responde el equipo de compras de Atlantis. Cada respuesta se notifica al comprador. Nunca cambia el precio publicado ni crea pedidos, y el pago aún no aplica los precios acordados.',
+        lead: 'Los precios que piden los compradores en las fichas de producto, a los que responde el equipo de compras de Ali FMCG. Cada respuesta se notifica al comprador. Nunca cambia el precio publicado ni crea pedidos, y el pago aún no aplica los precios acordados.',
         readOnly: 'Puedes consultar los precios objetivo. Solo propietarios y administradores pueden responder.',
         tabsAria: 'Filtrar por estado',
         tab_OPEN: 'Por responder', tab_COUNTER_OFFERED: 'Esperando al comprador', tab_RESPONDED: 'Respondidos', tab_ACCEPTED: 'Acordados', tab_DECLINED: 'Rechazados', tab_WITHDRAWN: 'Retirados', tab_ALL: 'Todos',
@@ -273,7 +273,7 @@ export default defineSection('adminTargets', [
     },
     pt: {
         title: 'Preços-alvo',
-        lead: 'Os preços pedidos pelos compradores nas páginas de produto, aos quais responde a equipa de compras da Atlantis. Cada resposta é notificada ao comprador. Nunca altera o preço anunciado nem cria encomendas, e o pagamento ainda não aplica os preços acordados.',
+        lead: 'Os preços pedidos pelos compradores nas páginas de produto, aos quais responde a equipa de compras da Ali FMCG. Cada resposta é notificada ao comprador. Nunca altera o preço anunciado nem cria encomendas, e o pagamento ainda não aplica os preços acordados.',
         readOnly: 'Pode consultar os preços-alvo. Apenas proprietários e administradores podem responder.',
         tabsAria: 'Filtrar por estado',
         tab_OPEN: 'Por responder', tab_COUNTER_OFFERED: 'A aguardar o comprador', tab_RESPONDED: 'Respondidos', tab_ACCEPTED: 'Acordados', tab_DECLINED: 'Recusados', tab_WITHDRAWN: 'Retirados', tab_ALL: 'Todos',

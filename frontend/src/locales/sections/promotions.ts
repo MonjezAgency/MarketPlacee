@@ -4,7 +4,7 @@ import { defineSection } from './define';
  * Special offers (backend model: Promotion) — the supplier and admin
  * management pages, and the special-offer price shown on product pages,
  * product cards and cart lines. "Special offer" is never the same thing as a
- * wholesale offer (Offer), which Atlantis reviews.
+ * wholesale offer (Offer), which Ali FMCG reviews.
  */
 export default defineSection('promotions', ['src/components/promotions/PromotionsManager.tsx', 'src/components/promotions/PromotionPrice.tsx', 'src/app/supplier/promotions/page.tsx', 'src/app/admin/promotions/page.tsx'], {
     en: {
@@ -23,7 +23,7 @@ export default defineSection('promotions', ['src/components/promotions/Promotion
         netLabel: 'Net', buyerLabel: 'Buyer', supplierLabel: 'Supplier',
         pctOff: '{pct}% off',
         timeUtc: '{time} UTC',
-        creatorYou: 'You', creatorAtlantis: 'Atlantis', creatorSupplier: 'Supplier',
+        creatorYou: 'You', creatorAtlantis: 'Ali FMCG', creatorSupplier: 'Supplier',
         view: 'View', edit: 'Edit', cancelOffer: 'Cancel offer',
         viewAria: 'View the special offer on {name}', editAria: 'Edit the special offer on {name}', cancelAria: 'Cancel the special offer on {name}',
         emptyTitle: 'No special offers yet',
@@ -77,7 +77,7 @@ export default defineSection('promotions', ['src/components/promotions/Promotion
         netLabel: 'الصافي', buyerLabel: 'المشتري', supplierLabel: 'المورّد',
         pctOff: 'خصم {pct}%',
         timeUtc: '{time} بتوقيت UTC',
-        creatorYou: 'أنت', creatorAtlantis: 'Atlantis', creatorSupplier: 'المورّد',
+        creatorYou: 'أنت', creatorAtlantis: 'Ali FMCG', creatorSupplier: 'المورّد',
         view: 'عرض', edit: 'تعديل', cancelOffer: 'إلغاء العرض',
         viewAria: 'عرض العرض الخاص على {name}', editAria: 'تعديل العرض الخاص على {name}', cancelAria: 'إلغاء العرض الخاص على {name}',
         emptyTitle: 'لا توجد عروض خاصة بعد',
@@ -132,7 +132,7 @@ export default defineSection('promotions', ['src/components/promotions/Promotion
         netLabel: 'Prix net', buyerLabel: 'Acheteur', supplierLabel: 'Fournisseur',
         pctOff: '{pct} % de remise',
         timeUtc: '{time} (UTC)',
-        creatorYou: 'Vous', creatorAtlantis: 'Atlantis', creatorSupplier: 'Fournisseur',
+        creatorYou: 'Vous', creatorAtlantis: 'Ali FMCG', creatorSupplier: 'Fournisseur',
         view: 'Voir', edit: 'Modifier', cancelOffer: 'Annuler l’offre',
         viewAria: 'Voir l’offre spéciale sur {name}', editAria: 'Modifier l’offre spéciale sur {name}', cancelAria: 'Annuler l’offre spéciale sur {name}',
         emptyTitle: 'Aucune offre spéciale pour le moment',
@@ -187,7 +187,7 @@ export default defineSection('promotions', ['src/components/promotions/Promotion
         netLabel: 'Preț net', buyerLabel: 'Cumpărător', supplierLabel: 'Furnizor',
         pctOff: 'Reducere {pct}%',
         timeUtc: '{time} (ora UTC)',
-        creatorYou: 'Dumneavoastră', creatorAtlantis: 'Atlantis', creatorSupplier: 'Furnizor',
+        creatorYou: 'Dumneavoastră', creatorAtlantis: 'Ali FMCG', creatorSupplier: 'Furnizor',
         view: 'Vizualizați', edit: 'Editați', cancelOffer: 'Anulați oferta',
         viewAria: 'Vizualizați oferta specială pentru {name}', editAria: 'Editați oferta specială pentru {name}', cancelAria: 'Anulați oferta specială pentru {name}',
         emptyTitle: 'Nu există încă oferte speciale',
@@ -242,7 +242,7 @@ export default defineSection('promotions', ['src/components/promotions/Promotion
         netLabel: 'Netto', buyerLabel: 'Acquirente', supplierLabel: 'Fornitore',
         pctOff: 'Sconto del {pct}%',
         timeUtc: '{time} (ora UTC)',
-        creatorYou: 'Tu', creatorAtlantis: 'Atlantis', creatorSupplier: 'Fornitore',
+        creatorYou: 'Tu', creatorAtlantis: 'Ali FMCG', creatorSupplier: 'Fornitore',
         view: 'Visualizza', edit: 'Modifica', cancelOffer: 'Annulla offerta',
         viewAria: 'Visualizza l’offerta speciale su {name}', editAria: 'Modifica l’offerta speciale su {name}', cancelAria: 'Annulla l’offerta speciale su {name}',
         emptyTitle: 'Ancora nessuna offerta speciale',
@@ -297,7 +297,7 @@ export default defineSection('promotions', ['src/components/promotions/Promotion
         netLabel: 'Neto', buyerLabel: 'Comprador', supplierLabel: 'Proveedor',
         pctOff: '{pct} % de descuento',
         timeUtc: '{time} (hora UTC)',
-        creatorYou: 'Tú', creatorAtlantis: 'Atlantis', creatorSupplier: 'Proveedor',
+        creatorYou: 'Tú', creatorAtlantis: 'Ali FMCG', creatorSupplier: 'Proveedor',
         view: 'Ver', edit: 'Editar', cancelOffer: 'Cancelar oferta',
         viewAria: 'Ver la oferta especial de {name}', editAria: 'Editar la oferta especial de {name}', cancelAria: 'Cancelar la oferta especial de {name}',
         emptyTitle: 'Aún no hay ofertas especiales',
@@ -352,7 +352,7 @@ export default defineSection('promotions', ['src/components/promotions/Promotion
         netLabel: 'Líquido', buyerLabel: 'Comprador', supplierLabel: 'Fornecedor',
         pctOff: '{pct}% de desconto',
         timeUtc: '{time} (hora UTC)',
-        creatorYou: 'A sua conta', creatorAtlantis: 'Atlantis', creatorSupplier: 'Fornecedor',
+        creatorYou: 'A sua conta', creatorAtlantis: 'Ali FMCG', creatorSupplier: 'Fornecedor',
         view: 'Ver', edit: 'Editar', cancelOffer: 'Cancelar oferta',
         viewAria: 'Ver a oferta especial de {name}', editAria: 'Editar a oferta especial de {name}', cancelAria: 'Cancelar a oferta especial de {name}',
         emptyTitle: 'Ainda não existem ofertas especiais',
@@ -392,10 +392,10 @@ export default defineSection('promotions', ['src/components/promotions/Promotion
         cartEnded: 'A oferta especial deste produto terminou a {date}. Aplica-se o preço normal.',
     },
 }, {
-    ar: { creatorAtlantis: 'Atlantis is the platform name and is never translated' },
-    fr: { creatorAtlantis: 'Atlantis is the platform name and is never translated', colActions: 'Same word in French', stateActive: 'Same word in French (feminine: une offre active)' },
-    ro: { creatorAtlantis: 'Atlantis is the platform name and is never translated', tabActive: 'Same word in Romanian (oferte active)' },
-    it: { creatorAtlantis: 'Atlantis is the platform name and is never translated' },
-    es: { creatorAtlantis: 'Atlantis is the platform name and is never translated' },
-    pt: { creatorAtlantis: 'Atlantis is the platform name and is never translated' },
+    ar: { creatorAtlantis: 'Ali FMCG is the platform name and is never translated' },
+    fr: { creatorAtlantis: 'Ali FMCG is the platform name and is never translated', colActions: 'Same word in French', stateActive: 'Same word in French (feminine: une offre active)' },
+    ro: { creatorAtlantis: 'Ali FMCG is the platform name and is never translated', tabActive: 'Same word in Romanian (oferte active)' },
+    it: { creatorAtlantis: 'Ali FMCG is the platform name and is never translated' },
+    es: { creatorAtlantis: 'Ali FMCG is the platform name and is never translated' },
+    pt: { creatorAtlantis: 'Ali FMCG is the platform name and is never translated' },
 });

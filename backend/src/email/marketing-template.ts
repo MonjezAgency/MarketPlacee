@@ -21,7 +21,7 @@ const TEAL = '#0E7C74', INK = '#0B1F3A', MUTED = '#5B6B7F', LINE = '#E3E8EE', BG
 function shell(o: { siteUrl: string; preheader: string; body: string; footerNote: string; unsubscribeUrl?: string | null }) {
     const site = o.siteUrl.replace(/\/+$/, '');
     return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Atlantis</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Ali FMCG</title>
 <style>
 @media (max-width:620px){ .wrap{width:100%!important} .col{display:block!important;width:100%!important;padding:0 0 16px 0!important} .px{padding-left:20px!important;padding-right:20px!important} h1{font-size:22px!important} }
 a{color:${TEAL}}
@@ -33,14 +33,14 @@ a{color:${TEAL}}
 <tr><td class="px" style="padding:22px 32px;border-bottom:1px solid ${LINE};">
   <a href="${site}/" style="text-decoration:none;display:inline-flex;align-items:center;">
     <img src="${site}/icon.png" width="32" height="32" alt="" style="display:inline-block;vertical-align:middle;border-radius:8px;">
-    <span style="display:inline-block;vertical-align:middle;margin-left:10px;font-size:18px;font-weight:800;letter-spacing:-0.3px;color:${INK};">ATLANTIS</span>
+    <span style="display:inline-block;vertical-align:middle;margin-left:10px;font-size:18px;font-weight:800;letter-spacing:-0.3px;color:${INK};">ALI FMCG</span>
   </a>
   <span style="float:right;font-size:12px;color:${MUTED};line-height:32px;">B2B FMCG marketplace</span>
 </td></tr>
 ${o.body}
 <tr><td class="px" style="padding:22px 32px;background:#FAFBFC;border-top:1px solid ${LINE};font-size:12px;line-height:1.6;color:${MUTED};">
   ${o.footerNote}<br>
-  Atlantis Marketplace, operated by Monjez Company · <a href="mailto:Info@atlantisfmcg.com" style="color:${MUTED};">Info@atlantisfmcg.com</a><br>
+  Ali FMCG Marketplace, operated by Monjez Company · <a href="mailto:Info@atlantisfmcg.com" style="color:${MUTED};">Info@atlantisfmcg.com</a><br>
   <a href="${site}/privacy-policy" style="color:${MUTED};">Privacy policy</a>${o.unsubscribeUrl ? ` · <a href="${esc(o.unsubscribeUrl)}" style="color:${MUTED};">Unsubscribe</a>` : ''}
 </td></tr>
 </table></td></tr></table></body></html>`;
@@ -63,30 +63,30 @@ function productCell(p: EmailProduct, site: string) {
 </td>`;
 }
 
-/** Marketplace update for consenting subscribers: products recently approved on Atlantis. */
+/** Marketplace update for consenting subscribers: products recently approved on Ali FMCG. */
 export function renderProductUpdateEmail(o: { products: EmailProduct[]; siteUrl: string; unsubscribeUrl: string; periodLabel?: string }): RenderedEmail {
     const site = o.siteUrl.replace(/\/+$/, '');
     const products = o.products.slice(0, 6);
-    const subject = products.length ? `New on Atlantis: ${products.length} product${products.length === 1 ? '' : 's'} added${o.periodLabel ? ` ${o.periodLabel}` : ''}` : 'Atlantis marketplace update';
-    const preheader = products.length ? `${products.slice(0, 3).map((p) => p.name).join(', ')}${products.length > 3 ? ' and more' : ''} — sign in to see wholesale prices and pack options.` : 'News from the Atlantis B2B FMCG marketplace.';
+    const subject = products.length ? `New on Ali FMCG: ${products.length} product${products.length === 1 ? '' : 's'} added${o.periodLabel ? ` ${o.periodLabel}` : ''}` : 'Ali FMCG marketplace update';
+    const preheader = products.length ? `${products.slice(0, 3).map((p) => p.name).join(', ')}${products.length > 3 ? ' and more' : ''} — sign in to see wholesale prices and pack options.` : 'News from the Ali FMCG B2B FMCG marketplace.';
     const rows: string[] = [];
     for (let i = 0; i < products.length; i += 2) rows.push(`<tr>${productCell(products[i], site)}${products[i + 1] ? productCell(products[i + 1], site) : '<td class="col" width="50%" style="width:50%;"></td>'}</tr>`);
     const body = `
 <tr><td class="px" style="padding:28px 32px 8px 32px;">
   <h1 style="margin:0;font-size:24px;line-height:1.25;font-weight:700;color:${INK};">New products on the marketplace</h1>
-  <p style="margin:10px 0 0 0;font-size:15px;line-height:1.6;color:${MUTED};">These listings were approved on Atlantis${o.periodLabel ? ` ${esc(o.periodLabel)}` : ' recently'}. Wholesale prices, minimum orders and packaging options are shown to signed-in business accounts.</p>
+  <p style="margin:10px 0 0 0;font-size:15px;line-height:1.6;color:${MUTED};">These listings were approved on Ali FMCG${o.periodLabel ? ` ${esc(o.periodLabel)}` : ' recently'}. Wholesale prices, minimum orders and packaging options are shown to signed-in business accounts.</p>
 </td></tr>
 <tr><td class="px" style="padding:20px 24px 4px 24px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows.join('') || `<tr><td style="font-size:14px;color:${MUTED};padding:0 8px 16px;">No new listings in this period.</td></tr>`}</table></td></tr>
 <tr><td class="px" align="center" style="padding:4px 32px 30px 32px;">
   <a href="${site}/categories" style="display:inline-block;background:${TEAL};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:13px 26px;border-radius:10px;">Browse the catalogue</a>
 </td></tr>`;
-    const html = shell({ siteUrl: site, preheader, body, unsubscribeUrl: o.unsubscribeUrl, footerNote: 'You’re receiving this because you subscribed to Atlantis marketplace updates or opted in to marketing emails in your account settings.' });
+    const html = shell({ siteUrl: site, preheader, body, unsubscribeUrl: o.unsubscribeUrl, footerNote: 'You’re receiving this because you subscribed to Ali FMCG marketplace updates or opted in to marketing emails in your account settings.' });
     const text = [
-        'New products on the Atlantis marketplace', '',
-        `These listings were approved on Atlantis${o.periodLabel ? ` ${o.periodLabel}` : ' recently'}. Wholesale prices, minimum orders and packaging options are shown to signed-in business accounts.`, '',
+        'New products on the Ali FMCG marketplace', '',
+        `These listings were approved on Ali FMCG${o.periodLabel ? ` ${o.periodLabel}` : ' recently'}. Wholesale prices, minimum orders and packaging options are shown to signed-in business accounts.`, '',
         ...products.flatMap((p) => [`- ${p.name}${p.brand ? ` (${p.brand})` : ''}${p.origin ? ` — origin ${p.origin}` : ''}`, `  ${site}/products/${p.id}`]),
         '', `Browse the catalogue: ${site}/categories`, '',
-        '—', 'Atlantis Marketplace, operated by Monjez Company · Info@atlantisfmcg.com',
+        '—', 'Ali FMCG Marketplace, operated by Monjez Company · Info@atlantisfmcg.com',
         `Privacy policy: ${site}/privacy-policy`, `Unsubscribe: ${o.unsubscribeUrl}`,
     ].join('\n');
     return { subject, preheader, html, text };
@@ -110,7 +110,7 @@ export function renderReviewNotificationEmail(o: { productName: string; rating: 
   <a href="${esc(o.reviewUrl)}" style="display:inline-block;background:${TEAL};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:10px;">See the review</a>
   <p style="margin:14px 0 0 0;font-size:13px;line-height:1.6;color:${MUTED};">Reviews come from signed-in buyers and are shown on the product page. The reviewer’s details aren’t shared by email.</p>
 </td></tr>`;
-    const html = shell({ siteUrl: site, preheader, body, footerNote: `You’re receiving this because you list this product on Atlantis. Change which emails you get in <a href="${esc(o.settingsUrl)}" style="color:${MUTED};">your notification settings</a>.` });
-    const text = [`New product review (published) — ${o.productName}`, `Rating: ${o.rating} / 5`, comment ? `“${comment}”` : 'No comment.', '', `See the review: ${o.reviewUrl}`, '', `Notification settings: ${o.settingsUrl}`, 'Atlantis Marketplace, operated by Monjez Company · Info@atlantisfmcg.com'].join('\n');
+    const html = shell({ siteUrl: site, preheader, body, footerNote: `You’re receiving this because you list this product on Ali FMCG. Change which emails you get in <a href="${esc(o.settingsUrl)}" style="color:${MUTED};">your notification settings</a>.` });
+    const text = [`New product review (published) — ${o.productName}`, `Rating: ${o.rating} / 5`, comment ? `“${comment}”` : 'No comment.', '', `See the review: ${o.reviewUrl}`, '', `Notification settings: ${o.settingsUrl}`, 'Ali FMCG Marketplace, operated by Monjez Company · Info@atlantisfmcg.com'].join('\n');
     return { subject, preheader, html, text };
 }

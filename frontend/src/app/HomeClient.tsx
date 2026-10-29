@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 // =====================================================================
-// Atlantis homepage — FMCG wholesale first.
+// Ali FMCG homepage — FMCG wholesale first.
 // Tokens: Navy #0B1F3A · Teal #2EC4B6 (text-safe teal #0E7C74)
 //         Ink #0F172A · Muted #475569/#64748B · Hairline #E6E8EC
 //         Canvas white with #F7F8FA bands.
@@ -456,7 +456,7 @@ export default function HomePage() {
             </section>
 
             {/* ============================================================
-                 WHY ATLANTIS
+                 WHY ALI FMCG
             ============================================================ */}
             <section className="py-16 sm:py-20">
                 <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">

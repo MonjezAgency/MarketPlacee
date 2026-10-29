@@ -12,7 +12,7 @@ import { CampaignStatusBadge, useInt, useTn, useWhen } from './newsletterUi';
 /**
  * Campaign history with real statuses. "Accepted" = accepted by the email
  * provider; delivery and bounces are not reported back, so they are shown as
- * not available. Opens/clicks come from Atlantis's own tracking pixel and links.
+ * not available. Opens/clicks come from Ali FMCG's own tracking pixel and links.
  */
 export function CampaignsPanel() {
     const tn = useTn();

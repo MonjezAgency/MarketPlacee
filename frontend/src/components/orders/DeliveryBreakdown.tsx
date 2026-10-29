@@ -9,7 +9,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 /**
  * Buyer-facing wording per delivery method. The server's own labels are
- * written for suppliers ("You deliver to an Atlantis hub"), so the buyer view
+ * written for suppliers ("You deliver to an Ali FMCG hub"), so the buyer view
  * names the method itself; figures and reasons still come only from the server.
  */
 const METHOD: Record<string, { label: string; handover: string }> = {
@@ -28,7 +28,7 @@ export function DeliveryBreakdown({ quote, compact = false, className, setByAtla
     if (!quote || !quote.groups?.length) return null;
     const eur = (n: number | null | undefined) => (n == null ? '—' : formatPrice(n, 'EUR', meta.intl));
     const many = quote.groups.length > 1;
-    // Atlantis quoted the delivery after the order: that figure replaces the order-time calculation.
+    // Ali FMCG quoted the delivery after the order: that figure replaces the order-time calculation.
     const fixed = setByAtlantis && quote.status !== 'priced' ? setByAtlantis : null;
     return (
         <div className={cn('space-y-3', className)}>

@@ -8,7 +8,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role, DisputeStatus } from '@prisma/client';
 
-/** Supplier net prices and the Atlantis margin are for OWNER / ADMIN only; everyone else gets the order lines without them. */
+/** Supplier net prices and the Ali FMCG margin are for OWNER / ADMIN only; everyone else gets the order lines without them. */
 const NET_ROLES = new Set<string>([Role.ADMIN, Role.OWNER]);
 const NET_FIELDS = ['supplierUnitPrice', 'supplierLineTotal'];
 export function redactDisputeNet<T>(value: T, role: string | undefined): T {

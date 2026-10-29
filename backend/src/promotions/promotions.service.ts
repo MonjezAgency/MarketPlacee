@@ -7,7 +7,7 @@ import {
 } from './promotion-rules';
 
 export type Actor = { id: string; role: string };
-/** supplier = the caller's own products only; admin = any product (Atlantis staff). */
+/** supplier = the caller's own products only; admin = any product (Ali FMCG staff). */
 export type Scope = { kind: 'supplier'; supplierId: string } | { kind: 'admin' };
 
 const PRODUCT_SELECT = {
@@ -18,7 +18,7 @@ const PRODUCT_SELECT = {
 const PAGE_SIZE = 25;
 
 /**
- * Special offers management for suppliers (own products) and Atlantis
+ * Special offers management for suppliers (own products) and Ali FMCG
  * admins (any product). Rules live in promotion-rules.ts; which promotion
  * applies to a price lives in promotion-lookup.ts.
  *
@@ -256,7 +256,7 @@ export class PromotionsService {
             const users = ids.length ? await this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, email: true, role: true } }).catch(() => [] as any[]) : [];
             for (const u of users) people.set(u.id, { name: u.name ?? null, email: u.email ?? null, role: u.role ?? null });
         }
-        // Suppliers see "you" or "Atlantis" — never a staff member's identity.
+        // Suppliers see "you" or "Ali FMCG" — never a staff member's identity.
         const who = (id: string | null | undefined, role?: string | null) => {
             if (!id) return null;
             if (scope.kind === 'supplier') return { kind: id === scope.supplierId ? 'YOU' : 'ATLANTIS' };

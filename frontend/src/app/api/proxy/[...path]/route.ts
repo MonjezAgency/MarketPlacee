@@ -35,9 +35,9 @@ const PUBLIC_PATHS = [
   'newsletter/confirm',
   'newsletter/unsubscribe',
   'products/price-ticker',
-  // Delivery policy (where Atlantis delivers) — public information.
+  // Delivery policy (where Ali FMCG delivers) — public information.
   'shipping/destinations',
-  // Verified Atlantis hubs (the Warehouses page) — public information.
+  // Verified Ali FMCG hubs (the Warehouses page) — public information.
   'fulfillment/hubs',
   // Health endpoints — no auth so the operator can hit them from
   // the browser to verify Railway connectivity even when locked out.

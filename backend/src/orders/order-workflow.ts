@@ -2,7 +2,7 @@
  * Order confirmation workflow — the rules, without the database.
  *
  *   Buyer submits ──► every supplier on the order accepts (or rejects) the
- *   exact terms ──► Atlantis approves ──► the buyer has the confirmed terms
+ *   exact terms ──► Ali FMCG approves ──► the buyer has the confirmed terms
  *   (and accepts them when they differ from what was submitted) ──► payment
  *   and fulfilment proceed.
  *
@@ -45,7 +45,7 @@ const round2 = (n: number) => Math.round(Number(n) * 100) / 100;
 export function supplierView(t: Terms, supplierId: string) {
     const lines = t.lines.filter((l) => l.supplierId === supplierId).map((l) => ({ itemId: l.itemId, productId: l.productId, name: l.name, tier: l.tier, quantity: l.quantity, unitNet: l.supplierUnitPrice, lineNet: l.supplierUnitPrice == null ? null : round2(l.supplierUnitPrice * l.quantity), selectedVariants: l.selectedVariants }));
     const f = t.fulfillment?.groups?.find?.((g: any) => g.supplierId === supplierId);
-    return { version: t.version, lines, netTotal: round2(lines.reduce((s, l) => s + (l.lineNet || 0), 0)), fulfillment: f ? { method: f.method, label: f.label, status: f.status, handover: f.handover, supplierCharges: (f.charges || []).filter((c: any) => c.paidTo !== 'Atlantis') } : null, destinationCountry: t.destinationCountry };
+    return { version: t.version, lines, netTotal: round2(lines.reduce((s, l) => s + (l.lineNet || 0), 0)), fulfillment: f ? { method: f.method, label: f.label, status: f.status, handover: f.handover, supplierCharges: (f.charges || []).filter((c: any) => c.paidTo !== 'Ali FMCG') } : null, destinationCountry: t.destinationCountry };
 }
 
 export function isExpired(c: Confirmation, now = new Date()): boolean {
@@ -72,14 +72,14 @@ export function confirmationState(confs: Confirmation[], version: number, suppli
 
 /**
  * The terms version suppliers last answered. Before approval it is always the
- * current version; after approval a change only Atlantis makes (e.g. freight)
+ * current version; after approval a change only Ali FMCG makes (e.g. freight)
  * creates a new version without asking suppliers again, so views read this one.
  */
 export function answeredVersion(confs: { termsVersion: number }[], current: number): number {
     return confs.length ? Math.max(...confs.map((c) => c.termsVersion)) : current;
 }
 
-/** Why Atlantis can't approve yet (null = it can). */
+/** Why Ali FMCG can't approve yet (null = it can). */
 export function approvalBlocker(order: { status: string; reviewStatus: string; termsVersion: number }, state: ReturnType<typeof confirmationState>): string | null {
     if (order.reviewStatus === 'APPROVED') return 'This order is already approved.';
     if (order.reviewStatus === 'REJECTED' || order.status === 'CANCELLED') return 'This order was rejected or cancelled.';
@@ -104,10 +104,10 @@ export function workflowBlocker(order: { status: string; reviewStatus: string; t
     if (order.reviewStatus === 'LEGACY' || to === 'CANCELLED') return null;
     // Approval is the only way out of "awaiting confirmation"; it confirms the order (PROCESSING).
     if (order.status === 'PENDING' && (to === 'PROCESSING' || to === 'PAID') && !opts.viaApproval) {
-        return 'An order is confirmed only by Atlantis approval, after every supplier accepted its terms.';
+        return 'An order is confirmed only by Ali FMCG approval, after every supplier accepted its terms.';
     }
     if (['SHIPPED', 'DELIVERED'].includes(to)) {
-        if (order.reviewStatus !== 'APPROVED') return 'This order hasn’t been approved by Atlantis.';
+        if (order.reviewStatus !== 'APPROVED') return 'This order hasn’t been approved by Ali FMCG.';
         if (buyerMustAccept(order)) return 'The buyer hasn’t accepted the changed terms yet.';
     }
     return null;
@@ -118,8 +118,8 @@ export function partyStatus(order: { status: string; reviewStatus: string; terms
     if (order.status === 'CANCELLED') return { key: 'CANCELLED', buyer: 'Cancelled', supplier: 'Cancelled' };
     if (order.reviewStatus === 'LEGACY') return null;
     if (order.reviewStatus === 'PENDING_REVIEW') {
-        if (state?.anyRejected) return { key: 'SUPPLIER_REJECTED', buyer: 'Being reviewed by Atlantis', supplier: 'You rejected these terms' };
-        if (state?.allAccepted) return { key: 'AWAITING_APPROVAL', buyer: 'Supplier confirmed — Atlantis is approving', supplier: 'Accepted — awaiting Atlantis approval' };
+        if (state?.anyRejected) return { key: 'SUPPLIER_REJECTED', buyer: 'Being reviewed by Ali FMCG', supplier: 'You rejected these terms' };
+        if (state?.allAccepted) return { key: 'AWAITING_APPROVAL', buyer: 'Supplier confirmed — Ali FMCG is approving', supplier: 'Accepted — awaiting Ali FMCG approval' };
         return { key: 'AWAITING_SUPPLIER', buyer: 'Waiting for supplier confirmation', supplier: 'Your confirmation is needed' };
     }
     if (buyerMustAccept(order)) return { key: 'AWAITING_BUYER', buyer: 'Updated terms — your acceptance is needed', supplier: 'Approved — waiting for the buyer to accept updated terms' };

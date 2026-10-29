@@ -4,7 +4,7 @@ import { ProductsController } from '../products.controller';
 /**
  * Supplier-owned product data is edited only by its supplier: staff can't
  * overwrite fields, override the status, resubmit, change variant stock or
- * create products under a supplier's account. Atlantis Catalog products
+ * create products under a supplier's account. Ali FMCG Catalog products
  * (owned by staff accounts) stay editable by staff.
  */
 function setup(ownerRole: string) {
@@ -50,7 +50,7 @@ describe('staff and supplier-owned products', () => {
         await expect(ctrl.create({ name: 'X', category: 'Snacks', supplierId: 'sup-1' }, admin)).rejects.toBeInstanceOf(ForbiddenException);
         expect(products.create).not.toHaveBeenCalled();
     });
-    it('lets staff edit and change the status of Atlantis Catalog products', async () => {
+    it('lets staff edit and change the status of Ali FMCG Catalog products', async () => {
         const { ctrl, products } = setup('OWNER');
         await expect(ctrl.update('p1', { name: 'Catalog name', category: 'Snacks' }, admin)).resolves.toEqual({ ok: true });
         await expect(ctrl.updateStatus('p1', { status: 'DRAFT' as any }, admin)).resolves.toEqual({ ok: true });

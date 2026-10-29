@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Atlantis design-system primitives (see docs/DESIGN_SYSTEM.md).
+ * Ali FMCG design-system primitives (see docs/DESIGN_SYSTEM.md).
  * Marketing, trust and policy pages are built from these — not from
  * page-specific spacing, type sizes or button styles.
  */
@@ -151,7 +151,7 @@ export function TrustNav({ current }: { current: 'inspection' | 'payments' | 'wa
     const pages = [
         { key: 'payments', href: '/protected-payments', title: 'Protected Payments', desc: 'What has to happen before money moves.' },
         { key: 'inspection', href: '/goods-inspection', title: 'Goods Inspection', desc: 'What an inspection checks, and how issues are resolved.' },
-        { key: 'warehouses', href: '/warehouses', title: 'Warehouses', desc: 'Verified Atlantis hubs in Europe and the Americas.' },
+        { key: 'warehouses', href: '/warehouses', title: 'Warehouses', desc: 'Verified Ali FMCG hubs in Europe and the Americas.' },
     ].filter((p) => p.key !== current);
     return (
         <Section tone="muted" size="sm">

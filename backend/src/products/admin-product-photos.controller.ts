@@ -12,7 +12,7 @@ import { ImageDiscoveryService } from './image-discovery.service';
  *
  * Catalog staff (owner, admin, moderator) see the list and can ask for a new
  * search. Choosing a found photo changes a product, so it is owner/admin only
- * and only for Atlantis Catalog products: a supplier's product photos are the
+ * and only for Ali FMCG Catalog products: a supplier's product photos are the
  * supplier's to choose (staff see the status, never the photos' application).
  */
 @Controller('admin-product-photos')
@@ -42,7 +42,7 @@ export class AdminProductPhotosController {
         return this.discovery.staffRetry({ id: req.user.sub, role: String(req.user.role || '').toUpperCase() }, ids as string[]);
     }
 
-    /** Use a found photo ({ url }), optionally with more exact-match photos for the gallery ({ also: [url] }). Atlantis Catalog only. */
+    /** Use a found photo ({ url }), optionally with more exact-match photos for the gallery ({ also: [url] }). Ali FMCG Catalog only. */
     @Post(':id/accept')
     @Roles(Role.ADMIN, Role.OWNER)
     @Throttle({ default: { limit: 30, ttl: 60_000 } })
@@ -52,7 +52,7 @@ export class AdminProductPhotosController {
         return this.discovery.staffAccept({ id: req.user.sub, role: String(req.user.role || '').toUpperCase() }, id, body.url, also);
     }
 
-    /** "Not this product": one photo ({ url }) or all of them. Atlantis Catalog only. */
+    /** "Not this product": one photo ({ url }) or all of them. Ali FMCG Catalog only. */
     @Post(':id/dismiss')
     @Roles(Role.ADMIN, Role.OWNER)
     @Throttle({ default: { limit: 60, ttl: 60_000 } })

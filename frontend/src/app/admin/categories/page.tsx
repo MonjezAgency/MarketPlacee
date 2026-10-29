@@ -95,7 +95,7 @@ export default function AdminCategoriesPage() {
         const trimmed = editValue.trim();
         if (!trimmed || categories[index].name === trimmed) { setEditingIndex(null); return; }
         // Renaming rewrites the category of every product that uses it. Staff may only edit
-        // Atlantis Catalog products (supplier products answer 403 SUPPLIER_OWNED), so count
+        // Ali FMCG Catalog products (supplier products answer 403 SUPPLIER_OWNED), so count
         // what the server actually changed instead of announcing success.
         if (categories[index].productCount > 0
             && !window.confirm(`Rename "${categories[index].name}" to "${trimmed}" on its products? Supplier-owned products can't be changed by staff and will keep the old name.`)) return; // i18n-ignore (legacy English-only page)

@@ -149,7 +149,7 @@ export default function OrderChatModal({ orderId, orderTotal, customerName, part
                 {/* Context banner */}
                 <div className="px-5 py-2 bg-teal-50 border-b border-teal-100 shrink-0">
                     <p className="text-[11px] text-teal-700 font-semibold">
-                        🔒 This is a private conversation about this order only. Atlantis support team can see this chat.
+                        🔒 This is a private conversation about this order only. Ali FMCG support team can see this chat.
                     </p>
                 </div>
 
@@ -196,7 +196,7 @@ export default function OrderChatModal({ orderId, orderTotal, customerName, part
                                         <div className={cn('flex flex-col gap-0.5 max-w-[80%]', mine ? 'items-end' : 'items-start')}>
                                             {!mine && (
                                                 <span className="text-[10px] text-slate-400 font-bold px-1">
-                                                    {staff ? '🏢 Atlantis Support' : msg.sender?.name}
+                                                    {staff ? '🏢 Ali FMCG Support' : msg.sender?.name}
                                                 </span>
                                             )}
                                             <div className={cn(

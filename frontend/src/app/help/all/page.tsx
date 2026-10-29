@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ARTICLES, CATEGORIES, articleHref, articlesIn } from '@/content/help';
 import HelpShell from '@/components/help/HelpShell';
 
-export const metadata: Metadata = { title: 'All articles — Help Center', description: 'Every Atlantis Help Center article, by topic.' };
+export const metadata: Metadata = { title: 'All articles — Help Center', description: 'Every Ali FMCG Help Center article, by topic.' };
 
 export default function AllArticles() {
     return (

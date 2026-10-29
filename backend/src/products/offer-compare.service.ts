@@ -15,7 +15,7 @@ export function gtinForms(ean: string): string[] {
 /**
  * Offers for the same product from different suppliers.
  *
- * Atlantis stores one Product row per supplier listing; listings that share a
+ * Ali FMCG stores one Product row per supplier listing; listings that share a
  * valid barcode (GTIN) are the same trade item — same variant and pack — so
  * they're compared. Nothing is invented: if only one approved listing has the
  * barcode, there is nothing to compare.

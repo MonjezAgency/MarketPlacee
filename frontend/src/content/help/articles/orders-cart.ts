@@ -53,7 +53,7 @@ export const ordersCart: Article[] = [
                 'Up to 60 lines per load.',
                 'The product\'s minimum order applies across its variants.',
                 'Products dispatched from different countries can\'t share a load.',
-                'Atlantis may set a minimum fill level for mixed loads; if so, the meter shows it.',
+                'Ali FMCG may set a minimum fill level for mixed loads; if so, the meter shows it.',
             ] },
         ],
         related: ['orders-cart/minimum-order-quantity', 'products-pricing/variants', 'products-pricing/cases-pallets-trucks'],
@@ -85,12 +85,12 @@ export const ordersCart: Article[] = [
         audience: 'both',
         keywords: ['status', 'awaiting confirmation', 'confirmed', 'shipped', 'delivered', 'cancelled', 'pending', 'processing'],
         blocks: [
-            { p: 'Placing an order sends a request. It is confirmed only after every supplier on it accepts the exact terms and Atlantis approves them. See [Protected Payments](/protected-payments).' },
+            { p: 'Placing an order sends a request. It is confirmed only after every supplier on it accepts the exact terms and Ali FMCG approves them. See [Protected Payments](/protected-payments).' },
             { table: { head: ['Buyer sees', 'Supplier sees', 'Meaning'], rows: [
                 ['Waiting for supplier confirmation', 'Your confirmation is needed', 'The request is with the supplier(s), who have a deadline to accept or reject it'],
-                ['Supplier confirmed — Atlantis is approving', 'Accepted — awaiting Atlantis approval', 'Every supplier accepted the exact terms; Atlantis does a final review'],
-                ['Being reviewed by Atlantis', 'You rejected these terms', 'A supplier couldn\'t supply as requested; Atlantis proposes changed terms or cancels'],
-                ['Confirmed', 'Confirmed — preparing', 'Approved by Atlantis; payment details are sent and goods are prepared'],
+                ['Supplier confirmed — Ali FMCG is approving', 'Accepted — awaiting Ali FMCG approval', 'Every supplier accepted the exact terms; Ali FMCG does a final review'],
+                ['Being reviewed by Ali FMCG', 'You rejected these terms', 'A supplier couldn\'t supply as requested; Ali FMCG proposes changed terms or cancels'],
+                ['Confirmed', 'Confirmed — preparing', 'Approved by Ali FMCG; payment details are sent and goods are prepared'],
                 ['Your acceptance needed', 'Approved — waiting for the buyer', 'The terms changed after you ordered (for example a delivery charge); nothing ships until the buyer accepts'],
                 ['Shipped', 'Shipped', 'On the way; tracking appears when the carrier reference is added'],
                 ['Delivered', 'Delivered', 'The buyer confirmed delivery'],
@@ -110,9 +110,9 @@ export const ordersCart: Article[] = [
         keywords: ['cancel', 'cancellation', 'change order', 'modify order'],
         blocks: [
             { list: [
-                '**Buyers** can\'t cancel from the order page. Contact Atlantis as early as possible with **Email Atlantis about this order**, or at Info@atlantisfmcg.com.',
+                '**Buyers** can\'t cancel from the order page. Contact Ali FMCG as early as possible with **Email Ali FMCG about this order**, or at Info@atlantisfmcg.com.',
                 '**Suppliers** can reject the terms of an order they can\'t fulfil, with a reason. See [Confirm or decline orders](/help/suppliers/handle-orders).',
-                'The **Atlantis team** can cancel orders.',
+                'The **Ali FMCG team** can cancel orders.',
             ] },
             { p: 'When an order is cancelled, the reserved cases go back to the supplier\'s stock and the buyer is notified.' },
         ],

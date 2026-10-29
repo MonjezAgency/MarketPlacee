@@ -1,5 +1,5 @@
 /**
- * Branded HTML Email Templates for Atlantis Marketplace
+ * Branded HTML Email Templates for Ali FMCG Marketplace
  * Colors: Navy #0A1A2F, Aqua #1BC7C9, Cool Gray #F2F4F7, Dark Gray #2E2E2E
  */
 
@@ -18,7 +18,7 @@ export function getInvitationEmailHtml(params: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>You're Invited to Atlantis</title>
+  <title>You're Invited to Ali FMCG</title>
 </head>
 <body style="margin:0; padding:0; background-color:#F2F4F7; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#F2F4F7; padding: 40px 0;">
@@ -85,7 +85,7 @@ export function getInvitationEmailHtml(params: {
                             font-size: 16px;
                             margin: 0;
                             line-height: 1.5;
-                          ">Join the Atlantis B2B distribution network</p>
+                          ">Join the Ali FMCG B2B distribution network</p>
                         </td>
                       </tr>
                     </table>
@@ -109,7 +109,7 @@ export function getInvitationEmailHtml(params: {
                       Welcome aboard! 🎉
                     </p>
                     <p style="color: #64748B; font-size: 15px; line-height: 1.7; margin: 0;">
-                      ${senderName ? `<strong>${senderName}</strong> has` : 'An Atlantis administrator has'} invited you to join our exclusive marketplace as a <strong style="color: #1BC7C9;">${roleName}</strong>. We're building the future of B2B distribution, and we'd love to have you on board.
+                      ${senderName ? `<strong>${senderName}</strong> has` : 'An Ali FMCG administrator has'} invited you to join our exclusive marketplace as a <strong style="color: #1BC7C9;">${roleName}</strong>. We're building the future of B2B distribution, and we'd love to have you on board.
                     </p>
                   </td>
                 </tr>

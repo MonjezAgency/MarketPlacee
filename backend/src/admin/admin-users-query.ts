@@ -173,5 +173,5 @@ export function countBy<K extends string>(rows: { _count: { _all: number } | num
     return out;
 }
 
-/** Product review decisions made by Atlantis (not the supplier's own submissions). */
+/** Product review decisions made by Ali FMCG (not the supplier's own submissions). */
 export const REVIEW_DECISION_ACTIONS = ['APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'STATUS_CHANGED'] as const;

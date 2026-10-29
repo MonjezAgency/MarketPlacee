@@ -93,7 +93,7 @@ function shouldTranslate(raw: string): boolean {
     if (/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(t)) return false;
     if (/^https?:\/\//i.test(t)) return false;
     if (/^[A-Z]{2,5}$/.test(t)) return false; // ISO codes / abbrevs
-    if (t === 'Atlantis' || t === 'Monjez') return false;
+    if (t === 'Ali FMCG' || t === 'Monjez') return false;
     return true;
 }
 

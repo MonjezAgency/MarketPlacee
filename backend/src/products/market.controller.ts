@@ -29,7 +29,7 @@ export class PriceHistoryController {
     }
 }
 
-/** Target-price requests (buyer side + Atlantis operations side). */
+/** Target-price requests (buyer side + Ali FMCG operations side). */
 @Controller('target-prices')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TargetPricesController {

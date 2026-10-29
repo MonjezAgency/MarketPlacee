@@ -26,7 +26,7 @@ function ConfirmationContent() {
                 <span className="w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><CheckCircle2 size={24} /></span>
                 <h1 className="mt-5 text-[22px] leading-tight font-semibold text-heading">Order received</h1>
                 <p className="mt-1.5 text-[14px] text-ink-2">
-                    Reference <span className="font-semibold text-ink tabular-nums">{orderRef(orderId)}</span>. Atlantis will confirm quantities and availability with the supplier before dispatch; you’ll see each update in Orders &amp; tracking.
+                    Reference <span className="font-semibold text-ink tabular-nums">{orderRef(orderId)}</span>. Ali FMCG will confirm quantities and availability with the supplier before dispatch; you’ll see each update in Orders &amp; tracking.
                 </p>
 
                 <div className="mt-6 rounded-xl ring-1 ring-line p-4 flex items-start gap-3">

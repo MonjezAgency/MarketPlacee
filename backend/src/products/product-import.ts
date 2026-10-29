@@ -265,7 +265,7 @@ export function parseMoq(raw: string, defaultUnit: string, casesPerLayer?: numbe
     const n = m[1] ? parseInt(m[1], 10) : 1;
     const w = m[3];
     if (/^layers?$/.test(w)) {
-        if (!casesPerLayer || !Number.isInteger(casesPerLayer) || casesPerLayer <= 0) return { problem: `MOQ “${raw.trim()}” is in layers; Atlantis needs Cases per Layer to convert it to cases.` };
+        if (!casesPerLayer || !Number.isInteger(casesPerLayer) || casesPerLayer <= 0) return { problem: `MOQ “${raw.trim()}” is in layers; Ali FMCG needs Cases per Layer to convert it to cases.` };
         return { moq: n * casesPerLayer, unit: 'CASE', note: `“${raw.trim()}” = ${n} layer${n === 1 ? '' : 's'} × ${casesPerLayer} cases` };
     }
     const unit = /^(pieces?|pcs?|units?)$/.test(w) ? 'PIECE' : /^(cases?|cartons?|ctns?|cs)$/.test(w) ? 'CASE' : /^(pallets?|pal|plts?)$/.test(w) ? 'PALLET' : 'TRUCK';
@@ -554,14 +554,14 @@ export function buildTemplate(format: 'xlsx' | 'csv', variant: 'blank' | 'exampl
         ['Product Name', 'As printed on the pack, including size: “Brand Product Variant 400 g”. One product per row; flavours of one product can share a row with Varieties.'],
         ['Brand', 'The brand on the pack (e.g. Milka), not the manufacturer (e.g. Mondelez). A “Manufacturer” column is kept in the import record.'],
         ['Country of Origin', 'Where the product was made (e.g. Poland). Not the warehouse location — that is EXW Location.'],
-        ['Price', 'Fill ONE of Price per Case or Price per Piece. A column called just “Price” or “Price at €” must be confirmed as per case or per piece during upload; Atlantis never assumes it. Use a dot or comma for decimals consistently.'],
+        ['Price', 'Fill ONE of Price per Case or Price per Piece. A column called just “Price” or “Price at €” must be confirmed as per case or per piece during upload; Ali FMCG never assumes it. Use a dot or comma for decimals consistently.'],
         ['Currency', 'ISO code (EUR, USD, GBP, RON …). Prices are converted to EUR for the marketplace; your original price and currency are kept.'],
         ['Pieces per Case', 'Pieces in one case/carton (e.g. 24). Needed to convert a piece price or a piece stock.'],
         ['Cases per Pallet', 'Cases on one full pallet. Optional cross-check: a “Pieces per Pallet” column is compared with Pieces per Case × Cases per Pallet.'],
         ['Stock', 'Fill ONE of Stock (cases), Stock (pieces) or Stock (pallets). Pieces are converted to whole cases; pallets to cases using Cases per Pallet.'],
         ['MOQ / MOQ Unit', 'Minimum order: a number plus its unit (piece, case, pallet, truck). Text such as “1 pallet” or “full layers” (with Cases per Layer) is understood.'],
         ['Weight per Piece', 'Net weight or volume of one piece with its unit: 400 g, 1.5 L, 6 x 330 ml. Not the case weight.'],
-        ['PDF price lists', 'You can also upload a PDF price list. Atlantis reads the table, shows every row with its page number for you to check and correct, and imports nothing until you confirm. Scanned PDFs (pictures of pages) can’t be read.'],
+        ['PDF price lists', 'You can also upload a PDF price list. Ali FMCG reads the table, shows every row with its page number for you to check and correct, and imports nothing until you confirm. Scanned PDFs (pictures of pages) can’t be read.'],
     ];
     const guide = [['Column', 'Required', 'What to enter', 'Example', 'Also accepted as'],
         ...fields.map((f) => [f.header, f.required === 'yes' ? 'Required' : f.required === 'one-of' ? `One of: ${fields.filter((x) => x.group === f.group).map((x) => x.header).join(' / ')}` : 'Optional', f.description, f.example, f.aliases.slice(0, 6).join(', ')]),

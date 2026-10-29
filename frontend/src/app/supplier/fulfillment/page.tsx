@@ -36,12 +36,12 @@ const WHO_KEY: Record<string, string> = { Supplier: 'whoSupplier', Atlantis: 'wh
 const CHARGE_LABEL: Record<string, string> = { ATLANTIS_COLLECTION: 'chargeCollection', SUPPLIER_TO_HUB: 'chargeHubFreight', HUB_TO_BUYER: 'chargeHubToBuyer' };
 /** Fixed server reasons (fulfillment-calc.ts priceOption) → key; reasons that embed names or routes stay as server text. */
 const REASON_KEY: Record<string, string> = {
-    'Direct shipment by suppliers isn’t offered on Atlantis yet.': 'reasonDirectNotOffered',
+    'Direct shipment by suppliers isn’t offered on Ali FMCG yet.': 'reasonDirectNotOffered',
     'Choose a delivery country to see delivery charges.': 'reasonChooseCountry',
     'Enter a quantity.': 'reasonEnterQuantity',
-    'The EXW location doesn’t name a country Atlantis recognises — freight is quoted after the order.': 'reasonExwCountry',
-    'Atlantis has no verified hub accepting deliveries yet.': 'reasonNoVerifiedHub',
-    'Choose the Atlantis hub you deliver to in your fulfilment settings.': 'reasonChooseHub',
+    'The EXW location doesn’t name a country Ali FMCG recognises — freight is quoted after the order.': 'reasonExwCountry',
+    'Ali FMCG has no verified hub accepting deliveries yet.': 'reasonNoVerifiedHub',
+    'Choose the Ali FMCG hub you deliver to in your fulfilment settings.': 'reasonChooseHub',
     'Add what you charge to bring one pallet to the hub.': 'reasonAddHubFreight',
     'Pallet spaces can’t be worked out for this load (set cases per pallet).': 'reasonPalletSpaces',
 };

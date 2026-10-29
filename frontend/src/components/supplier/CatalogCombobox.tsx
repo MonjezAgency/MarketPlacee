@@ -96,7 +96,7 @@ export type BrandState = 'known' | 'new' | 'unchecked';
 interface BrandResult { brands: { name: string; count: number }[]; exact: string | null; similar: { name: string; count: number }[] }
 
 /**
- * Brands on Atlantis (live listings + the supplier's own), searched on the
+ * Brands on Ali FMCG (live listings + the supplier's own), searched on the
  * server (/supplier-catalog/brands). Choosing one sets its canonical name; a
  * brand that isn't there needs the explicit "add it as a new brand" option.
  */

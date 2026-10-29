@@ -85,8 +85,8 @@ export interface DecisionInput {
 }
 
 /**
- * Target-price requests: a buyer tells Atlantis the price they'd buy at.
- * The Atlantis sourcing desk answers (Atlantis is the seller of record, so the
+ * Target-price requests: a buyer tells Ali FMCG the price they'd buy at.
+ * The Ali FMCG sourcing desk answers (Ali FMCG is the seller of record, so the
  * supplier is not contacted through this flow and never sees buyer prices or
  * the buyer). Nothing here changes a listing price or creates an order, and an
  * agreed price is NOT applied at checkout: orders are priced from the catalog
@@ -202,7 +202,7 @@ export class TargetPricesService {
             { targetPriceRequestId: created.id, targetRef: created.ref, productId: p.id, kind: 'TARGET_CREATED', params: { ref: created.ref, product: p.name, cases: quantityCases }, dedupeKey: `target:${created.id}:created` }).catch(() => {});
         // The product's supplier learns that buyers want this product at a better price — never the target, the buyer or any buyer price.
         if (p.supplierId) {
-            this.notifications.notifyUser(p.supplierId, 'Buyer price interest', `A buyer asked Atlantis for a better price on “${p.name}” (${quantityCases} cases). Atlantis handles the request; you may be asked about your price.`, 'INFO',
+            this.notifications.notifyUser(p.supplierId, 'Buyer price interest', `A buyer asked Ali FMCG for a better price on “${p.name}” (${quantityCases} cases). Ali FMCG handles the request; you may be asked about your price.`, 'INFO',
                 { targetPriceRequestId: created.id, productId: p.id, kind: 'TARGET_INTEREST_SUPPLIER', params: { product: p.name, cases: quantityCases }, dedupeKey: `target:${created.id}:supplier` }).catch(() => {});
         }
         return this.buyerView(created, listed);
@@ -423,10 +423,10 @@ export class TargetPricesService {
             TARGET_RESPONDED: `Reply to your target price ${r.ref}`,
         };
         const body1: Record<string, string> = {
-            TARGET_ACCEPTED: `The Atlantis sourcing desk accepted your target of €${r.targetCasePrice.toFixed(2)} per case for ${product}. Nothing is ordered yet — the desk will follow up.`,
-            TARGET_DECLINED: `The Atlantis sourcing desk declined your target price for ${product}.`,
-            TARGET_COUNTERED: `The Atlantis sourcing desk offers €${(price ?? 0).toFixed(2)} per case${casesText} for ${product}. Accept or decline it on your target prices page.`,
-            TARGET_RESPONDED: `The Atlantis sourcing desk answered your request for ${product}.`,
+            TARGET_ACCEPTED: `The Ali FMCG sourcing desk accepted your target of €${r.targetCasePrice.toFixed(2)} per case for ${product}. Nothing is ordered yet — the desk will follow up.`,
+            TARGET_DECLINED: `The Ali FMCG sourcing desk declined your target price for ${product}.`,
+            TARGET_COUNTERED: `The Ali FMCG sourcing desk offers €${(price ?? 0).toFixed(2)} per case${casesText} for ${product}. Accept or decline it on your target prices page.`,
+            TARGET_RESPONDED: `The Ali FMCG sourcing desk answered your request for ${product}.`,
         };
         const text = `${body1[kind]}${response ? ` “${response}”` : ''}`;
         const link = `/dashboard/customer/targets?ref=${encodeURIComponent(r.ref)}`;

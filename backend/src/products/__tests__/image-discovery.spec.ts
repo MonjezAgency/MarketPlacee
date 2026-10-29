@@ -471,7 +471,7 @@ describe('choosing the best photos: identity first, then the white-background pa
         expect(db.byId.get('rb')!.images[0]).toBe(own);                    // the supplier's photo stays first
     });
 
-    it('staff: list with reasons for everyone, but only Atlantis Catalog products get photos applied', async () => {
+    it('staff: list with reasons for everyone, but only Ali FMCG Catalog products get photos applied', async () => {
         const a = sized(redbull, 'ro', 5, 1200, 1600);
         const off = provider('off', 'food', { [redbull]: { status: 'found', record: rec(redbull, 'Red Bull Energy Drink 250 ml', 'Red Bull', '250 ml', [a], ['en:energy-drinks']) } });
         const { svc, db, products, settle } = setup([{ ...rbRow, id: 'cat', supplierId: 'staff1' }, { ...rbRow, id: 'sup', supplierId: 's1' }, { ...takisRow, id: 'bad', ean: '5941143028848', supplierId: 'staff1' }], [off.p]);

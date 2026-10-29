@@ -1,9 +1,9 @@
 /**
- * Design Tokens for Atlantis B2B Platform
+ * Design Tokens for Ali FMCG B2B Platform
  * Defines core colors, spacing, and transition constants.
  * Supports Light/Dark mode via CSS variables.
  */
-export const BRAND_NAME = 'Atlantis';
+export const BRAND_NAME = 'Ali FMCG';
 
 export const designTokens = {
     colors: {

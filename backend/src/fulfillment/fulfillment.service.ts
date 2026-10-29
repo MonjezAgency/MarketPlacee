@@ -9,7 +9,7 @@ import {
 const HUB_SERVICES = ['INSPECTION', 'CONSOLIDATION', 'STORAGE', 'CROSS_DOCK', 'COLLECTION'];
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Which map a hub belongs on (null = outside the regions Atlantis shows). */
+/** Which map a hub belongs on (null = outside the regions Ali FMCG shows). */
 export function hubRegion(lat: number, lng: number): 'europe' | 'americas' | null {
     if (lat >= 34 && lat <= 72 && lng >= -25 && lng <= 45) return 'europe';
     if (lat >= -56 && lat <= 72 && lng >= -170 && lng <= -30) return 'americas';
@@ -105,14 +105,14 @@ export class FulfillmentService {
     async updateSupplierSettings(supplierId: string, body: any) {
         const defaultMethod = String(body?.defaultMethod || 'ATLANTIS_COLLECTION') as FulfillmentMethod;
         if (!FULFILLMENT_METHODS.includes(defaultMethod)) throw new BadRequestException('Unknown fulfilment method.');
-        if (defaultMethod === 'SUPPLIER_DIRECT') throw new BadRequestException('Direct shipment by suppliers isn’t offered on Atlantis yet.');
+        if (defaultMethod === 'SUPPLIER_DIRECT') throw new BadRequestException('Direct shipment by suppliers isn’t offered on Ali FMCG yet.');
         let hubId: string | null = body?.hubId ? String(body.hubId) : null;
         const fp = body?.hubFreightPerPallet === '' || body?.hubFreightPerPallet == null ? null : Number(body.hubFreightPerPallet);
         if (fp != null && (!Number.isFinite(fp) || fp < 0 || fp > 10000)) throw new BadRequestException('Freight per pallet must be between 0 and 10,000 EUR.');
         if (defaultMethod === 'SUPPLIER_TO_HUB') {
-            if (!hubId) throw new BadRequestException('Choose the Atlantis hub you deliver to.');
+            if (!hubId) throw new BadRequestException('Choose the Ali FMCG hub you deliver to.');
             const hub = await this.prisma.atlantisHub.findFirst({ where: { id: hubId, verified: true, active: true } });
-            if (!hub) throw new BadRequestException('That hub isn’t a verified, active Atlantis hub.');
+            if (!hub) throw new BadRequestException('That hub isn’t a verified, active Ali FMCG hub.');
             if (fp == null) throw new BadRequestException('Add what you charge to bring one pallet to the hub.');
         } else if (hubId) {
             const hub = await this.prisma.atlantisHub.findFirst({ where: { id: hubId, verified: true, active: true } });
@@ -131,14 +131,14 @@ export class FulfillmentService {
         if (!p) throw new NotFoundException('Product not found');
         if (p.supplierId !== supplierId) throw new ForbiddenException('You can only change your own products.');
         if (method && !FULFILLMENT_METHODS.includes(method as FulfillmentMethod)) throw new BadRequestException('Unknown fulfilment method.');
-        if (method === 'SUPPLIER_DIRECT') throw new BadRequestException('Direct shipment by suppliers isn’t offered on Atlantis yet.');
+        if (method === 'SUPPLIER_DIRECT') throw new BadRequestException('Direct shipment by suppliers isn’t offered on Ali FMCG yet.');
         return this.prisma.product.update({ where: { id: productId }, data: { fulfillmentMethod: method || null }, select: { id: true, fulfillmentMethod: true } });
     }
 
     /**
      * Side-by-side comparison for one of the supplier's products. Shows the
      * supplier's own net price (unchanged by any method) and the logistics
-     * charges each method adds. The buyer price includes the Atlantis margin,
+     * charges each method adds. The buyer price includes the Ali FMCG margin,
      * which suppliers don't see, so it is not part of this view.
      */
     async supplierPreview(supplierId: string, q: { productId: string; tier?: string; quantity?: number; destination?: string; draft?: Partial<SupplierFulfillmentSettings> }) {
@@ -164,8 +164,8 @@ export class FulfillmentService {
             options,
             notes: [
                 'Your net price is what you receive for the goods. It is the same for every method.',
-                'Charges marked “passed through” are paid to you on top of your net price; Atlantis charges are paid by the buyer.',
-                'The buyer’s price includes the Atlantis margin, which isn’t shown to suppliers. VAT is added on the invoice.',
+                'Charges marked “passed through” are paid to you on top of your net price; Ali FMCG charges are paid by the buyer.',
+                'The buyer’s price includes the Ali FMCG margin, which isn’t shown to suppliers. VAT is added on the invoice.',
             ],
         };
     }

@@ -166,7 +166,7 @@ export class StripeWebhookController {
             if (order.supplier?.email) {
                 this.emailService.sendMail(
                     order.supplier.email,
-                    'Atlantis — New Paid Order Ready to Ship',
+                    'Ali FMCG — New Paid Order Ready to Ship',
                     `
                     <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;">
                       <div style="background:#0A1A2F;padding:32px 30px;text-align:center;">
@@ -185,7 +185,7 @@ export class StripeWebhookController {
                         </div>
                       </div>
                       <div style="background:#0A1A2F;padding:16px;text-align:center;">
-                        <p style="color:#667085;font-size:11px;margin:0;">© 2026 Atlantis Marketplace</p>
+                        <p style="color:#667085;font-size:11px;margin:0;">© 2026 Ali FMCG Marketplace</p>
                       </div>
                     </div>`,
                 ).catch(err => this.logger.error(`[EMAIL_SUPPLIER] ${err.message}`));

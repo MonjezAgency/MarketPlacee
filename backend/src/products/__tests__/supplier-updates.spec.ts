@@ -43,24 +43,24 @@ describe('Bulk price update — template', () => {
 describe('Bulk price update — preview and apply', () => {
     it('re-uploading the downloaded catalog with one new price changes only that price', async () => {
         const { svc } = setup();
-        const p = await svc.preview('sup', { headers: H, rows: [helper, row({ 'Atlantis ID': 'p-1', EAN: '5449000000996', 'Current Price per Case': '10', 'New Price per Case': '11.5', 'Current Stock (cases)': '100' }), row({ 'Atlantis ID': 'p-2', 'Current Stock (cases)': '50' })] });
+        const p = await svc.preview('sup', { headers: H, rows: [helper, row({ 'Ali FMCG ID': 'p-1', EAN: '5449000000996', 'Current Price per Case': '10', 'New Price per Case': '11.5', 'Current Stock (cases)': '100' }), row({ 'Ali FMCG ID': 'p-2', 'Current Stock (cases)': '50' })] });
         expect(p.summary).toEqual({ total: 2, changes: 1, unchanged: 1, errors: 0 });
         expect(p.rows[0]).toMatchObject({ row: 3, productId: 'p-1', state: 'change', fields: ['price'], price: { before: 10, after: 11.5, currency: 'EUR' }, stock: { changed: false } });
     });
     it('a stale "Current Stock" in the file never overwrites stock', async () => {
         const { svc } = setup();
-        const p = await svc.preview('sup', { headers: H, rows: [row({ 'Atlantis ID': 'p-1', 'Current Stock (cases)': '999' })] });
+        const p = await svc.preview('sup', { headers: H, rows: [row({ 'Ali FMCG ID': 'p-1', 'Current Stock (cases)': '999' })] });
         expect(p.rows[0].state).toBe('unchanged');
     });
     it('rejects unknown IDs, duplicates, invalid prices, ambiguous barcodes, rejected listings and a changed currency', async () => {
         const { svc } = setup();
         const p = await svc.preview('sup', { headers: H, rows: [
-            row({ 'Atlantis ID': 'someone-elses-id', 'New Price per Case': '5' }),
-            row({ 'Atlantis ID': 'p-1', 'New Price per Case': '12' }),
-            row({ 'Atlantis ID': 'p-1', 'New Price per Case': '13' }),
+            row({ 'Ali FMCG ID': 'someone-elses-id', 'New Price per Case': '5' }),
+            row({ 'Ali FMCG ID': 'p-1', 'New Price per Case': '12' }),
+            row({ 'Ali FMCG ID': 'p-1', 'New Price per Case': '13' }),
             row({ EAN: '4000000000001', 'New Price per Case': '6' }),
-            row({ 'Atlantis ID': 'p-2', 'New Price per Case': '-3' }),
-            row({ 'Atlantis ID': 'p-5', 'New Price per Case': '6' }),
+            row({ 'Ali FMCG ID': 'p-2', 'New Price per Case': '-3' }),
+            row({ 'Ali FMCG ID': 'p-5', 'New Price per Case': '6' }),
         ] });
         const errs = p.rows.map((r: any) => r.errors.join(' '));
         expect(errs[0]).toMatch(/isn’t one of your products/);
@@ -69,17 +69,17 @@ describe('Bulk price update — preview and apply', () => {
         expect(errs[3]).toMatch(/Several of your products share this barcode/);
         expect(errs[4]).toMatch(/isn’t a valid price/);
         expect(errs[5]).toMatch(/Rejected listings/);
-        const cur = await svc.preview('sup', { headers: [...H, 'Currency'], rows: [[...row({ 'Atlantis ID': 'p-2', 'New Price per Case': '50' }), 'EUR']] });
+        const cur = await svc.preview('sup', { headers: [...H, 'Currency'], rows: [[...row({ 'Ali FMCG ID': 'p-2', 'New Price per Case': '50' }), 'EUR']] });
         expect(cur.rows[0].errors.join(' ')).toMatch(/differs from this product’s currency \(RON\)/);
     });
     it('the earlier file format (Price per Case / Stock (cases)) still works', async () => {
         const { svc } = setup();
-        const p = await svc.preview('sup', { headers: ['Atlantis ID', 'Price per Case', 'Stock (cases)'], rows: [['p-1', '10', '120']] });
+        const p = await svc.preview('sup', { headers: ['Ali FMCG ID', 'Price per Case', 'Stock (cases)'], rows: [['p-1', '10', '120']] });
         expect(p.rows[0]).toMatchObject({ state: 'change', fields: ['stock'] });
     });
     it('apply writes only the changed price, in the product’s own currency, with an audit reason; error rows are skipped', async () => {
         const { svc, products } = setup();
-        const r = await svc.commit('sup', { headers: H, fileName: 'prices.xlsx', rows: [row({ 'Atlantis ID': 'p-2', 'New Price per Case': '47' }), row({ 'Atlantis ID': 'nope', 'New Price per Case': '1' })] });
+        const r = await svc.commit('sup', { headers: H, fileName: 'prices.xlsx', rows: [row({ 'Ali FMCG ID': 'p-2', 'New Price per Case': '47' }), row({ 'Ali FMCG ID': 'nope', 'New Price per Case': '1' })] });
         expect(r.summary).toEqual({ total: 2, updated: 1, unchanged: 0, failed: 1 });
         expect(products.supplierUpdate).toHaveBeenCalledTimes(1);
         expect(products.supplierUpdate.mock.calls[0][2]).toEqual({ changeReason: 'Bulk price/stock update (prices.xlsx)', supplierCurrency: 'RON', supplierPrice: 47 });

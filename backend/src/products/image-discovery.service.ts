@@ -12,7 +12,7 @@ import { ProductsService } from './products.service';
 /**
  * Background photo search for products saved without a photo.
  *
- * When a product (supplier editor, import, Atlantis Catalog) is saved with a
+ * When a product (supplier editor, import, Ali FMCG Catalog) is saved with a
  * valid barcode and no photo, the barcode is looked up in the background
  * through the shared engine (ImportEnrichmentService: same cache, same
  * rate-limited queue as the import review). Every photo found is then:
@@ -26,7 +26,7 @@ import { ProductsService } from './products.service';
  * survives reloads and restarts.
  *
  * Nothing is ever applied automatically: a found photo waits for a person's
- * "Use this photo" (the supplier, or for Atlantis Catalog products, staff).
+ * "Use this photo" (the supplier, or for Ali FMCG Catalog products, staff).
  * A product that has a photo is never searched in the background, and a found
  * photo never replaces one: on a product without a photo it fills the gallery;
  * on a product that has photos (an explicit "look for more") it can only be
@@ -260,7 +260,7 @@ export class ImageDiscoveryService implements OnModuleInit {
 
     /**
      * Use photos found for this product: `url` first, then `also` (other
-     * exact-match photos for the gallery), each copied into Atlantis storage
+     * exact-match photos for the gallery), each copied into Ali FMCG storage
      * and credited (licence, attribution, source page, who approved it).
      */
     async accept(supplierId: string, id: string, url: string, also: string[] = []) {
@@ -273,11 +273,11 @@ export class ImageDiscoveryService implements OnModuleInit {
         return this.drop(await this.own(supplierId, id), url);
     }
 
-    // ─── Staff (Atlantis Catalog photos; read-only status for supplier products) ──
+    // ─── Staff (Ali FMCG Catalog photos; read-only status for supplier products) ──
 
     /**
      * Products that need a photo or have photos waiting for review, with the
-     * reason. Atlantis Catalog products can be acted on; supplier products are
+     * reason. Ali FMCG Catalog products can be acted on; supplier products are
      * listed for their status only (staff never apply photos to them).
      */
     async staffList(q: { scope?: string; bucket?: string; q?: string; page?: string | number; limit?: string | number }) {
@@ -386,10 +386,10 @@ export class ImageDiscoveryService implements OnModuleInit {
         const existing = realImages(latest.images);
         if (mode === 'fill' && existing.length) throw new ConflictException({ code: 'HAS_PHOTO', message: 'This product got a photo in the meantime; nothing was changed.' });
         const images = [...existing, ...saved.map((s) => s.url).filter((u) => !existing.includes(u))];
-        const who = actor.role === 'SUPPLIER' ? 'the supplier' : `Atlantis (${actor.role.toLowerCase()})`;
+        const who = actor.role === 'SUPPLIER' ? 'the supplier' : `Ali FMCG (${actor.role.toLowerCase()})`;
         const wasLive = latest.status === 'APPROVED';
         let product: any = await this.products.supplierUpdate(p.id, ownerId, { images, changeReason: `${saved.length === 1 ? 'Photo' : `${saved.length} photos`} from ${main.source} (${main.license}), chosen by ${who}` });
-        // Staff adding a photo to a live Atlantis Catalog product is itself the review: keep it live.
+        // Staff adding a photo to a live Ali FMCG Catalog product is itself the review: keep it live.
         if (actor.role !== 'SUPPLIER' && wasLive && product?.status === 'PENDING') {
             product = await this.products.updateStatus(p.id, 'APPROVED' as any, '', { id: actor.id, role: actor.role }, { notify: false }).catch(() => product);
         }
@@ -442,7 +442,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         return rows.map((r) => r.id);
     }
 
-    /** Atlantis Catalog = owned by a staff account (catalog-scope.ts). */
+    /** Ali FMCG Catalog = owned by a staff account (catalog-scope.ts). */
     private async isCatalog(p: Row): Promise<boolean> {
         const owner = await this.prisma.user.findUnique({ where: { id: p.supplierId }, select: { role: true } });
         return isStaffRole(owner?.role);

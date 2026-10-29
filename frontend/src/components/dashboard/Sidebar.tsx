@@ -149,7 +149,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden border-2 border-white/10 group-hover/sidebar:scale-110 transition-transform">
                     <img 
                         src="/icon.png" 
-                        alt="Atlantis" /* i18n-ignore: brand name */
+                        alt="Ali FMCG" /* i18n-ignore: brand name */
                         className="w-full h-full object-contain p-1" 
                     />
                 </div>

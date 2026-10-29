@@ -40,7 +40,7 @@ function Reset() {
             if (b?.code === 'WEAK_PASSWORD') { setError(typeof b.message === 'string' ? b.message : 'Choose a stronger password.'); return; }
             if (res.status === 400) { setState('invalid'); return; }
             setError('Something went wrong. Try again in a moment.');
-        } catch { setError('We couldn’t reach Atlantis. Check your connection and try again.'); }
+        } catch { setError('We couldn’t reach Ali FMCG. Check your connection and try again.'); }
         finally { setBusy(false); }
     };
 

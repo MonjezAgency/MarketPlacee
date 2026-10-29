@@ -9,9 +9,9 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.atlantisfmcg.
 
 export const metadata: Metadata = {
     title: 'Help Center',
-    description: 'Guides for buyers and suppliers on Atlantis: accounts, product listings, packaging and pricing, minimum orders, mixed loads, checkout, delivery and troubleshooting.',
+    description: 'Guides for buyers and suppliers on Ali FMCG: accounts, product listings, packaging and pricing, minimum orders, mixed loads, checkout, delivery and troubleshooting.',
     alternates: { canonical: `${SITE_URL}/help` },
-    openGraph: { type: 'website', title: 'Atlantis Help Center', description: 'Guides for buyers and suppliers on Atlantis.', url: `${SITE_URL}/help` },
+    openGraph: { type: 'website', title: 'Ali FMCG Help Center', description: 'Guides for buyers and suppliers on Ali FMCG.', url: `${SITE_URL}/help` },
 };
 
 const BUYER_PATH = ['welcome/getting-started-checklist', 'buyers/find-products', 'products-pricing/cases-pallets-trucks', 'orders-cart/minimum-order-quantity', 'buyers/checkout', 'buyers/track-orders'];
@@ -27,7 +27,7 @@ export default function HelpHome() {
                     <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-teal">Help Center</p>
                     <h1 className="mt-2 text-[30px] sm:text-[38px] font-bold tracking-tight text-heading leading-tight">How can we help?</h1>
                     <p className="mt-3 max-w-2xl text-[16px] leading-relaxed text-ink-2">
-                        Welcome to Atlantis. Whether you’re a buyer comparing wholesale offers or a supplier managing products and inventory, this Help Center guides you through the platform, explains how key workflows work, and helps you resolve common issues.
+                        Welcome to Ali FMCG. Whether you’re a buyer comparing wholesale offers or a supplier managing products and inventory, this Help Center guides you through the platform, explains how key workflows work, and helps you resolve common issues.
                     </p>
                     <div className="mt-7 max-w-2xl"><HelpSearch size="lg" /></div>
                     <p className="mt-3 text-[13px] text-ink-3">{ARTICLES.length} articles · <Link href="/help/all" className="font-medium text-teal hover:underline">Browse all</Link></p>

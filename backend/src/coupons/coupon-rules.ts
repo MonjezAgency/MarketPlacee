@@ -8,7 +8,7 @@ import { randomInt } from 'crypto';
  *   Wholesale offers and special offers already discount individual lines (the deeper of the two, never both).
  *   A coupon never touches a line price. It is one order-level discount, computed on the eligible lines' totals
  *   AFTER those line discounts, applied once per order, and it never exceeds the eligible amount (so the goods
- *   total can't go below zero). One coupon per order. The discount is funded by the Atlantis margin: supplier
+ *   total can't go below zero). One coupon per order. The discount is funded by the Ali FMCG margin: supplier
  *   net prices (supplierUnitPrice) are not changed by a coupon.
  *
  * Eligibility:

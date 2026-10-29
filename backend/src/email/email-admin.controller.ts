@@ -59,7 +59,7 @@ export class EmailAdminController {
     @Get('preview')
     async preview(@Query('template') template = 'product-update') {
         const r = await this.render(template, `${site()}/unsubscribe?token=PREVIEW`);
-        return { ...r, from: `Atlantis FMCG <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`, replyTo: process.env.EMAIL_USER || 'Info@atlantisfmcg.com' };
+        return { ...r, from: `Ali FMCG <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`, replyTo: process.env.EMAIL_USER || 'Info@atlantisfmcg.com' };
     }
 
     /**

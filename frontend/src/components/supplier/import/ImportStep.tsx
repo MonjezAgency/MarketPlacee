@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { listJoin, where, type CommitResult, type Review } from './types';
 import type { ImportTarget } from './api';
 
-/** Wording that differs for the Atlantis Catalog import (adminProducts dictionary): rows are published, not sent to review. */
+/** Wording that differs for the Ali FMCG Catalog import (adminProducts dictionary): rows are published, not sent to review. */
 const CATALOG_TEXT: Record<string, string> = { sumUpdates: 'impSumUpdates', sumReady: 'impSumReady', sumDraft: 'impSumDraft', importConfirm: 'impConfirm', resSentToReview: 'impResPublished', draftsHidden: 'impDraftsHidden', openYourDrafts: 'impOpenDrafts' };
 function useText(target: ImportTarget) {
     const { t } = useLanguage();
@@ -69,7 +69,7 @@ function Results({ target, results, review, error, multi, fileName }: { target: 
     const tc = useText(target);
     const int = (n: number) => fmt.number(n);
     const n = (o: CommitResult['outcome']) => results.filter((r) => r.outcome === o).length;
-    // Supplier import: complete rows go to Atlantis review. Catalog import: complete rows are published.
+    // Supplier import: complete rows go to Ali FMCG review. Catalog import: complete rows are published.
     const pending = results.filter((r) => (target === 'catalog' ? r.status === 'APPROVED' && r.outcome === 'created' : r.status === 'PENDING')).length;
     const drafts = results.filter((r) => r.outcome === 'created' && r.status === 'DRAFT');
     const failed = results.filter((r) => r.outcome === 'failed');

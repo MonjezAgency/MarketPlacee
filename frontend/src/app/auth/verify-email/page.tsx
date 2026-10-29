@@ -31,7 +31,7 @@ function VerifyEmail() {
         setEmail(e);
         // Honest + non-revealing: a new address gets a code; an address that already
         // has an account gets a sign-in notice instead (no code).
-        if (sp.get('sent') === '1') { setInfo(`If ${e} is new to Atlantis, a 6-digit code is on its way (valid 15 minutes). If it already has an account, we emailed a sign-in reminder instead — no code is sent.`); setCooldown(60); }
+        if (sp.get('sent') === '1') { setInfo(`If ${e} is new to Ali FMCG, a 6-digit code is on its way (valid 15 minutes). If it already has an account, we emailed a sign-in reminder instead — no code is sent.`); setCooldown(60); }
         if (sp.get('sent') === 'failed') setError(`We couldn’t send the email to ${e} just now. Check the address, then use “Resend code”.`);
         refs.current[0]?.focus();
     }, [sp]);
@@ -70,7 +70,7 @@ function VerifyEmail() {
             }
             try { sessionStorage.removeItem('atl_verify_email'); } catch { /* ignore */ }
             setVerified({ role: body?.role });
-        } catch { setError('We couldn’t reach Atlantis. Check your connection and try again.'); }
+        } catch { setError('We couldn’t reach Ali FMCG. Check your connection and try again.'); }
         finally { setBusy(false); }
     };
 
@@ -87,7 +87,7 @@ function VerifyEmail() {
             // Same message whether or not the address has an unverified account.
             setInfo(`If ${email.trim()} has an account waiting for verification, a new code is on its way. Codes expire after 15 minutes.`);
             setDigits(Array(6).fill('')); refs.current[0]?.focus();
-        } catch { setError('We couldn’t reach Atlantis. Check your connection and try again.'); }
+        } catch { setError('We couldn’t reach Ali FMCG. Check your connection and try again.'); }
     };
 
     if (verified) {

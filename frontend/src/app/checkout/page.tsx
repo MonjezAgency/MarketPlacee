@@ -239,7 +239,7 @@ export default function CheckoutPage() {
                     couponCode: couponApplied || undefined,
                     idempotencyKey: idempotencyKey.current,
                     totalAmount: grandTotal,
-                    // Preferred carrier only — freight is quoted by Atlantis after the order.
+                    // Preferred carrier only — freight is quoted by Ali FMCG after the order.
                     shippingCompany: selectedShipping?.name,
                     shippingAddress: {
                         name: addrName,
@@ -440,7 +440,7 @@ export default function CheckoutPage() {
                                                                                 animate={{ opacity: 1, height: 'auto' }}
                                                                                 className="mt-2 pt-2 border-t border-secondary/20"
                                                                             >
-                                                                                <p className="text-xs text-muted-foreground">Cost and transit time are confirmed by Atlantis with this carrier after your order{rate.note ? ` · ${rate.note}` : ''}.</p>
+                                                                                <p className="text-xs text-muted-foreground">Cost and transit time are confirmed by Ali FMCG with this carrier after your order{rate.note ? ` · ${rate.note}` : ''}.</p>
                                                                             </motion.div>
                                                                         )}
                                                                     </AnimatePresence>
@@ -462,7 +462,7 @@ export default function CheckoutPage() {
                                                 <div>
                                                     <p className="text-xs font-bold text-foreground">Delivery isn’t charged at checkout</p>
                                                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                                        Where Atlantis has a configured rate for your route, the delivery charge is shown on the next step. Otherwise Atlantis quotes it after the order, and nothing is added until you accept that quote.
+                                                        Where Ali FMCG has a configured rate for your route, the delivery charge is shown on the next step. Otherwise Ali FMCG quotes it after the order, and nothing is added until you accept that quote.
                                                     </p>
                                                 </div>
                                             </div>
@@ -591,7 +591,7 @@ export default function CheckoutPage() {
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Preferred carrier</span>
-                                                <span className="font-bold">{selectedShipping?.name || 'Atlantis chooses'}</span>
+                                                <span className="font-bold">{selectedShipping?.name || 'Ali FMCG chooses'}</span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Delivery</span>
@@ -609,7 +609,7 @@ export default function CheckoutPage() {
 
                                         <div className="rounded-2xl ring-1 ring-line p-4 text-[13px] text-ink-2 space-y-1">
                                             <p className="font-semibold text-ink">What happens when you place the order</p>
-                                            <p>Placing the order sends a request — nothing is charged. Each supplier confirms availability, quantities and price; Atlantis then approves the order and sends you the confirmed terms and payment details. If anything changes, you’re asked to accept the new terms first. <Link href="/protected-payments" className="text-teal font-medium hover:underline">How it works</Link></p>
+                                            <p>Placing the order sends a request — nothing is charged. Each supplier confirms availability, quantities and price; Ali FMCG then approves the order and sends you the confirmed terms and payment details. If anything changes, you’re asked to accept the new terms first. <Link href="/protected-payments" className="text-teal font-medium hover:underline">How it works</Link></p>
                                         </div>
 
                                         {quoteError && <p role="alert" className="mb-3 text-[13px] text-[#B91C1C]">{quoteError}</p>}

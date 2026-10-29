@@ -6,8 +6,8 @@ import NotFoundClient from './NotFoundClient';
 // with the homepage title). Next.js automatically returns a 404 HTTP status
 // for app/not-found.tsx; this override only changes the metadata.
 export const metadata: Metadata = {
-    title: 'Page Not Found | Atlantis B2B Wholesale Marketplace',
-    description: 'The page you were looking for could not be found. Browse our verified wholesale catalogue or contact the Atlantis team.',
+    title: 'Page Not Found | Ali FMCG B2B Wholesale Marketplace',
+    description: 'The page you were looking for could not be found. Browse our verified wholesale catalogue or contact the Ali FMCG team.',
     robots: { index: false, follow: false },
 };
 

@@ -13,14 +13,14 @@ import { confirmationState, buyerMustAccept, type Confirmation } from '../orders
  *    in the period. totalAmount is the goods total at buyer prices (EUR), as
  *    approved; freight that is "quoted after the order" is not in it.
  *    Eligible + recognised = supplier-metrics.ts saleRecognizedAt: workflow
- *    orders approved by Atlantis and not cancelled (at reviewedAt); legacy
+ *    orders approved by Ali FMCG and not cancelled (at reviewedAt); legacy
  *    orders confirmed with the status controls (at the first confirmed
  *    history row). Requests still waiting, rejected requests and cancelled
  *    orders are never sales.
  *  Supplier net (period) — Σ OrderItem.supplierUnitPrice × quantity over the
  *    same lines, counted only where the supplier price was recorded.
- *  Atlantis revenue (period) — the business model is a markup on the supplier
- *    net price, so Atlantis's revenue on a line is (buyer price − supplier net)
+ *  Ali FMCG revenue (period) — the business model is a markup on the supplier
+ *    net price, so Ali FMCG's revenue on a line is (buyer price − supplier net)
  *    × quantity. Summed over lines that have a recorded supplier price; the
  *    number of lines without one is returned so the page can say the figure is
  *    partial. `margin` (whole-period) is set only when every line is covered.
@@ -89,7 +89,7 @@ export interface PeriodCommercial {
     linesWithoutNet: number;
     /** Order value − supplier net; null unless every line has a supplier price. */
     margin: number | null;
-    /** Atlantis revenue (buyer price − supplier net) on the lines that have a supplier price. */
+    /** Ali FMCG revenue (buyer price − supplier net) on the lines that have a supplier price. */
     revenueRecorded: number;
     casesSold: number;
     productsSold: number;
@@ -131,7 +131,7 @@ export function commercialSummary(all: EligibleOrder[], range: Pick<ResolvedRang
         if (i < 0) continue;
         series[i].orderValue += o.totalAmount;
         series[i].orders += 1;
-        // Atlantis revenue per bucket, from lines with a recorded supplier price (the rest are counted, never estimated).
+        // Ali FMCG revenue per bucket, from lines with a recorded supplier price (the rest are counted, never estimated).
         for (const l of o.lines) {
             if (l.supplierUnitPrice == null) { series[i].linesWithoutNet++; continue; }
             series[i].revenue += ((Number(l.price) || 0) - l.supplierUnitPrice) * l.quantity;
@@ -220,8 +220,8 @@ export interface OpenOrderFacts {
  * What the open orders are waiting for right now — the same confirmation rules
  * as the order workflow (order-workflow.ts), so this agrees with /admin/orders.
  *
- *  readyForApproval — every supplier accepted; Atlantis has to approve.
- *  needsDecision    — a supplier rejected or let the deadline pass; Atlantis has
+ *  readyForApproval — every supplier accepted; Ali FMCG has to approve.
+ *  needsDecision    — a supplier rejected or let the deadline pass; Ali FMCG has
  *                     to amend or reject the order.
  *  waitingSuppliers — suppliers still have time to answer (no admin action yet).
  *  legacyPending    — placed before the workflow; managed with the status controls.

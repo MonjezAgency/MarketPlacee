@@ -1,5 +1,5 @@
 /**
- * The Atlantis team invitation email. Transactional: it carries the one-time
+ * The Ali FMCG team invitation email. Transactional: it carries the one-time
  * link (the only place the raw token ever appears) and says what the role can do.
  */
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -27,14 +27,14 @@ export function teamInvitationEmail(p: { name: string; role: string; inviterName
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid #E6E8EC;border-radius:16px;overflow:hidden;">
 <tr><td style="background:#0B1F3A;padding:22px 28px;"><span style="font-size:20px;font-weight:700;color:#FFFFFF;">Atlan<span style="color:#2EC4B6;">tis</span></span><span style="float:right;font-size:12px;color:#94A3B8;line-height:28px;">Team invitation</span></td></tr>
 <tr><td style="padding:28px;">
-<h1 style="margin:0 0 12px;font-size:20px;line-height:1.3;color:#0B1F3A;">Join the Atlantis team</h1>
-${para(`Hi ${esc(p.name) || 'there'}, ${esc(p.inviterName)} invited you to the Atlantis team as <strong>${esc(role)}</strong>.`)}
+<h1 style="margin:0 0 12px;font-size:20px;line-height:1.3;color:#0B1F3A;">Join the Ali FMCG team</h1>
+${para(`Hi ${esc(p.name) || 'there'}, ${esc(p.inviterName)} invited you to the Ali FMCG team as <strong>${esc(role)}</strong>.`)}
 ${para(`<span style="color:#64748B;">${esc(ROLE_SUMMARY[p.role] || '')}</span>`)}
 ${para('Open the link to choose your password and activate your account. The link works once.')}
 <p style="margin:18px 0 22px;"><a href="${esc(p.link)}" style="display:inline-block;padding:12px 22px;border-radius:10px;background:#0B1F3A;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:600;">Accept invitation</a></p>
 ${para(`<span style="font-size:13px;color:#64748B;">This invitation expires on ${esc(expires)}. If you weren’t expecting it, ignore this email: no account is created until the link is used.</span>`)}
 </td></tr>
-<tr><td style="padding:18px 28px;border-top:1px solid #E6E8EC;font-size:12px;line-height:1.6;color:#64748B;">Sent because an Atlantis owner or admin invited this address. It isn’t a marketing email.<br>Atlantis FMCG · <a href="mailto:Info@atlantisfmcg.com" style="color:#0E7C74;">Info@atlantisfmcg.com</a></td></tr>
+<tr><td style="padding:18px 28px;border-top:1px solid #E6E8EC;font-size:12px;line-height:1.6;color:#64748B;">Sent because an Ali FMCG owner or admin invited this address. It isn’t a marketing email.<br>Ali FMCG · <a href="mailto:Info@atlantisfmcg.com" style="color:#0E7C74;">Info@atlantisfmcg.com</a></td></tr>
 </table></td></tr></table></body></html>`;
-    return { subject: `You're invited to the Atlantis team (${role})`, html };
+    return { subject: `You're invited to the Ali FMCG team (${role})`, html };
 }

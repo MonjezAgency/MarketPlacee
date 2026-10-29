@@ -58,7 +58,7 @@ function Login() {
             }
             if (!r.user?.role) { setError('Something went wrong. Please try again.'); return; }
             go(r.user.role);
-        } catch { setError('We couldn’t reach Atlantis. Check your connection and try again.'); }
+        } catch { setError('We couldn’t reach Ali FMCG. Check your connection and try again.'); }
         finally { clearTimeout(slowTimer); setSlow(false); setBusy(false); }
     };
 
@@ -71,7 +71,7 @@ function Login() {
             const r = await verify2FALogin(partialToken, code2fa);
             if (!r.success) { setError(r.message || 'That code isn’t right.'); setCode2fa(''); return; }
             go(r.user!.role);
-        } catch { setError('We couldn’t reach Atlantis. Check your connection and try again.'); }
+        } catch { setError('We couldn’t reach Ali FMCG. Check your connection and try again.'); }
         finally { setBusy(false); }
     };
 
@@ -109,7 +109,7 @@ function Login() {
                             {busy ? <><Loader2 size={16} className="animate-spin" /> {slow ? 'Waking up the server…' : 'Signing in…'}</> : 'Sign in'}
                         </button>
                     </form>
-                    <p className="mt-6 text-[14px] text-ink-3">New to Atlantis? <Link href="/auth/register" className="font-semibold text-teal hover:underline">Create a business account</Link></p>
+                    <p className="mt-6 text-[14px] text-ink-3">New to Ali FMCG? <Link href="/auth/register" className="font-semibold text-teal hover:underline">Create a business account</Link></p>
                 </>) : (<>
                     <button type="button" onClick={() => { setStep(1); setError(''); setCode2fa(''); setPartialToken(''); setQrCodeUrl(null); }} className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-3 hover:text-ink"><ArrowLeft size={14} /> Back</button>
                     <span className="mt-4 w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><KeyRound size={22} /></span>

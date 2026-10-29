@@ -13,7 +13,7 @@ import { DayDivider, IncomingMessage, OutgoingMessage, orderRef, useWhen } from 
 import { Composer, Kbd } from './Composer';
 
 /**
- * Order conversations: one thread per order between you and the Atlantis team
+ * Order conversations: one thread per order between you and the Ali FMCG team
  * (buyers and suppliers each see only their own thread). Everything shown is
  * read from the server; nothing is sent without the server accepting it.
  */

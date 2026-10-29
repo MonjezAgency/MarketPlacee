@@ -159,7 +159,7 @@ export function supplierIdsOf(o: { items: { product?: { supplierId?: string | nu
 
 /**
  * What an order is waiting for, from the order workflow rules.
- *  APPROVE         every supplier accepted the current terms — Atlantis approves.   (requires action)
+ *  APPROVE         every supplier accepted the current terms — Ali FMCG approves.   (requires action)
  *  DECIDE          a supplier rejected or let the deadline pass — amend or reject.   (requires action)
  *  LEGACY_CONFIRM  placed before the workflow; confirm with the status controls.     (requires action)
  *  WAIT_SUPPLIERS  suppliers still have time to answer.
@@ -470,7 +470,7 @@ export function loadTotals(loads: OrderLoad[]) {
 
 /**
  * Staff without net-price access (support, moderation, logistics) get the same
- * detail without supplier net prices or the Atlantis markup. Applied to the
+ * detail without supplier net prices or the Ali FMCG markup. Applied to the
  * whole response, including the workflow terms and the mixed-load contents.
  */
 export function redactNet<T extends Record<string, any>>(detail: T): T {

@@ -96,17 +96,17 @@ export class I18nService {
         const langName = I18nService.LANGUAGE_NAMES[targetLocale] || targetLocale;
 
         const systemPrompt = [
-            `You are a professional UI translator for a B2B wholesale marketplace called Atlantis.`,
+            `You are a professional UI translator for a B2B wholesale marketplace called Ali FMCG.`,
             `Translate each English string in the user's JSON array into ${langName}.`,
             ``,
             `STRICT RULES — violation breaks the page:`,
             `1. Output a JSON array of strings, one per input, in the SAME order, with EXACTLY ${texts.length} items.`,
             `2. No explanations, no markdown fences, no surrounding text — just the JSON array.`,
-            `3. Keep brand names "Atlantis" and "Monjez" exactly as they are (do NOT transliterate).`,
+            `3. Keep brand names "Ali FMCG" and "Monjez" exactly as they are (do NOT transliterate).`,
             `4. Keep currency codes (EUR, USD, GBP), country codes (EU, UK), and numbers exactly.`,
             `5. Preserve emojis and any inline HTML/markup tags exactly.`,
             `6. Preserve placeholder syntax like {name}, {{var}}, %s, %d exactly.`,
-            `7. If a string is already in ${langName} or is brand-only (e.g. "Atlantis"), return it unchanged.`,
+            `7. If a string is already in ${langName} or is brand-only (e.g. "Ali FMCG"), return it unchanged.`,
             `8. Use natural, professional B2B/business tone — not literal word-for-word.`,
         ].join('\n');
 
@@ -118,7 +118,7 @@ export class I18nService {
                 Authorization: `Bearer ${this.apiKey}`,
                 'Content-Type': 'application/json',
                 'HTTP-Referer': process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com',
-                'X-Title': 'Atlantis Marketplace i18n',
+                'X-Title': 'Ali FMCG Marketplace i18n',
             },
             body: JSON.stringify({
                 model: 'google/gemini-2.0-flash-exp:free',

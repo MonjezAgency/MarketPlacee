@@ -91,7 +91,7 @@ function parseListLine(raw: string): Line | null {
 /** GTIN/EAN: 8, 12, 13 or 14 digits. */
 const isEan = (v: string) => /^(\d{8}|\d{12,14})$/.test(v.replace(/\s/g, ''));
 
-/** Atlantis product link → product id; null for anything else. */
+/** Ali FMCG product link → product id; null for anything else. */
 function productIdFromUrl(v: string): string | null | 'external' {
     let u: URL;
     try { u = new URL(v.trim()); } catch { return null; }
@@ -141,7 +141,7 @@ function BrandTile({ name, image, size = 48 }: { name?: string; image?: string; 
     );
 }
 
-/** Parallel-style request card, in Atlantis colours. */
+/** Parallel-style request card, in Ali FMCG colours. */
 function RequestCard({ r }: { r: SentRequest }) {
     const vol = r.volumes && r.volumes.length ? r.volumes.map((v) => `${v.n.toLocaleString()} ${v.n === 1 ? v.unit.replace(/s$/, '') : v.unit}`).join(' · ') : r.summary;
     return (
@@ -215,7 +215,7 @@ function LineRow({ line, index, canRemove, onChange, onRemove, onResolve, placeh
                     {String(index + 1).padStart(2, '0')}
                 </span>
 
-                {/* Product: name, EAN or Atlantis product link */}
+                {/* Product: name, EAN or Ali FMCG product link */}
                 <div ref={boxRef} className="relative w-full sm:w-auto sm:flex-1 min-w-0">
                     <label className="sr-only" htmlFor={`p-${line.id}`}>Product name, EAN or product link</label>
                     <div className={cn('flex items-center h-11 rounded-xl border bg-surface-2 focus-within:bg-surface focus-within:border-[#2EC4B6] focus-within:ring-4 focus-within:ring-[#2EC4B6]/10 transition-all', ring(err('product')))}>
@@ -427,7 +427,7 @@ function Composer({ onAdd, placeholder }: { onAdd: (lines: Line[]) => void; plac
 
             {open && suggestions.length > 0 && (
                 <div className="absolute z-30 top-full mt-2 inset-x-0 bg-surface border border-line rounded-2xl shadow-[0_20px_50px_rgba(15,23,42,0.14)] p-2 text-start">
-                    <p className="px-3 pt-1 pb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-4">From the Atlantis catalog</p>
+                    <p className="px-3 pt-1 pb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-4">From the Ali FMCG catalog</p>
                     {suggestions.map((p, i) => (
                         <button
                             key={p.id}
@@ -600,14 +600,14 @@ function RequestsContent() {
         if (!raw || line.productId) return;
         const urlId = productIdFromUrl(raw);
         if (urlId === 'external') {
-            update(line.id, { lookup: { state: 'unsupported', message: 'We can only read Atlantis product links. Add the product name or EAN instead.' } });
+            update(line.id, { lookup: { state: 'unsupported', message: 'We can only read Ali FMCG product links. Add the product name or EAN instead.' } });
             return;
         }
         if (urlId) {
             update(line.id, { lookup: { state: 'resolving' } });
             const p = await fetchProductById(urlId).catch(() => null);
             if (p) update(line.id, { product: p.name, productId: p.id, ean: p.ean, brand: p.brand, image: p.image || p.images?.[0], lookup: { state: 'catalog' } });
-            else update(line.id, { lookup: { state: 'notfound', message: 'This link doesn\u2019t match a product in the Atlantis catalog.' } });
+            else update(line.id, { lookup: { state: 'notfound', message: 'This link doesn\u2019t match a product in the Ali FMCG catalog.' } });
             return;
         }
         const ean = raw.replace(/\s/g, '');
@@ -625,12 +625,12 @@ function RequestsContent() {
             if (j?.matched && (j.confidence_score ?? 0) >= 0.8 && j.title) {
                 update(line.id, {
                     product: j.title, ean, image: j.images?.[0],
-                    lookup: { state: 'external', message: 'Identified from the EAN database — not currently listed on Atlantis. Our desk will source it.' },
+                    lookup: { state: 'external', message: 'Identified from the EAN database — not currently listed on Ali FMCG. Our desk will source it.' },
                 });
                 return;
             }
         } catch { /* fall through */ }
-        update(line.id, { ean, lookup: { state: 'notfound', message: `EAN ${ean} isn\u2019t in the Atlantis catalog and couldn\u2019t be identified. Add the product name so our desk can source it.` } });
+        update(line.id, { ean, lookup: { state: 'notfound', message: `EAN ${ean} isn\u2019t in the Ali FMCG catalog and couldn\u2019t be identified. Add the product name so our desk can source it.` } });
     };
 
     // Resolve EANs / links that arrive via the composer.
@@ -727,10 +727,10 @@ function RequestsContent() {
 
                 <div className="relative max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-14 sm:pt-24 sm:pb-20 text-center">
                     <span className="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-cta text-[12px] font-semibold text-[#7FE3D9]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6] animate-pulse" /> Atlantis Sourcing Desk
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6] animate-pulse" /> Ali FMCG Sourcing Desk
                     </span>
                     <h1 className="font-sans mt-5 text-[30px] sm:text-[40px] font-bold tracking-tight text-heading leading-tight">
-                        Tell Atlantis what you need{dept ? <> in <span className="text-[#0E9F92]">{dept.label}</span></> : null}
+                        Tell Ali FMCG what you need{dept ? <> in <span className="text-[#0E9F92]">{dept.label}</span></> : null}
                     </h1>
                     <p className="mt-3 text-[15px] text-ink-3 max-w-xl mx-auto">
                         Search the catalog or paste your list — we price every line and send you a quote. Nothing is committed until you approve it.
@@ -794,7 +794,7 @@ function RequestsContent() {
                                         errors={touched ? lineErrors[l.id] : {}}
                                         onResolve={() => resolveLine(l)}
                                         canRemove
-                                        placeholder="Product name, EAN or Atlantis product link"
+                                        placeholder="Product name, EAN or Ali FMCG product link"
                                         onChange={(patch) => update(l.id, patch)}
                                         onRemove={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}
                                     />
@@ -881,7 +881,7 @@ function RequestsContent() {
                                     <button type="submit" disabled={status === 'sending'}
                                         className="w-full h-12 rounded-xl bg-[#2EC4B6] hover:bg-[#25AFA2] disabled:opacity-60 text-heading text-[14px] font-bold flex items-center justify-center gap-2 transition-colors">
                                         {status === 'sending' ? <Loader2 size={17} className="animate-spin" /> : <Send size={16} />}
-                                        Send to Atlantis
+                                        Send to Ali FMCG
                                     </button>
                                     <p className="flex items-start gap-2 text-[12px] text-ink-3 leading-relaxed">
                                         <ShieldCheck size={14} className="text-[#2EC4B6] shrink-0 mt-0.5" />

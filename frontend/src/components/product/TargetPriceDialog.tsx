@@ -22,7 +22,7 @@ export interface TargetProduct {
 /**
  * "Set a target price" on the product page (layout follows the sourcing-request
  * reference: price, quantity stepper with the pack maths, delivery country,
- * more options, then a review step). The request goes to the Atlantis sourcing
+ * more options, then a review step). The request goes to the Ali FMCG sourcing
  * desk through POST /target-prices; it never changes the listing or places an
  * order, and nothing claims suppliers are notified or delivery is included.
  */

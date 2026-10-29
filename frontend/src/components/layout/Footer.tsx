@@ -2,10 +2,9 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Mail } from 'lucide-react';
 import NewsletterSignup from '@/components/newsletter/NewsletterSignup';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { CONTACT_EMAIL, SOCIAL_LINKS } from '@/lib/config';
+import { SOCIAL_LINKS } from '@/lib/config';
 
 /** Brand marks drawn from the networks' own simple glyphs (24×24, currentColor). */
 const SOCIAL_ICONS: Record<'facebook' | 'instagram' | 'linkedin' | 'x', React.ReactNode> = {
@@ -38,7 +37,7 @@ export default function Footer() {
             { href: '/help', label: t('footer', 'helpCenter') },
         ] },
         { title: t('footer', 'colSuppliers'), links: [
-            // Suppliers register like buyers (Supplier preselected) and are approved by Atlantis.
+            // Suppliers register like buyers (Supplier preselected) and are approved by Ali FMCG.
             { href: '/auth/register?role=supplier', label: t('footer', 'becomeSupplier') },
             { href: '/auth/login?redirect=/supplier', label: t('footer', 'supplierSignIn') },
             { href: '/targets', label: t('footer', 'sourcingRequests') },
@@ -75,17 +74,11 @@ export default function Footer() {
                         <Link href="/" className="inline-flex items-center gap-2.5" aria-label={t('nav', 'homeAria')}>
                             <img src="/brand/atlantis-mark.png" alt="" width={36} height={36} className="w-9 h-9 object-contain rounded-lg" />
                             <span dir="ltr" className="text-[21px] font-black tracking-tighter uppercase">
-                                <span className="text-heading">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
+                                <span className="text-heading">ALI&nbsp;</span><span className="text-[#2EC4B6]">FMCG.</span>
                             </span>
                         </Link>
                         <p className="mt-4 text-[14px] leading-relaxed max-w-xs">{t('footer', 'description')}</p>
-                        <a href={`mailto:${CONTACT_EMAIL}`} className={`${footerLink} mt-4 text-[14px] font-medium`}><bdi dir="ltr">{CONTACT_EMAIL}</bdi></a>
-                        <ul className="mt-5 flex flex-wrap items-center gap-2" aria-label={t('footer', 'socialAria')}>
-                            <li>
-                                <a href={`mailto:${CONTACT_EMAIL}`} aria-label={t('footer', 'emailAria', { email: CONTACT_EMAIL })} title={CONTACT_EMAIL} className={iconBtn}>
-                                    <Mail size={16} aria-hidden />
-                                </a>
-                            </li>
+                        {socials.length > 0 && <ul className="mt-5 flex flex-wrap items-center gap-2" aria-label={t('footer', 'socialAria')}>
                             {socials.map((s) => (
                                 <li key={s.id}>
                                     <a href={s.url!} target="_blank" rel="noopener noreferrer" aria-label={t('footer', 'socialLink', { network: s.label })} title={s.label} className={iconBtn}>
@@ -93,7 +86,7 @@ export default function Footer() {
                                     </a>
                                 </li>
                             ))}
-                        </ul>
+                        </ul>}
                     </div>
                     {cols.map((c) => (
                         <nav key={c.title} aria-label={c.title}>

@@ -50,7 +50,7 @@ export default function Hero() {
                             className="inline-flex items-center gap-2 bg-gradient-to-r from-[#FF6B00] to-[#FF8C33] text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-full mb-6 shadow-lg shadow-[#FF6B00]/20"
                         >
                             <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                            Wholesale B2B Atlantis
+                            Wholesale B2B Ali FMCG
                         </motion.span>
 
                         <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] mb-6">

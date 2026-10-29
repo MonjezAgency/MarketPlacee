@@ -17,7 +17,7 @@ describe('fulfilment calculation', () => {
         expect(shippingUnits({ tier: 'carton', quantity: 90, casesPerPallet: 80 })).toEqual({ cases: 90, pallets: 2, trucks: null });
         expect(shippingUnits({ tier: 'carton', quantity: 90 })).toEqual({ cases: 90, pallets: null, trucks: null });
     });
-    it('prices Atlantis collection from the configured rate, with its basis and source', () => {
+    it('prices Ali FMCG collection from the configured rate, with its basis and source', () => {
         const o = priceOption({ ...base, method: 'ATLANTIS_COLLECTION' });
         expect(o.status).toBe('priced');
         expect(o.total).toBe(240);

@@ -33,11 +33,11 @@ const MAX_PHOTO_IN_REQUEST = 3.5 * 1024 * 1024;
 
 /**
  * Bulk product import: upload any product sheet → match its columns to
- * Atlantis fields (with the evidence for each suggestion) → review every row
+ * Ali FMCG fields (with the evidence for each suggestion) → review every row
  * against the original cells → confirm → import in batches with a report.
  *
  * One wizard, two destinations: `supplier` (the supplier's own catalog, via
- * /supplier-catalog/import/*) and `catalog` (the Atlantis Catalog, staff only,
+ * /supplier-catalog/import/*) and `catalog` (the Ali FMCG Catalog, staff only,
  * via /admin-catalog/import/*). Parsing, mapping, review and batching are the
  * same; only the endpoints, the destination copy and the links differ.
  */
