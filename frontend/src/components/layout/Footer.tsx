@@ -74,7 +74,7 @@ export default function Footer() {
                         <Link href="/" className="inline-flex items-center gap-2.5" aria-label={t('nav', 'homeAria')}>
                             <img src="/brand/atlantis-mark.png" alt="" width={36} height={36} className="w-9 h-9 object-contain rounded-lg" />
                             <span dir="ltr" className="text-[21px] font-black tracking-tighter uppercase">
-                                <span className="text-heading">ALI&nbsp;</span><span className="text-[#2EC4B6]">FMCG.</span>
+                                <span className="text-heading">ALI</span><span className="ms-[0.3em] text-[#2EC4B6]">FMCG.</span>
                             </span>
                         </Link>
                         <p className="mt-4 text-[14px] leading-relaxed max-w-xs">{t('footer', 'description')}</p>

@@ -12,7 +12,7 @@ export function AtlantisMark({ className }: { className?: string }) {
         <Link href="/" aria-label="Ali FMCG home" className={cn('inline-flex items-center gap-2.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60', className)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/atlantis-mark.png" alt="" width={32} height={32} className="w-8 h-8 object-contain rounded-lg" />
-            <span className="text-[18px] font-black tracking-tighter uppercase"><span className="text-heading">ALI&nbsp;</span><span className="text-[#2EC4B6]">FMCG.</span></span>
+            <span className="text-[18px] font-black tracking-tighter uppercase"><span className="text-heading">ALI</span><span className="ms-[0.3em] text-[#2EC4B6]">FMCG.</span></span>
         </Link>
     );
 }
@@ -37,7 +37,7 @@ export function AuthShell({ children, wide = false }: { children: React.ReactNod
                 <Link href="/" aria-label="Ali FMCG home" className="inline-flex items-center gap-2.5">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/brand/atlantis-mark.png" alt="" width={32} height={32} className="w-8 h-8 object-contain rounded-lg bg-white/95 p-0.5" />
-                    <span className="text-[18px] font-black tracking-tighter uppercase">ALI&nbsp;<span className="text-[#2EC4B6]">FMCG.</span></span>
+                    <span className="text-[18px] font-black tracking-tighter uppercase">ALI<span className="ms-[0.3em] text-[#2EC4B6]">FMCG.</span></span>
                 </Link>
                 <div className="max-w-[420px]">
                     <p className="text-[13px] font-medium text-[#2EC4B6]">Wholesale FMCG · Europe &amp; Gulf</p>

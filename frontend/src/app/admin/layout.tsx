@@ -429,7 +429,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </span>
                         {isOpen && (
                             <span className="font-sans font-black text-[17px] tracking-tighter uppercase leading-none">
-                                <span className="text-white">ALI&nbsp;</span><span className="text-[#2EC4B6]">FMCG.</span>{/* i18n-ignore: wordmark */}
+                                <span className="text-white">ALI</span><span className="ms-[0.3em] text-[#2EC4B6]">FMCG.</span>{/* i18n-ignore: wordmark */}
                             </span>
                         )}
                     </Link>

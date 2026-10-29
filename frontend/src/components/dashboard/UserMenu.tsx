@@ -97,7 +97,7 @@ export function UserMenu({ role }: UserMenuProps) {
                                 isTeamMember ? "bg-primary" : normalizedRole === 'supplier' ? "bg-emerald-500" : "bg-blue-500"
                             )} />
                             <span className={cn(
-                                "text-[9px] font-black uppercase tracking-tighter",
+                                "text-[10px] font-bold uppercase tracking-wide whitespace-nowrap",
                                 isTeamMember ? "text-primary" : normalizedRole === 'supplier' ? "text-emerald-500" : "text-blue-500"
                             )}>
                                 {getRoleLabel()}
