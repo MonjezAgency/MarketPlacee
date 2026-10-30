@@ -76,8 +76,9 @@ export default function ImageDiscoveryPanel({ productId, product, ean, hasImages
         try { await fn(); } catch (e: any) { setError(e?.message || String(e)); } finally { setBusy(null); }
     };
     const retry = () => run('retry', async () => { const r = await supplierApi.retryImageDiscovery(productId!); setState(r.state); toast.success(ti('toastRetry')); });
-    const accept = (c: DiscoveryCandidate, also: string[] = []) => run(also.length ? 'all' : c.url, async () => {
-        const p = await supplierApi.acceptDiscoveredImage(productId!, c.url, also);
+    const whiten = (c: DiscoveryCandidate) => run(`w${c.url}`, async () => { const r = await supplierApi.whitenDiscoveredImage(productId!, c.url); setState(r.state); });
+    const accept = (c: DiscoveryCandidate, also: string[] = [], clean = false) => run(also.length ? 'all' : clean ? `c${c.url}` : c.url, async () => {
+        const p = await supplierApi.acceptDiscoveredImage(productId!, c.url, also, clean);
         onAccepted(p);
         setState(p.imageDiscovery ?? null);
         toast.success(ti('toastAccepted'));
@@ -150,7 +151,7 @@ export default function ImageDiscoveryPanel({ productId, product, ean, hasImages
             </div>
         )}
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {st.candidates.map((c) => <PhotoCandidateCard key={c.url} c={c} barcode={st.barcode} busy={busy} canApply onUse={(x) => accept(x)} onDismiss={dismiss} dismissLabel={ti('notMyProduct')} />)}
+            {st.candidates.map((c) => <PhotoCandidateCard key={c.url} c={c} barcode={st.barcode} busy={busy} canApply onUse={(x, clean) => accept(x, [], clean)} onDismiss={dismiss} onWhiten={whiten} dismissLabel={ti('notMyProduct')} />)}
         </ul>
         <p className={cn('text-[12px] text-ink-3')}>{ti('licenseNote', { license: st.candidates[0].license })}{checked ? ` · ${checked}` : ''}</p>
         <div className="flex flex-wrap gap-2">{retryBtn}{uploadBtn}</div>

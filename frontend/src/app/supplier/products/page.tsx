@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Plus, Upload, Search, Package, Pencil, Trash2, Send, SlidersHorizontal, Image as ImageIcon, RefreshCw, ChevronLeft, ChevronRight, AlertCircle, Boxes, Tags, Clock3, CheckCircle2 } from 'lucide-react';
+import { Plus, Upload, Search, Package, Pencil, Trash2, Send, SlidersHorizontal, Image as ImageIcon, RefreshCw, ScanBarcode, ChevronLeft, ChevronRight, AlertCircle, Boxes, Tags, Clock3, CheckCircle2 } from 'lucide-react';
 import { supplierApi, type ProductPage, type SupplierProduct } from '@/lib/supplier-api';
 import { Badge, Button, Card, EmptyState, ErrorState, PRODUCT_STATUS, PageHeader, Skeleton, Stat, Thumb, inputCls, selectCls, useConfirm } from '@/components/supplier/ui';
 import { categoryLabel, statusLabel } from '@/components/supplier/import/types';
@@ -14,6 +14,9 @@ import PriceStockUpdateDialog from '@/components/supplier/PriceStockUpdateDialog
 import ImageDiscoveryBadge from '@/components/supplier/ImageDiscoveryBadge';
 import { Trans } from '@/components/i18n/Trans';
 import { cn } from '@/lib/utils';
+import { isRealImage } from '@/lib/catalog-rules';
+
+const FIND_PER_CLICK = 15; // the server allows 20 searches a minute per person
 
 /** `label` values are supplierCatalog dictionary keys. */
 const STATUS_TABS = [
@@ -85,6 +88,16 @@ function InventoryManager() {
     const allOnPage = rows.length > 0 && rows.every((r) => selected.has(r.id));
     const toggleAll = () => setSelected(allOnPage ? new Set() : new Set(rows.map((r) => r.id)));
     const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    // Products saved before the photo search existed were never searched: start it for the ones on this page.
+    const unsearched = rows.filter((r) => r.ean && !r.imageDiscovery && !(r.images || []).some(isRealImage)).slice(0, FIND_PER_CLICK);
+    const [finding, setFinding] = React.useState(false);
+    const findPage = async () => {
+        setFinding(true);
+        const results = await Promise.allSettled(unsearched.map((r) => supplierApi.retryImageDiscovery(r.id)));
+        setFinding(false);
+        toast.success(t('imageDiscovery', 'findPageDone', { count: results.filter((r) => r.status === 'fulfilled').length }));
+        load();
+    };
     const chosen = rows.filter((r) => selected.has(r.id));
     const submittable = chosen.filter((r) => ['DRAFT', 'NEEDS_CHANGES'].includes(r.status) && r.missing.length === 0);
 
@@ -145,6 +158,7 @@ function InventoryManager() {
                                 attention === 'images' ? 'bg-amber-100 text-amber-900 ring-1 ring-amber-300' : 'text-ink-2 hover:bg-surface-2')}>
                             <ImageIcon size={14} aria-hidden />{t('imageDiscovery', 'filterImageNeeded')}{s?.imageNeeded !== undefined && <span className="tabular-nums text-ink-4">{fmt.number(s.imageNeeded)}</span>}
                         </button>
+                        {attention === 'images' && unsearched.length > 0 && <Button size="sm" variant="secondary" icon={<ScanBarcode size={13} />} loading={finding} onClick={findPage}>{t('imageDiscovery', 'findPageBtn')}</Button>}
                     </div>
                     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_200px_160px_190px]">
                         <label className="relative">

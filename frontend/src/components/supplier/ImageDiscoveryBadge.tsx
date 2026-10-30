@@ -18,12 +18,25 @@ import { useDiscoveryState } from '@/components/supplier/ImageDiscoveryPanel';
 export default function ImageDiscoveryBadge({ product, onAccepted }: { product: SupplierProduct; onAccepted: () => void }) {
     const { t } = useLanguage();
     const ti = (k: string, v?: Record<string, string | number>) => t('imageDiscovery', k, v);
-    const [state] = useDiscoveryState(product.id, product.imageDiscovery);
+    const [state, setState] = useDiscoveryState(product.id, product.imageDiscovery);
     const [busy, setBusy] = React.useState(false);
     if ((product.images || []).some(isRealImage)) return null;
 
     const line = (icon: React.ReactNode, text: string, tone = 'text-ink-3') => <span className={`inline-flex items-center gap-1 text-[12px] ${tone}`}>{icon}{text}</span>;
-    if (!state) return line(<ImageOff size={12} aria-hidden />, ti('badgeNoPhoto'));
+    const find = async () => {
+        setBusy(true);
+        try { const r = await supplierApi.retryImageDiscovery(product.id); setState(r.state); }
+        catch (e: any) { toast.error(e?.message || String(e)); }
+        finally { setBusy(false); }
+    };
+    if (!state) {
+        return (
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+                {line(<ImageOff size={12} aria-hidden />, ti('badgeNoPhoto'))}
+                {product.ean && <Button size="sm" variant="secondary" className="h-7 px-2" icon={<ScanBarcode size={12} />} loading={busy} onClick={find} aria-label={ti('badgeFindAria', { name: product.name })}>{ti('badgeFind')}</Button>}
+            </span>
+        );
+    }
     if (state.status === 'searching') return line(<Loader2 size={12} className="animate-spin" aria-hidden />, ti('badgeSearching'));
     if (state.status !== 'found_review' || !state.candidates.length) {
         const text = state.status === 'invalid_barcode' ? ti('badgeInvalid') : state.status === 'unavailable' ? ti('badgeUnavailable') : ti('badgeNone');

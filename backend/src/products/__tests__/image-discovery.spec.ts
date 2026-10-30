@@ -50,10 +50,15 @@ function setup(rows: any[], providers: ProductDataProvider[]) {
         supplierUpdate: jest.fn(async (id: string, _s: string, patch: any) => ({ ...db.save(id, { images: patch.images }), status: 'DRAFT' })),
         setImageCredits: jest.fn(async () => undefined),
     };
-    const imageLookup: any = { accept: jest.fn(async (url: string) => ({ url: `https://cdn.example.com/${url.split('/').pop()}` })) };
-    const svc = new ImageDiscoveryService(db.prisma, products, enrichment, imageLookup);
+    const imageLookup: any = {
+        accept: jest.fn(async (url: string) => ({ url: `https://cdn.example.com/${url.split('/').pop()}` })),
+        download: jest.fn(async () => ({ buf: Buffer.from('jpg'), type: 'image/jpeg' })),
+        store: jest.fn(async () => ({ url: 'https://cdn.example.com/white.png' })),
+    };
+    const photoroom: any = { testMode: false, whiteBackground: jest.fn(async () => Buffer.from('png')) };
+    const svc = new ImageDiscoveryService(db.prisma, products, enrichment, imageLookup, photoroom);
     const settle = async () => { while (svc.running.size) await Promise.all([...svc.running.values()]); };
-    return { svc, db, products, imageLookup, enrichment, settle };
+    return { svc, db, products, imageLookup, enrichment, settle, photoroom };
 }
 
 const takis = '5941143028849';
@@ -234,6 +239,52 @@ describe('background photo search for saved products', () => {
         expect(enrichment.status('s1', job.jobId).results[0].status).toBe('verified');
         expect(off.calls).toEqual([takis]);
         expect(enrichment.candidateFor(takis, `${IMG}/${takis}/front_en.3.full.jpg`)).toBeTruthy();
+    });
+});
+
+describe('white background (Photoroom)', () => {
+    const found = async (testMode: boolean) => {
+        const off = provider('off', 'food', { [takis]: { status: 'found', record: rec(takis, 'Takis Fuego 55g', 'Takis', '55 g') } });
+        const ctx = setup([takisRow], [off.p]);
+        ctx.photoroom.testMode = testMode;
+        await ctx.svc.enqueue('p1');
+        await ctx.settle();
+        return { ...ctx, url: ctx.db.byId.get('p1')!.imageDiscovery.candidates[0].url as string };
+    };
+
+    it('makes the white version once and keeps it on the photo; nothing changes on the product', async () => {
+        const { svc, db, url, photoroom, products } = await found(false);
+        const st = await svc.whiten('s1', 'p1', url);
+        expect(st!.candidates[0].clean).toMatchObject({ url: 'https://cdn.example.com/white.png', watermarked: false });
+        await svc.whiten('s1', 'p1', url);
+        expect(photoroom.whiteBackground).toHaveBeenCalledTimes(1);   // each call is paid for
+        expect(db.byId.get('p1')!.images).toEqual([]);
+        expect(products.supplierUpdate).not.toHaveBeenCalled();
+    });
+
+    it('saves the white version as the product photo and credits the edit', async () => {
+        const { svc, db, url, products, imageLookup } = await found(false);
+        await svc.whiten('s1', 'p1', url);
+        await svc.accept('s1', 'p1', url, [], true);
+        expect(db.byId.get('p1')!.images).toEqual(['https://cdn.example.com/white.png']);
+        expect(imageLookup.accept).not.toHaveBeenCalled();
+        const credits = products.setImageCredits.mock.calls[0][1];
+        expect(credits['https://cdn.example.com/white.png']).toMatchObject({ edited: expect.stringContaining('Photoroom'), license: 'CC BY-SA 3.0' });
+    });
+
+    it('a test-mode result has a watermark, so it can never become a product photo', async () => {
+        const { svc, db, url } = await found(true);
+        const st = await svc.whiten('s1', 'p1', url);
+        expect(st!.candidates[0].clean?.watermarked).toBe(true);
+        await expect(svc.accept('s1', 'p1', url, [], true)).rejects.toMatchObject({ response: expect.objectContaining({ code: 'TEST_MODE' }) });
+        expect(db.byId.get('p1')!.images).toEqual([]);
+    });
+
+    it('refuses without a white version, for a photo that was not found, and for another supplier', async () => {
+        const { svc, url } = await found(false);
+        await expect(svc.accept('s1', 'p1', url, [], true)).rejects.toMatchObject({ response: expect.objectContaining({ code: 'NOT_WHITENED' }) });
+        await expect(svc.whiten('s1', 'p1', 'https://evil.example/x.jpg')).rejects.toMatchObject({ response: expect.objectContaining({ code: 'NOT_A_CANDIDATE' }) });
+        await expect(svc.whiten('s2', 'p1', url)).rejects.toThrow('Product not found');
     });
 });
 

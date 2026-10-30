@@ -4,6 +4,7 @@ import { PrismaService } from '../common/prisma.service';
 import { barcodeProblem, normaliseBarcode, realImages } from './catalog-rules';
 import { isStaffRole } from './catalog-scope';
 import { ImageLookupService } from './image-lookup.service';
+import { PhotoroomService } from './photoroom.service';
 import { ImportEnrichmentService, type RankedCandidate } from './import-enrichment.service';
 import { USER_AGENT } from './product-data-providers';
 import { MAX_ANALYSE_BYTES, analyseBuffer, rankScored, scoreCandidate, type ScoreLine, type Tier, type Visual } from './image-quality';
@@ -48,6 +49,8 @@ export interface DiscoveryCandidate {
     visual?: Visual | null;
     /** primary = suggested main photo · gallery = another photo of the same product · review = identity to be checked. */
     role?: 'primary' | 'gallery' | 'review';
+    /** The same photo on pure white (Photoroom). watermarked = made with a sandbox key: a preview that can't be saved. */
+    clean?: { url: string; watermarked: boolean; at: string };
 }
 export interface DiscoveryState {
     status: DiscoveryStatus;
@@ -92,6 +95,8 @@ export class ImageDiscoveryService implements OnModuleInit {
     private readonly inflight = new Map<string, string>();
     /** Promises of running searches, for tests and graceful waits. */
     readonly running = new Map<string, Promise<void>>();
+    /** Photos being sent to Photoroom right now, so a double click isn't charged twice. */
+    private readonly cleaning = new Set<string>();
     /** previewUrl → what its pixels showed (a photo is downloaded and measured once). */
     private readonly visuals = new Map<string, Promise<Visual>>();
     now = () => Date.now();
@@ -108,6 +113,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         private readonly products: ProductsService,
         private readonly enrichment: ImportEnrichmentService,
         private readonly imageLookup: ImageLookupService,
+        private readonly photoroom: PhotoroomService,
     ) {}
 
     /** Searches cut short by a restart are picked up again (the cache is gone, the queue keeps the pace). */
@@ -263,9 +269,14 @@ export class ImageDiscoveryService implements OnModuleInit {
      * exact-match photos for the gallery), each copied into Ali FMCG storage
      * and credited (licence, attribution, source page, who approved it).
      */
-    async accept(supplierId: string, id: string, url: string, also: string[] = []) {
+    async accept(supplierId: string, id: string, url: string, also: string[] = [], clean = false) {
         const p = await this.own(supplierId, id);
-        return this.apply(p, url, also, { id: supplierId, role: 'SUPPLIER' }, supplierId);
+        return this.apply(p, url, also, { id: supplierId, role: 'SUPPLIER' }, supplierId, clean);
+    }
+
+    /** Make the white-background version of a found photo, for the supplier to look at before using it. */
+    async whiten(supplierId: string, id: string, url: string): Promise<DiscoveryState | null> {
+        return this.makeClean(await this.own(supplierId, id), url);
     }
 
     /** "Not my product": drop one found photo (or all), and never offer it again for this barcode. */
@@ -341,11 +352,18 @@ export class ImageDiscoveryService implements OnModuleInit {
         return { catalog, canApply: catalog, state: catalog ? st : summary(st) };
     }
 
-    async staffAccept(actor: DiscoveryActor, id: string, url: string, also: string[] = []) {
+    async staffWhiten(id: string, url: string): Promise<DiscoveryState | null> {
         const p = await this.load(id);
         if (!p) throw new NotFoundException('Product not found');
         if (!(await this.isCatalog(p))) throw new ForbiddenException({ code: 'SUPPLIER_OWNED', message: 'This product belongs to a supplier. Only the supplier can choose its photos.' });
-        return this.apply(p, url, also, actor, p.supplierId);
+        return this.makeClean(p, url);
+    }
+
+    async staffAccept(actor: DiscoveryActor, id: string, url: string, also: string[] = [], clean = false) {
+        const p = await this.load(id);
+        if (!p) throw new NotFoundException('Product not found');
+        if (!(await this.isCatalog(p))) throw new ForbiddenException({ code: 'SUPPLIER_OWNED', message: 'This product belongs to a supplier. Only the supplier can choose its photos.' });
+        return this.apply(p, url, also, actor, p.supplierId, clean);
     }
 
     async staffDismiss(id: string, url?: string) {
@@ -357,13 +375,41 @@ export class ImageDiscoveryService implements OnModuleInit {
 
     // ─── Shared ──────────────────────────────────────────────────────
 
-    private async apply(p: Row, url: string, also: string[], actor: DiscoveryActor, ownerId: string) {
+    /** Photoroom charges per call, so a photo is processed once: the result stays on the candidate. */
+    private async makeClean(p: Row, url: string): Promise<DiscoveryState | null> {
+        const st = asState(p.imageDiscovery);
+        const cand = st?.status === 'found_review' ? st.candidates.find((c) => c.url === url || c.previewUrl === url) : undefined;
+        if (!st || !cand) throw new BadRequestException({ code: 'NOT_A_CANDIDATE', message: 'Only a photo found for this product’s barcode can be used here.' });
+        if (cand.clean) return st;
+        const key = `${p.id}:${cand.url}`;
+        if (this.cleaning.has(key)) throw new ConflictException({ code: 'ALREADY_RUNNING', message: 'This photo is already being processed.' });
+        this.cleaning.add(key);
+        try {
+            const { buf, type } = await this.imageLookup.download(cand.url, ((u: any, i: any) => { const { signal, ...rest } = i || {}; void signal; return this.enrichment.imageQueue.fetch(String(u), { ...rest, timeoutMs: 15_000 }); }) as typeof fetch);
+            const png = await this.photoroom.whiteBackground(buf, type);
+            const saved = await this.imageLookup.store(png, 'image/png');
+            const latest = await this.load(p.id);
+            const now = latest ? asState(latest.imageDiscovery) : null;
+            if (!latest || !now) return st;
+            const clean = { url: saved.url, watermarked: this.photoroom.testMode, at: this.iso() };
+            const next: DiscoveryState = { ...now, candidates: now.candidates.map((c) => (c.url === cand.url ? { ...c, clean } : c)) };
+            await this.write(latest, next);
+            return next;
+        } finally {
+            this.cleaning.delete(key);
+        }
+    }
+
+    private async apply(p: Row, url: string, also: string[], actor: DiscoveryActor, ownerId: string, clean = false) {
         const st = asState(p.imageDiscovery);
         const mode = st?.mode || 'fill';
         if (mode === 'fill' && realImages(p.images).length) throw new ConflictException({ code: 'HAS_PHOTO', message: 'This product already has a photo, so a found photo can’t be added here.' });
         const find = (u: string) => (st?.status === 'found_review' ? st.candidates.find((c) => c.url === u || c.previewUrl === u) : undefined);
         const main = find(url);
         if (!st || !main) throw new BadRequestException({ code: 'NOT_A_CANDIDATE', message: 'Only a photo found for this product’s barcode can be used here.' });
+        if (clean && !main.clean) throw new BadRequestException({ code: 'NOT_WHITENED', message: 'Make the white background first.' });
+        // A sandbox result carries a watermark: it must never reach a product page.
+        if (clean && main.clean?.watermarked) throw new ConflictException({ code: 'TEST_MODE', message: 'This white background was made in test mode and has a watermark, so it can’t be saved.' });
         const extras: DiscoveryCandidate[] = [];
         for (const u of (Array.isArray(also) ? also : []).slice(0, 8)) {
             const c = find(String(u));
@@ -376,6 +422,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         const picked = [main, ...extras];
         const saved: { cand: DiscoveryCandidate; url: string }[] = [];
         for (const cand of picked) {
+            if (clean && cand === main) { saved.push({ cand, url: main.clean!.url }); continue; }
             // The download's timeout starts when it leaves the queue, not while it waits its turn.
             const s = await this.imageLookup.accept(cand.url, ((u: any, i: any) => { const { signal, ...rest } = i || {}; void signal; return this.enrichment.imageQueue.fetch(String(u), { ...rest, timeoutMs: 15_000 }); }) as typeof fetch);
             saved.push({ cand, url: s.url });
@@ -399,6 +446,7 @@ export class ImageDiscoveryService implements OnModuleInit {
             barcode: st.barcode, originalUrl: cand.url, origin: 'discovery', chosenBy: actor.role === 'SUPPLIER' ? 'supplier' : 'staff',
             approvedBy: actor.id, approvedByRole: actor.role, approvedAt: at, addedAt: at,
             ...(cand.tier !== undefined ? { tier: cand.tier } : {}), ...(cand.imgid ? { imgid: cand.imgid } : {}),
+            ...(clean && cand === main ? { edited: 'Background changed to white (Photoroom)' } : {}),
         }]))).catch((e) => this.logger.warn(`[discovery] credit for ${p.id}: ${e?.message}`));
         const after = await this.load(p.id);
         let next: DiscoveryState | null = null;

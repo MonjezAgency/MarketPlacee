@@ -46,10 +46,19 @@ export class AdminProductPhotosController {
     @Post(':id/accept')
     @Roles(Role.ADMIN, Role.OWNER)
     @Throttle({ default: { limit: 30, ttl: 60_000 } })
-    accept(@Request() req, @Param('id') id: string, @Body() body: { url?: unknown; also?: unknown }) {
+    accept(@Request() req, @Param('id') id: string, @Body() body: { url?: unknown; also?: unknown; clean?: unknown }) {
         if (typeof body?.url !== 'string' || !body.url) throw new BadRequestException('Choose a photo.');
         const also = Array.isArray(body.also) ? body.also.filter((x): x is string => typeof x === 'string') : [];
-        return this.discovery.staffAccept({ id: req.user.sub, role: String(req.user.role || '').toUpperCase() }, id, body.url, also);
+        return this.discovery.staffAccept({ id: req.user.sub, role: String(req.user.role || '').toUpperCase() }, id, body.url, also, body.clean === true);
+    }
+
+    /** White-background version of a found photo (one Photoroom call). Ali FMCG Catalog only. */
+    @Post(':id/whiten')
+    @Roles(Role.ADMIN, Role.OWNER)
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    whiten(@Param('id') id: string, @Body() body: { url?: unknown }) {
+        if (typeof body?.url !== 'string' || !body.url) throw new BadRequestException('Choose a photo.');
+        return this.discovery.staffWhiten(id, body.url).then((state) => ({ state }));
     }
 
     /** "Not this product": one photo ({ url }) or all of them. Ali FMCG Catalog only. */

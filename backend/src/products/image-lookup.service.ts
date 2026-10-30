@@ -257,7 +257,8 @@ export class ImageLookupService {
     }
 
     /** Copy an accepted candidate into Ali FMCG storage. Only lookup-source hosts are allowed. */
-    async accept(url: string, fetcher: typeof fetch = fetch): Promise<{ url: string }> {
+    /** Download a found photo (allowed hosts, JPEG/PNG/WebP, at most 10 MB). */
+    async download(url: string, fetcher: typeof fetch = fetch): Promise<{ buf: Buffer; type: string }> {
         let u: URL;
         try { u = new URL(url); } catch { throw new BadRequestException('Invalid image link.'); }
         if (u.protocol !== 'https:' || !ALLOWED_IMAGE_HOSTS.has(u.hostname)) throw new BadRequestException('Only images found by the barcode lookup can be accepted here. Upload other photos directly.');
@@ -267,6 +268,16 @@ export class ImageLookupService {
         if (!/^image\/(jpeg|png|webp)$/.test(type)) throw new BadRequestException('That link isn’t a JPEG, PNG or WebP image.');
         const buf = Buffer.from(await res.arrayBuffer());
         if (buf.length > 10 * 1024 * 1024) throw new BadRequestException('Image is larger than 10 MB.');
+        return { buf, type };
+    }
+
+    async accept(url: string, fetcher: typeof fetch = fetch): Promise<{ url: string }> {
+        const { buf, type } = await this.download(url, fetcher);
+        return this.store(buf, type);
+    }
+
+    /** Save an image in Ali FMCG storage. */
+    async store(buf: Buffer, type: string): Promise<{ url: string }> {
         const ext = type === 'image/png' ? '.png' : type === 'image/webp' ? '.webp' : '.jpg';
         try {
             const stored = await this.storage.uploadProductImage(buf, `barcode-lookup${ext}`, type);

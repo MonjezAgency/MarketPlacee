@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { Check, CheckCircle2, ExternalLink, X } from 'lucide-react';
+import { Check, CheckCircle2, ExternalLink, Sparkles, X } from 'lucide-react';
 import type { DiscoveryCandidate } from '@/lib/supplier-api';
-import { Badge, Button } from '@/components/supplier/ui';
+import { Badge, Button, Notice } from '@/components/supplier/ui';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useDiscoveryReason } from '@/components/supplier/ImageDiscoveryPanel';
 
@@ -27,9 +27,9 @@ export function TierBadge({ c }: { c: DiscoveryCandidate }) {
  * ranks and why, what the database record says, its source and licence, and
  * the actions. An unconfirmed match needs a tick before it can be used.
  */
-export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, onDismiss, dismissLabel }: {
+export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, onDismiss, onWhiten, dismissLabel }: {
     c: DiscoveryCandidate; barcode: string; busy: string | null; canApply: boolean;
-    onUse: (c: DiscoveryCandidate) => void; onDismiss: (c: DiscoveryCandidate) => void; dismissLabel: string;
+    onUse: (c: DiscoveryCandidate, clean?: boolean) => void; onDismiss: (c: DiscoveryCandidate) => void; onWhiten: (c: DiscoveryCandidate) => void; dismissLabel: string;
 }) {
     const { t, fmt } = useLanguage();
     const ti = (k: string, v?: Record<string, string | number>) => t('imageDiscovery', k, v);
@@ -41,13 +41,14 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
 
     return (
         <li className="rounded-lg ring-1 ring-line overflow-hidden flex flex-col">
-            <a href={c.url} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-white flex items-center justify-center">
+            <a href={c.clean?.url || c.url} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-white flex items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.previewUrl} alt={ti('altFound', { barcode })} className="max-w-[90%] max-h-[90%] object-contain" referrerPolicy="no-referrer" loading="lazy" />
+                <img src={c.clean?.url || c.previewUrl} alt={ti('altFound', { barcode })} className="max-w-[90%] max-h-[90%] object-contain" referrerPolicy="no-referrer" loading="lazy" />
                 <span className="absolute top-1.5 start-1.5 flex flex-wrap gap-1">
                     <Badge>{c.kind === 'front' ? ti('kindFront') : c.kind === 'packaging' ? ti('kindPackaging') : ti('kindPhoto')}{c.language ? <> · <bdi dir="ltr">{String(c.language).toUpperCase()}</bdi></> : null}</Badge>
                     {c.role === 'primary' && <Badge tone="success">{tp('rolePrimary')}</Badge>}
                     {c.role === 'gallery' && <Badge>{tp('roleGallery')}</Badge>}
+                    {c.clean && <Badge tone="info">{ti('whitenBadge')}</Badge>}
                 </span>
             </a>
             <div className="p-3 border-t border-line text-[12.5px] space-y-1.5 flex-1">
@@ -74,6 +75,7 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
                         </ul>
                     </details>
                 )}
+                {c.clean?.watermarked && <Notice tone="warning">{ti('whitenTestMode')}</Notice>}
                 {needsTick && canApply && (
                     <label className="flex items-start gap-2 pt-1 text-ink-2 cursor-pointer">
                         <input type="checkbox" className="mt-0.5 accent-[#0E7C74]" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />
@@ -83,7 +85,9 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
             </div>
             {canApply && (
                 <div className="flex flex-wrap gap-2 p-3 pt-0">
-                    <Button size="sm" variant="primary" icon={<Check size={13} />} loading={busy === c.url} disabled={!!busy || (needsTick && !ticked)} onClick={() => onUse(c)}>{ti('useThisPhoto')}</Button>
+                    {c.clean && !c.clean.watermarked && <Button size="sm" variant="primary" icon={<Sparkles size={13} />} loading={busy === `c${c.url}`} disabled={!!busy || (needsTick && !ticked)} onClick={() => onUse(c, true)}>{ti('whitenUse')}</Button>}
+                    <Button size="sm" variant={c.clean && !c.clean.watermarked ? 'secondary' : 'primary'} icon={<Check size={13} />} loading={busy === c.url} disabled={!!busy || (needsTick && !ticked)} onClick={() => onUse(c)}>{ti('useThisPhoto')}</Button>
+                    {!c.clean && c.tier !== 1 && <Button size="sm" variant="secondary" icon={<Sparkles size={13} />} loading={busy === `w${c.url}`} disabled={!!busy} onClick={() => onWhiten(c)}>{ti('whitenButton')}</Button>}
                     <Button size="sm" variant="secondary" icon={<X size={13} />} loading={busy === `x${c.url}`} disabled={!!busy} onClick={() => onDismiss(c)}>{dismissLabel}</Button>
                 </div>
             )}

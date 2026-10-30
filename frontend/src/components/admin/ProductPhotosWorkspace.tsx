@@ -191,8 +191,9 @@ function ReviewDialog({ row, canApply, onClose, onChanged }: { row: PhotoRow; ca
         setBusy(key); setError(null);
         try { await fn(); } catch (e: any) { setError(e?.message || String(e)); } finally { setBusy(null); }
     };
-    const use = (c: DiscoveryCandidate, also: string[] = []) => run(also.length ? 'all' : c.url, async () => {
-        await adminPhotosApi.accept(row.id, c.url, also);
+    const whiten = (c: DiscoveryCandidate) => run(`w${c.url}`, async () => { const r = await adminPhotosApi.whiten(row.id, c.url); if (r.state) setState(r.state); });
+    const use = (c: DiscoveryCandidate, also: string[] = [], clean = false) => run(also.length ? 'all' : clean ? `c${c.url}` : c.url, async () => {
+        await adminPhotosApi.accept(row.id, c.url, also, clean);
         toast.success(t('imageDiscovery', 'toastAccepted'));
         onChanged();
     });
@@ -211,7 +212,7 @@ function ReviewDialog({ row, canApply, onClose, onChanged }: { row: PhotoRow; ca
                 : undefined}>
             {error && <div className="mb-3"><Notice tone="danger">{error}</Notice></div>}
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {state.candidates.map((c) => <PhotoCandidateCard key={c.url} c={c} barcode={state.barcode} busy={busy} canApply={canApply} onUse={(x) => use(x)} onDismiss={dismiss} dismissLabel={tp('notThisProduct')} />)}
+                {state.candidates.map((c) => <PhotoCandidateCard key={c.url} c={c} barcode={state.barcode} busy={busy} canApply={canApply} onUse={(x, clean) => use(x, [], clean)} onDismiss={dismiss} onWhiten={whiten} dismissLabel={tp('notThisProduct')} />)}
             </ul>
             <p className="mt-3 text-[12px] text-ink-3">{t('imageDiscovery', 'licenseNote', { license: state.candidates[0]?.license || 'CC BY-SA 3.0' })}</p>
         </Dialog>

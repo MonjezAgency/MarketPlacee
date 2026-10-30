@@ -76,11 +76,19 @@ export class SupplierCatalogController {
     /** Use stored candidates as the product photos (copied to storage and credited; never replaces a photo). */
     @Post('products/:id/image-discovery/accept')
     @Throttle({ default: { limit: 30, ttl: 60_000 } })
-    acceptImageDiscovery(@Request() req, @Param('id') id: string, @Body() body: { url?: string; also?: unknown }) {
+    acceptImageDiscovery(@Request() req, @Param('id') id: string, @Body() body: { url?: string; also?: unknown; clean?: unknown }) {
         if (!body?.url || typeof body.url !== 'string') throw new BadRequestException('Choose a photo.');
         // `also`: more photos of the same product for the gallery, after the main one.
         const also = Array.isArray(body.also) ? body.also.filter((x): x is string => typeof x === 'string') : [];
-        return this.discovery.accept(req.user.sub, id, body.url, also);
+        return this.discovery.accept(req.user.sub, id, body.url, also, body.clean === true);
+    }
+
+    /** Make the white-background version of a found photo (one Photoroom call, kept on the photo). */
+    @Post('products/:id/image-discovery/whiten')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    whitenImageDiscovery(@Request() req, @Param('id') id: string, @Body() body: { url?: string }) {
+        if (!body?.url || typeof body.url !== 'string') throw new BadRequestException('Choose a photo.');
+        return this.discovery.whiten(req.user.sub, id, body.url).then((state) => ({ state }));
     }
 
     /** "Not my product": one photo ({url}) or all of them. */

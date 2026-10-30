@@ -9,6 +9,8 @@ export interface DiscoveryCandidate {
     url: string; previewUrl: string; source: string; sourceUrl: string; license: string; licenseUrl: string; attribution: string;
     confidence: 'verified' | 'needs_confirmation'; reasons: string[];
     kind?: string; language?: string | null; width?: number; height?: number;
+    /** The same photo on pure white. watermarked = made in test mode: a preview that can't be saved. */
+    clean?: { url: string; watermarked: boolean; at: string };
     productName?: string | null; brand?: string | null; quantity?: string | null;
     /** 1 white background · 2 plain light background · 3 other photo of this exact product · null identity to check (backend image-quality.ts). */
     tier?: 1 | 2 | 3 | null;
@@ -97,7 +99,8 @@ export const supplierApi = {
     imageDiscovery: (id: string) => apiFetch(`/supplier-catalog/products/${id}/image-discovery`, { cache: 'no-store' }).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     retryImageDiscovery: (id: string) => post(`/supplier-catalog/products/${id}/image-discovery/retry`, {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     /** Use a found photo (and `also`: more confirmed photos for the gallery): the server copies them, adds them and records their licence. Returns the saved product. */
-    acceptDiscoveredImage: (id: string, url: string, also: string[] = []) => post(`/supplier-catalog/products/${id}/image-discovery/accept`, { url, also }).then((r) => json<SupplierProduct>(r)),
+    whitenDiscoveredImage: (id: string, url: string) => post(`/supplier-catalog/products/${id}/image-discovery/whiten`, { url }).then((r) => json<{ state: ImageDiscovery | null }>(r)),
+    acceptDiscoveredImage: (id: string, url: string, also: string[] = [], clean = false) => post(`/supplier-catalog/products/${id}/image-discovery/accept`, { url, also, clean }).then((r) => json<SupplierProduct>(r)),
     dismissDiscoveredImage: (id: string, url?: string) => post(`/supplier-catalog/products/${id}/image-discovery/dismiss`, url ? { url } : {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     acceptImage: (url: string) => post('/supplier-catalog/image-lookup/accept', { url }).then((r) => json<{ url: string }>(r)),
     preferences: () => apiFetch('/supplier-catalog/preferences', { cache: 'no-store' }).then((r) => json<{ defaultCurrency: string | null; suggestedCurrency: string; effectiveCurrency: string; country: string | null; currencies: string[]; rates: Record<string, number> }>(r)),
