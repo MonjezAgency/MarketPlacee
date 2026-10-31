@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 /** Reason codes the server sends (backend import-enrichment / image-discovery); each has a `reason_<code>` text. */
 const REASONS = new Set(['not_in_database', 'no_photo', 'source_unavailable', 'invalid_barcode', 'internal_code', 'variable_measure', 'dismissed',
     'name_matches', 'brand_matches', 'size_matches', 'barcode_differs', 'name_differs', 'brand_differs', 'size_differs', 'nothing_to_compare',
-    'kind_unknown', 'second_source_needed', 'case_code', 'low_resolution']);
+    'kind_unknown', 'second_source_needed', 'case_code', 'case_of_unit', 'low_resolution']);
 /** Codes added with photo ranking (texts in the productPhotos section). */
 const RANKING_REASONS = new Set(['record_mismatch', 'variant_differs', 'no_clean_background', 'identity_unconfirmed', 'already_in_gallery']);
 
@@ -76,6 +76,7 @@ export default function ImageDiscoveryPanel({ productId, product, ean, hasImages
         try { await fn(); } catch (e: any) { setError(e?.message || String(e)); } finally { setBusy(null); }
     };
     const retry = () => run('retry', async () => { const r = await supplierApi.retryImageDiscovery(productId!); setState(r.state); toast.success(ti('toastRetry')); });
+    const restore = () => run('restore', async () => { const r = await supplierApi.retryImageDiscovery(productId!, true); setState(r.state); });
     const whiten = (c: DiscoveryCandidate) => run(`w${c.url}`, async () => { const r = await supplierApi.whitenDiscoveredImage(productId!, c.url); setState(r.state); });
     const accept = (c: DiscoveryCandidate, also: string[] = [], clean = false) => run(also.length ? 'all' : clean ? `c${c.url}` : c.url, async () => {
         const p = await supplierApi.acceptDiscoveredImage(productId!, c.url, also, clean);
@@ -131,7 +132,11 @@ export default function ImageDiscoveryPanel({ productId, product, ean, hasImages
                     {!adding && <p className="text-[12.5px] text-ink-3">{ti('uploadInstead')}{checked ? ` · ${checked}` : ''}</p>}
                 </div>
             </div>
-            <div className="flex flex-wrap gap-2">{st.status !== 'invalid_barcode' && retryBtn}{uploadBtn}</div>
+            <div className="flex flex-wrap gap-2">
+                {st.status !== 'invalid_barcode' && retryBtn}
+                {!!st.dismissed?.length && <Button size="sm" variant="secondary" icon={<Images size={13} />} loading={busy === 'restore'} disabled={!!busy} onClick={restore}>{ti('restoreDismissed')}</Button>}
+                {uploadBtn}
+            </div>
         </>);
     }
 

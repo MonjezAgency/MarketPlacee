@@ -26,6 +26,8 @@ export interface ImageDiscovery {
     mode?: 'fill' | 'add';
     barcode: string; startedAt?: string; checkedAt?: string; reason?: string; reasons?: string[];
     candidates: DiscoveryCandidate[]; attempts?: number;
+    /** Photos marked "Not my product" for this barcode. */
+    dismissed?: string[];
     /** The database record, when it was rejected as a different product. */
     record?: { productName: string | null; brand: string | null; quantity: string | null; sourceUrl: string } | null;
 }
@@ -97,7 +99,7 @@ export const supplierApi = {
     uploadImage: (file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/products/upload-image', { method: 'POST', body: fd }).then((r) => json<{ url: string }>(r)); },
     imageLookup: (q: { productId?: string; ean: string; name?: string; brand?: string; weight?: string }) => post('/supplier-catalog/image-lookup', q).then((r) => json<any>(r)),
     imageDiscovery: (id: string) => apiFetch(`/supplier-catalog/products/${id}/image-discovery`, { cache: 'no-store' }).then((r) => json<{ state: ImageDiscovery | null }>(r)),
-    retryImageDiscovery: (id: string) => post(`/supplier-catalog/products/${id}/image-discovery/retry`, {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
+    retryImageDiscovery: (id: string, restore = false) => post(`/supplier-catalog/products/${id}/image-discovery/retry`, restore ? { restore: true } : {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     /** Use a found photo (and `also`: more confirmed photos for the gallery): the server copies them, adds them and records their licence. Returns the saved product. */
     whitenDiscoveredImage: (id: string, url: string) => post(`/supplier-catalog/products/${id}/image-discovery/whiten`, { url }).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     acceptDiscoveredImage: (id: string, url: string, also: string[] = [], clean = false) => post(`/supplier-catalog/products/${id}/image-discovery/accept`, { url, also, clean }).then((r) => json<SupplierProduct>(r)),

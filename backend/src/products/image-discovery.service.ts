@@ -135,9 +135,10 @@ export class ImageDiscoveryService implements OnModuleInit {
      * Decide whether this product needs a search and start it. Returns the
      * state now stored. `force` = a person asked to search again (skips cached
      * "not found" answers; never runs twice at once). `add` = a person asked
-     * for more photos of a product that already has some.
+     * for more photos of a product that already has some. `restore` = a person
+     * takes back their "Not my product" answers for this barcode.
      */
-    async enqueue(productId: string, opts: { force?: boolean; add?: boolean; by?: DiscoveryActor } = {}): Promise<DiscoveryState | null> {
+    async enqueue(productId: string, opts: { force?: boolean; add?: boolean; restore?: boolean; by?: DiscoveryActor } = {}): Promise<DiscoveryState | null> {
         const p = await this.load(productId);
         if (!p) return null;
         const state = asState(p.imageDiscovery);
@@ -161,9 +162,9 @@ export class ImageDiscoveryService implements OnModuleInit {
             const at = Date.parse(state!.checkedAt || '');
             const age = Number.isFinite(at) ? this.now() - at : Infinity;
             if (!opts.force && !(state!.status === 'unavailable' && age > UNAVAILABLE_RETRY_MS)) return state;   // answered already
-            if (opts.force && age < RETRY_COOLDOWN_MS) return state;
+            if (opts.force && !opts.restore && age < RETRY_COOLDOWN_MS) return state;
         }
-        const keepDismissed = !!state && state.barcode === code && state.dismissed?.length;
+        const keepDismissed = !opts.restore && !!state && state.barcode === code && state.dismissed?.length;
         const next: DiscoveryState = {
             status: 'searching', barcode: code, mode, startedAt: this.iso(), candidates: [],
             ...(keepDismissed ? { dismissed: state!.dismissed } : {}),
@@ -223,6 +224,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         if (!p || normaliseBarcode(p.ean) !== code) return;
         if (mode === 'fill' && realImages(p.images).length) { if (asState(p.imageDiscovery)) await this.write(p, null); return; }
         await this.write(p, state);
+        this.logger.log(`[discovery] ${id} ${code}: ${state.status} ${state.reason || (state.reasons || []).join(',')} (${candidates.length} offered, ${rejected.length} rejected)`);
     }
 
     // ─── Pixels ──────────────────────────────────────────────────────
@@ -258,10 +260,10 @@ export class ImageDiscoveryService implements OnModuleInit {
     }
 
     /** Search again. On a product that has photos this looks for more (they can only be added after the existing ones). */
-    async retry(supplierId: string, id: string): Promise<DiscoveryState | null> {
+    async retry(supplierId: string, id: string, restore = false): Promise<DiscoveryState | null> {
         const p = await this.own(supplierId, id);
         if (!normaliseBarcode(p.ean)) throw new BadRequestException({ code: 'NO_BARCODE', message: 'Add the product’s barcode and save it first.' });
-        return this.enqueue(id, { force: true, add: realImages(p.images).length > 0, by: { id: supplierId, role: 'SUPPLIER' } });
+        return this.enqueue(id, { force: true, restore, add: realImages(p.images).length > 0, by: { id: supplierId, role: 'SUPPLIER' } });
     }
 
     /**

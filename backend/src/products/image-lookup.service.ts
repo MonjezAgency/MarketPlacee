@@ -161,6 +161,36 @@ export function comparePack(supplier: { name?: string; weight?: string }, source
     return { match: compared ? true : null, reason: null };
 }
 
+/**
+ * Wholesale listings sell the case: "Red Bull 24x250ml" (or a case weight in the weight field) under the barcode of
+ * the 250 ml can. The size differs from the record, but the record is the right item, shown as a single piece.
+ * A listing whose own name gives another size ("1 L" against "500 ml") is not a case: that stays a different product.
+ */
+export function caseOfUnit(supplier: { name?: string; weight?: string }, source: { name: string | null; quantity: string | null }): boolean {
+    const mine = `${supplier.name || ''} ${supplier.weight || ''}`;
+    const theirs = `${source.name || ''} ${source.quantity || ''}`;
+    if (multipackCount(theirs)) return false;
+    const b = specs(theirs);
+    const count = multipackCount(mine);
+    if (count) {
+        let same = false;
+        for (const [unit, vals] of specs(mine)) {
+            const other = b.get(unit);
+            if (!other || unit === '%') continue;
+            if (![...vals].some((v) => other.has(v))) return false;
+            same = true;
+        }
+        return same;
+    }
+    if ([...specs(supplier.name).keys()].some((unit) => unit !== '%' && b.has(unit))) return false;
+    for (const [unit, vals] of specs(supplier.weight)) {
+        const other = b.get(unit);
+        if (!other || unit === '%') continue;
+        return [...vals].some((v) => [...other].some((o) => o > 0 && v >= 2 * o && Math.abs(v / o - Math.round(v / o)) < 1e-6));
+    }
+    return false;
+}
+
 /** Upgrade an OFF display image URL (…/front_en.12.400.jpg) to the full-size file. */
 const fullSize = (u: string) => u.replace(/\.(\d+)\.(100|200|400)\.(jpg|png)$/i, '.$1.full.$3');
 

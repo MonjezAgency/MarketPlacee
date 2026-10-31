@@ -21,6 +21,15 @@ describe('supplier identity on read paths', () => {
             expect(out.data[0]).not.toHaveProperty('supplier');
         }
     });
+    it('anonymous visitors and buyers get a photo\'s licence credit, not the photo search or who approved it', () => {
+        const row = { ...product(), imageDiscovery: { requestedBy: { id: 'sup-a', role: 'SUPPLIER' } }, imageCredits: { u: { license: 'CC BY-SA 3.0', attribution: 'OFF', approvedBy: 'sup-a', approvedByRole: 'SUPPLIER', chosenBy: 'supplier' } } };
+        for (const viewer of [null, { id: 'b1', role: 'CUSTOMER' }]) {
+            const out: any = applyPricePrivacy({ data: [JSON.parse(JSON.stringify(row))] }, viewer as any, m);
+            expect(out.data[0]).not.toHaveProperty('imageDiscovery');
+            expect(out.data[0].imageCredits).toEqual({ u: { license: 'CC BY-SA 3.0', attribution: 'OFF' } });
+        }
+    });
+
     it('strips supplier ids from a buyer’s order terms, fulfilment groups and mixed loads', () => {
         const order: any = applyPricePrivacy({
             id: 'o1', customerId: 'b1', supplierId: null,

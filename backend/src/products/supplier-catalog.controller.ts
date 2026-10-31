@@ -69,8 +69,8 @@ export class SupplierCatalogController {
 
     @Post('products/:id/image-discovery/retry')
     @Throttle({ default: { limit: 20, ttl: 60_000 } })
-    retryImageDiscovery(@Request() req, @Param('id') id: string) {
-        return this.discovery.retry(req.user.sub, id).then((state) => ({ state }));
+    retryImageDiscovery(@Request() req, @Param('id') id: string, @Body() body: { restore?: unknown }) {
+        return this.discovery.retry(req.user.sub, id, body?.restore === true).then((state) => ({ state }));
     }
 
     /** Use stored candidates as the product photos (copied to storage and credited; never replaces a photo). */

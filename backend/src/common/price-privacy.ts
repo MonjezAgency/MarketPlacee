@@ -47,6 +47,15 @@ function viewProduct(p: any, viewer: Viewer, m: Markups, ownerScoped = false) {
     delete p.supplierPrice;
     delete p.supplierCurrency;
     delete p.adminNotes;
+    // The photo search belongs to the supplier; a photo's public credit keeps its licence and source, not who approved it.
+    delete p.imageDiscovery;
+    if (p.imageCredits && typeof p.imageCredits === 'object') {
+        p.imageCredits = Object.fromEntries(Object.entries(p.imageCredits).map(([k, c]: [string, any]) => {
+            if (!c || typeof c !== 'object') return [k, c];
+            const { approvedBy, approvedByRole, chosenBy, ...open } = c;
+            return [k, open];
+        }));
+    }
     // Who supplies a product is Ali FMCG's business: another supplier sees neither the id nor the account.
     delete p.supplierId;
     if (p.supplier && typeof p.supplier === 'object') delete p.supplier;

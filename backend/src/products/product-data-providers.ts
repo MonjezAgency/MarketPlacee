@@ -135,7 +135,7 @@ function openFactsProvider(o: { id: string; label: string; site: string; product
         async lookup(barcode) {
             let res: Response;
             try {
-                res = await queue.fetch(`${o.site}/api/v3/product/${encodeURIComponent(barcode)}.json?fields=${FIELDS}`, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' }, timeoutMs: 10_000 });
+                res = await queue.fetch(`${o.site}/api/v3/product/${encodeURIComponent(barcode)}.json?fields=${FIELDS}`, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' }, timeoutMs: 20_000 });
             } catch (e: any) { return { status: 'unavailable', reason: e?.name === 'TimeoutError' ? 'timeout' : 'error' }; }
             if (res.status === 429 || res.status === 503) return { status: 'unavailable', reason: 'rate_limited' };
             if (res.status !== 404 && !res.ok) return { status: 'unavailable', reason: 'error' };

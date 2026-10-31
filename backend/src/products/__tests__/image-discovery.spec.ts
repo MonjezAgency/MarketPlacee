@@ -223,6 +223,12 @@ describe('background photo search for saved products', () => {
         await svc.retry('s1', 'p1');
         await settle();
         expect(db.byId.get('p1')!.imageDiscovery).toMatchObject({ status: 'not_found', reason: 'dismissed' });
+        // The supplier can take the answer back, at once; a plain search never does.
+        await svc.retry('s1', 'p1', true);
+        await settle();
+        expect(db.byId.get('p1')!.imageDiscovery).toMatchObject({ status: 'found_review' });
+        expect(db.byId.get('p1')!.imageDiscovery.candidates.map((c: any) => c.url)).toEqual(expect.arrayContaining([a, b]));
+        expect(db.byId.get('p1')!.imageDiscovery.dismissed).toBeUndefined();
     });
 
     it('the import review and the background search share one cache and never ask twice at once', async () => {
@@ -345,6 +351,24 @@ describe('lookup engine: barcode forms, databases, photo choice', () => {
         expect(monster.candidates[0]).toMatchObject({ confidence: 'verified' });
         const single = await e.lookupOne({ ean: '8000500461051', name: 'Ferrero Rocher Ice Cream Stick 90ml', brand: 'Ferrero', category: 'Frozen Food' });
         expect(single.candidates[0]).toMatchObject({ confidence: 'needs_confirmation', reasons: expect.arrayContaining(['size_differs']) });
+    });
+
+    it('a wholesale case of the record\'s item is offered to check, as a single piece; a real size difference is not', async () => {
+        const can = '9002490100070';
+        const milk = '7622210276650';
+        const off = provider('off', 'food', {
+            [can]: { status: 'found', record: rec(can, 'Energy Drink', 'Red Bull', '250ml') },
+            [milk]: { status: 'found', record: rec(milk, 'Milka Choco', 'Milka', '100 g') },
+        });
+        const e = new ImportEnrichmentService();
+        e.useProviders([off.p]);
+        const look = async (ean: string, name: string, weight?: string) => (await e.lookupOne({ ean, name, brand: ean === can ? 'Red Bull' : 'Milka', weight, category: 'Beverages' })).candidates[0];
+        expect(await look(can, 'Red Bull Energy Drink 24x250ml', '6 kg')).toMatchObject({ confidence: 'needs_confirmation', reasons: expect.arrayContaining(['case_of_unit']) });
+        expect((await look(can, 'Red Bull Energy Drink 24x250ml')).reasons).not.toContain('size_differs');
+        expect((await look(milk, 'Milka Choco', '2.4 kg')).reasons).toContain('case_of_unit');              // a case weight in the weight field
+        expect((await look(can, 'Red Bull Energy Drink 500ml')).reasons).toContain('size_differs');         // another can
+        expect((await look(can, 'Red Bull Energy Drink 1 L')).reasons).toContain('size_differs');            // a multiple in the name is a size, not a case
+        expect((await look(can, 'Red Bull Energy Drink 24x500ml')).reasons).toContain('size_differs');
     });
 
     it('reads the v3 API: sizes from images metadata, full-size URLs, "elsewhere" 404s, outages', async () => {

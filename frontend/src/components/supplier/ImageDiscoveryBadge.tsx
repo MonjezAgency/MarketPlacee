@@ -8,7 +8,7 @@ import { supplierApi, type SupplierProduct } from '@/lib/supplier-api';
 import { Button } from '@/components/supplier/ui';
 import { isRealImage } from '@/lib/catalog-rules';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useDiscoveryState } from '@/components/supplier/ImageDiscoveryPanel';
+import { useDiscoveryReason, useDiscoveryState } from '@/components/supplier/ImageDiscoveryPanel';
 
 /**
  * Product list: for a product without a photo, the state of its background
@@ -20,6 +20,7 @@ export default function ImageDiscoveryBadge({ product, onAccepted }: { product: 
     const ti = (k: string, v?: Record<string, string | number>) => t('imageDiscovery', k, v);
     const [state, setState] = useDiscoveryState(product.id, product.imageDiscovery);
     const [busy, setBusy] = React.useState(false);
+    const reason = useDiscoveryReason();
     if ((product.images || []).some(isRealImage)) return null;
 
     const line = (icon: React.ReactNode, text: string, tone = 'text-ink-3') => <span className={`inline-flex items-center gap-1 text-[12px] ${tone}`}>{icon}{text}</span>;
@@ -40,7 +41,14 @@ export default function ImageDiscoveryBadge({ product, onAccepted }: { product: 
     if (state.status === 'searching') return line(<Loader2 size={12} className="animate-spin" aria-hidden />, ti('badgeSearching'));
     if (state.status !== 'found_review' || !state.candidates.length) {
         const text = state.status === 'invalid_barcode' ? ti('badgeInvalid') : state.status === 'unavailable' ? ti('badgeUnavailable') : ti('badgeNone');
-        return line(<AlertCircle size={12} aria-hidden />, text, 'text-amber-800');
+        const why = reason(state.reason || state.reasons?.[0] || '');
+        return (
+            <span className="inline-flex flex-col items-start gap-0.5">
+                {line(<AlertCircle size={12} aria-hidden />, text, 'text-amber-800')}
+                {why && <span className="text-[12px] text-ink-3">{why}</span>}
+                <Link href={`/supplier/products/${product.id}/edit#media`} className="text-[12px] text-teal font-medium hover:underline">{ti('badgeDetails')}</Link>
+            </span>
+        );
     }
     const best = state.candidates[0];
     const use = async () => {

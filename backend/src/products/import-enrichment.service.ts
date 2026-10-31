@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { barcodeProblem, normaliseBarcode } from './catalog-rules';
-import { brandInName, compareBrands, compareNames, comparePack, variantConflict } from './image-lookup.service';
+import { brandInName, caseOfUnit, compareBrands, compareNames, comparePack, variantConflict } from './image-lookup.service';
 import { HostQueue, buildProviders, kindOf, lookupPlan, sameGtin, type ProductDataProvider, type ProductKind, type ProviderPhoto, type ProviderRecord, type ProviderResult } from './product-data-providers';
 
 /**
@@ -258,7 +258,8 @@ export class ImportEnrichmentService {
         // A different variant (zero / light / another %) is a different product; other wording differences only need a check.
         if (nameMatch === false && variantConflict(it.name, record.name, [it.brand, record.brands])) reasons.push('variant_differs');
         if (brandMatch === false) reasons.push('brand_differs');
-        if (pack.match === false) reasons.push('size_differs');
+        const soldAsCase = pack.match === false && caseOfUnit({ name: it.name, weight: it.weight }, { name: record.name, quantity: record.quantity });
+        if (pack.match === false) reasons.push(soldAsCase ? 'case_of_unit' : 'size_differs');
         if (nameMatch === null && brandMatch === null) reasons.push('nothing_to_compare');
         const agrees = nameMatch === true || brandMatch === true;
         // Without a category on the row or the record, we can't tell this is a product the source may verify.
