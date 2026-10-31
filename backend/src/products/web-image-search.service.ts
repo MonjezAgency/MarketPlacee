@@ -4,7 +4,7 @@ import * as https from 'https';
 import { BlockList, isIP } from 'net';
 import { PrismaService } from '../common/prisma.service';
 import { MAX_ANALYSE_BYTES, MIN_PRIMARY_LONG_SIDE, analyseBuffer, decodeImage, isWideBanner, type Visual, type VisualReport } from './image-quality';
-import { ImageLookupService, webTitleMatches } from './image-lookup.service';
+import { ImageLookupService, similarScore, webTitleMatches } from './image-lookup.service';
 import type { RankedCandidate } from './import-enrichment.service';
 import { USER_AGENT } from './product-data-providers';
 
@@ -24,9 +24,9 @@ import { USER_AGENT } from './product-data-providers';
  * second click doesn't pay again.
  */
 export const WEB_SEARCH_MONTHLY_LIMIT = 200;
-const MAX_PHOTOS = 3;
+const MAX_PHOTOS = 6;
 /** Downloads tried per search: most results are shops' lifestyle photos, and a slow site must not hold up the search. */
-const MAX_DOWNLOADS = 12;
+const MAX_DOWNLOADS = 24;
 const CACHE_MS = 30 * 24 * 60 * 60 * 1000;
 const DOWNLOAD_TIMEOUT_MS = 8_000;
 
@@ -99,7 +99,7 @@ export class WebImageSearchService {
         if (!this.enabled) return { status: 'off', candidates: [] };
         try {
             const query = searchQuery(it);
-            const key = `web_photos:${it.ean}`;
+            const key = `web_photos:v2:${it.ean}`;
             const hit = await this.prisma.appConfig.findUnique({ where: { key } });
             const cached = hit ? JSON.parse(hit.value) as { query: string; at: number; candidates: WebCandidate[] } : null;
             let candidates: WebCandidate[];
@@ -121,7 +121,8 @@ export class WebImageSearchService {
 
     private async collect(it: { name: string; brand?: string; weight?: string }, results: WebResult[]): Promise<WebCandidate[]> {
         const out: WebCandidate[] = [];
-        const matching = results.filter((r) => r.original && webTitleMatches(it, String(r.title || ''))).slice(0, MAX_DOWNLOADS);
+        const score = (r: WebResult) => similarScore(it, { name: String(r.title || ''), brands: null, quantity: null });
+        const matching = results.filter((r) => r.original && webTitleMatches(it, String(r.title || ''))).sort((a, b) => score(b) - score(a)).slice(0, MAX_DOWNLOADS);
         for (const r of matching) {
             if (out.length >= MAX_PHOTOS) break;
             const buf = await this.download(r.original!);
@@ -136,6 +137,7 @@ export class WebImageSearchService {
                 confidence: 'needs_confirmation', reasons: ['web_search'], visual,
             } as WebCandidate);
         }
+        this.logger.log(`[web-photos] "${searchQuery(it)}": ${results.length} results, ${matching.length} tried, ${out.length} on white`);
         return out;
     }
 

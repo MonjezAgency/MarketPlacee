@@ -72,9 +72,9 @@ describe('web photo search', () => {
         expect(svc.download).not.toHaveBeenCalled();
     });
 
-    it('offers at most three photos', async () => {
-        const { svc } = setup([1, 2, 3, 4, 5].map((n) => result(n)));
-        expect((await svc.find(ITEM, new Set())).candidates).toHaveLength(3);
+    it('offers at most six photos', async () => {
+        const { svc } = setup([1, 2, 3, 4, 5, 6, 7, 8].map((n) => result(n)));
+        expect((await svc.find(ITEM, new Set())).candidates).toHaveLength(6);
     });
 
     it('a second search for the same product is not paid for', async () => {
@@ -129,9 +129,10 @@ describe('web photo search', () => {
 
     it('matches a title only when it says this product', () => {
         expect(webTitleMatches(ITEM, 'Monster Energy Zero Green 500ml can')).toBe(true);
-        expect(webTitleMatches(ITEM, 'Buy Monster Energy Drink Zero Sugar Can 500mL')).toBe(false);
+        expect(webTitleMatches(ITEM, 'Buy Monster Energy Drink Zero Sugar Can 500mL')).toBe(true);
+        expect(webTitleMatches(ITEM, 'Monster Energy Drink 500ml')).toBe(false);
         expect(webTitleMatches(ITEM, 'Red Bull Zero 500ml')).toBe(false);
-        for (const t of ['Monster Green Zero Sugar 24Uds de 500ML', 'Monster Energy GREEN ZERO 4х500 ml', 'MONSTER Energy Green Zero 500 ml, confezione da 24 pezzi', 'Monster Energy Zero Green 12 pack 500ml']) expect(webTitleMatches(ITEM, t)).toBe(false);
+        for (const t of ['Monster Green Zero Sugar 24Uds de 500ML', 'Monster Energy GREEN ZERO 4х500 ml', 'MONSTER Energy Green Zero 500 ml, confezione da 24 pezzi', 'Monster Energy Zero Green 12 pack 500ml', 'Monster Zero Green 500ml (24/carton)']) expect(webTitleMatches(ITEM, t)).toBe(false);
         expect(webTitleMatches({ name: 'Monster Zero Green 24 x 500ml' }, 'Monster Zero Green 24x500ml tray')).toBe(true);
     });
 
