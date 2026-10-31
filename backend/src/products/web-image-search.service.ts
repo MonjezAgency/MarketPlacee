@@ -79,6 +79,23 @@ export function isCleanPackshot(v: Visual, buf: Buffer): v is VisualReport {
     return !!img && !isWideBanner(img);
 }
 
+/** Takes one from this month's allowance, with no two callers getting the same one. False when it's used up (fails closed). */
+export async function reserveMonthly(prisma: PrismaService, prefix: string, limit: number, now: number): Promise<boolean> {
+    const key = `${prefix}:${new Date(now).toISOString().slice(0, 7)}`;
+    for (let i = 0; i < 6; i++) {
+        const row = await prisma.appConfig.findUnique({ where: { key } });
+        const used = Number(row?.value) || 0;
+        if (used >= limit) return false;
+        if (!row) {
+            if (await prisma.appConfig.create({ data: { key, value: '1' } }).then(() => true, () => false)) return true;
+            continue;
+        }
+        const r = await prisma.appConfig.updateMany({ where: { key, value: row.value }, data: { value: String(used + 1) } });
+        if (r.count) return true;
+    }
+    return false;
+}
+
 @Injectable()
 export class WebImageSearchService {
     private readonly logger = new Logger(WebImageSearchService.name);
@@ -142,20 +159,14 @@ export class WebImageSearchService {
     }
 
     /** Count one search if the month has room, across every server. A failed count refuses, so the limit can't be passed. */
-    private async reserve(): Promise<boolean> {
-        const key = `web_search_count:${new Date(this.now()).toISOString().slice(0, 7)}`;
-        for (let i = 0; i < 6; i++) {
-            const row = await this.prisma.appConfig.findUnique({ where: { key } });
-            const used = Number(row?.value) || 0;
-            if (used >= WEB_SEARCH_MONTHLY_LIMIT) return false;
-            if (!row) {
-                if (await this.prisma.appConfig.create({ data: { key, value: '1' } }).then(() => true, () => false)) return true;
-                continue;
-            }
-            const r = await this.prisma.appConfig.updateMany({ where: { key, value: row.value }, data: { value: String(used + 1) } });
-            if (r.count) return true;
-        }
-        return false;
+    private reserve(): Promise<boolean> {
+        return reserveMonthly(this.prisma, 'web_search_count', WEB_SEARCH_MONTHLY_LIMIT, this.now());
+    }
+
+    /** Searches left this month. */
+    async remaining(): Promise<number> {
+        const row = await this.prisma.appConfig.findUnique({ where: { key: `web_search_count:${new Date(this.now()).toISOString().slice(0, 7)}` } });
+        return Math.max(0, WEB_SEARCH_MONTHLY_LIMIT - (Number(row?.value) || 0));
     }
 
     private async serpApi(query: string): Promise<WebResult[]> {

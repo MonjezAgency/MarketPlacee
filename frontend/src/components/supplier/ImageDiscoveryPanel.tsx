@@ -13,7 +13,8 @@ import { cn } from '@/lib/utils';
 /** Reason codes the server sends (backend import-enrichment / image-discovery); each has a `reason_<code>` text. */
 const REASONS = new Set(['not_in_database', 'no_photo', 'source_unavailable', 'invalid_barcode', 'internal_code', 'variable_measure', 'dismissed',
     'name_matches', 'brand_matches', 'size_matches', 'barcode_differs', 'name_differs', 'brand_differs', 'size_differs', 'nothing_to_compare',
-    'kind_unknown', 'second_source_needed', 'case_code', 'case_of_unit', 'low_resolution', 'different_barcode', 'no_exact_match', 'web_search', 'web_no_white', 'web_limit_reached']);
+    'kind_unknown', 'second_source_needed', 'case_code', 'case_of_unit', 'low_resolution', 'different_barcode', 'no_exact_match', 'web_search', 'web_no_white', 'web_limit_reached',
+    'ai_brand', 'ai_variant', 'ai_size', 'ai_view', 'ai_multi', 'ai_clutter', 'ai_unsure']);
 /** Codes added with photo ranking (texts in the productPhotos section). */
 const RANKING_REASONS = new Set(['record_mismatch', 'variant_differs', 'no_clean_background', 'identity_unconfirmed', 'already_in_gallery']);
 
@@ -47,7 +48,8 @@ export function useDiscoveryState(productId: string | undefined, initial: ImageD
  * first); "Use with the gallery photos" adds the other confirmed photos after
  * the main one. A product that has photos can look for more: they are only
  * ever added after the supplier's own. Accepting saves on the server right
- * away (copied, credited); nothing else on the product changes.
+ * away (copied, credited); nothing else on the product changes. A photo the
+ * AI check put on the product by itself says so here and can be taken off.
  */
 export default function ImageDiscoveryPanel({ productId, product, ean, hasImages, onAccepted, onUpload }: {
     productId?: string; product: SupplierProduct | null; ean: string; hasImages: boolean;
@@ -68,6 +70,25 @@ export default function ImageDiscoveryPanel({ productId, product, ean, hasImages
     // While the editor's photos differ from the saved ones (unsaved changes), nothing is offered.
     const savedHasImages = (product?.images || []).some(isRealImage);
     if (productId && hasImages !== savedHasImages) return null;
+    const automatic = (product?.images || []).find((u) => { const c = product?.imageCredits?.[u]; return c?.chosenBy === 'auto' && !c.reviewedAt; });
+    if (productId && automatic) {
+        const remove = async () => {
+            setBusy('auto'); setError(null);
+            try {
+                await supplierApi.removeAutomaticImage(productId);
+                onAccepted(await supplierApi.product(productId));
+                toast.success(ti('toastAutoRemoved'));
+            } catch (e: any) { setError(e?.message || String(e)); } finally { setBusy(null); }
+        };
+        return (
+            <div className="rounded-xl ring-1 ring-line p-3 space-y-2" aria-live="polite">
+                <p className="flex items-center gap-2 text-[13.5px] font-medium text-heading"><ScanBarcode size={16} className="text-teal" />{ti('autoTitle')}</p>
+                <p className="text-[12.5px] text-ink-3">{ti('autoBody')}</p>
+                {error && <Notice tone="danger">{error}</Notice>}
+                <Button size="sm" variant="secondary" loading={busy === 'auto'} disabled={!!busy} onClick={remove}>{ti('autoRemove')}</Button>
+            </div>
+        );
+    }
     const adding = hasImages;
     if (adding && (!productId || !saved || (typed && typed !== saved))) return null;
 

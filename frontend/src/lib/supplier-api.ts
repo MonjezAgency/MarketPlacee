@@ -14,6 +14,8 @@ export interface DiscoveryCandidate {
     productName?: string | null; brand?: string | null; quantity?: string | null;
     /** The barcode of the record, for a photo found by name (role `similar`). */
     sourceBarcode?: string; webImage?: string;
+    /** What the AI check said about this photo; why = reason codes. */
+    aiCheck?: { ok: boolean; confidence: number; why: string[]; read: string };
     /** 1 white background · 2 plain light background · 3 other photo of this exact product · null identity to check (backend image-quality.ts). */
     tier?: 1 | 2 | 3 | null;
     score?: number;
@@ -45,6 +47,7 @@ export interface SupplierProduct {
     createdAt: string; updatedAt: string; reserved?: number;
     missing: Missing[]; statusNote: string;
     imageDiscovery?: ImageDiscovery | null;
+    imageCredits?: Record<string, { chosenBy?: string; reviewedAt?: string } | null> | null;
     movement?: { reserved: number; inTransit: number; delivered: number; cancelled: number; ordered: number };
 }
 
@@ -105,6 +108,7 @@ export const supplierApi = {
     /** Use a found photo (and `also`: more confirmed photos for the gallery): the server copies them, adds them and records their licence. Returns the saved product. */
     whitenDiscoveredImage: (id: string, url: string) => post(`/supplier-catalog/products/${id}/image-discovery/whiten`, { url }).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     acceptDiscoveredImage: (id: string, url: string, also: string[] = [], clean = false, confirmed = false) => post(`/supplier-catalog/products/${id}/image-discovery/accept`, { url, also, clean, confirmed }).then((r) => json<SupplierProduct>(r)),
+    removeAutomaticImage: (id: string) => post(`/supplier-catalog/products/${id}/image-discovery/remove-automatic`, {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     dismissDiscoveredImage: (id: string, url?: string) => post(`/supplier-catalog/products/${id}/image-discovery/dismiss`, url ? { url } : {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     acceptImage: (url: string) => post('/supplier-catalog/image-lookup/accept', { url }).then((r) => json<{ url: string }>(r)),
     preferences: () => apiFetch('/supplier-catalog/preferences', { cache: 'no-store' }).then((r) => json<{ defaultCurrency: string | null; suggestedCurrency: string; effectiveCurrency: string; country: string | null; currencies: string[]; rates: Record<string, number> }>(r)),

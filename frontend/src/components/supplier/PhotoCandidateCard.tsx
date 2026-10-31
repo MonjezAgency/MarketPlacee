@@ -58,6 +58,8 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
                     <TierBadge c={c} />
                 </div>
                 <ul className="space-y-0.5">
+                    {c.aiCheck?.ok && <li className="text-emerald-700">{ti('aiConfirmed')}</li>}
+                    {c.aiCheck?.why.map((r) => { const txt = reason(r); return txt ? <li key={r} className="text-amber-800">{txt}</li> : null; })}
                     {c.reasons.map((r) => { const txt = reason(r); return txt ? <li key={r} className={GOOD.has(r) ? 'text-emerald-700' : 'text-amber-800'}>{txt}</li> : null; })}
                 </ul>
                 <p className="text-ink-2"><span className="text-ink-3">{ti(c.webImage ? 'webPageTitle' : 'inDatabase')}</span> <bdi>{[c.brand, c.productName || ti('noName'), c.quantity].filter(Boolean).join(' · ')}</bdi></p>

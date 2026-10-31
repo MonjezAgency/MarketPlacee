@@ -42,6 +42,24 @@ export class AdminProductPhotosController {
         return this.discovery.staffRetry({ id: req.user.sub, role: String(req.user.role || '').toUpperCase() }, ids as string[]);
     }
 
+    /** Reviewed automatic photos stay: { ids: [...] } (one or many, at most 100). Every outcome is reported. */
+    @Post('auto/keep')
+    @Roles(Role.ADMIN, Role.OWNER)
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    keepAuto(@Request() req, @Body() body: { ids?: unknown }) {
+        const ids = Array.isArray(body?.ids) ? body.ids.filter((x) => typeof x === 'string') : [];
+        if (!ids.length) throw new BadRequestException('Choose at least one product.');
+        return this.discovery.staffKeepAuto({ id: req.user.sub, role: String(req.user.role || '').toUpperCase() }, ids as string[]);
+    }
+
+    /** Wrong automatic photo: off the product, and never offered again. */
+    @Post(':id/auto/remove')
+    @Roles(Role.ADMIN, Role.OWNER)
+    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    removeAuto(@Param('id') id: string) {
+        return this.discovery.staffRemoveAuto(id).then((state) => ({ state }));
+    }
+
     /** Use a found photo ({ url }), optionally with more exact-match photos for the gallery ({ also: [url] }). Ali FMCG Catalog only. */
     @Post(':id/accept')
     @Roles(Role.ADMIN, Role.OWNER)

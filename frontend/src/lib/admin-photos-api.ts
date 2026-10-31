@@ -8,7 +8,7 @@ import { ApiError, type DiscoveryCandidate, type ImageDiscovery } from '@/lib/su
  * image-quality.ts); nothing here decides which photo is right.
  */
 
-export const PHOTO_BUCKETS = ['review', 'no_clean_background', 'searching', 'not_searched', 'no_barcode', 'invalid_barcode', 'not_in_database', 'mismatch', 'no_photo', 'unavailable', 'dismissed'] as const;
+export const PHOTO_BUCKETS = ['auto', 'review', 'no_clean_background', 'searching', 'not_searched', 'no_barcode', 'invalid_barcode', 'not_in_database', 'mismatch', 'no_photo', 'unavailable', 'dismissed'] as const;
 export type PhotoBucket = (typeof PHOTO_BUCKETS)[number];
 export type PhotoScope = 'catalog' | 'submissions';
 
@@ -17,6 +17,8 @@ export type StaffDiscovery = ImageDiscovery & { found?: number; bestTier?: 1 | 2
 export interface PhotoRow {
     id: string; name: string; brand: string | null; ean: string | null; status: string; bucket: PhotoBucket;
     hasPhoto: boolean; photo: string | null; supplier: string | null; discovery: StaffDiscovery | null;
+    /** The automatic photo waiting for review. held = a live product: it's added when kept. */
+    automatic: { url: string; held: boolean } | null;
 }
 export interface PhotoList { scope: PhotoScope; total: number; page: number; limit: number; counts: Record<PhotoBucket, number>; canApply: boolean; items: PhotoRow[] }
 export type RetryOutcome = 'started' | 'searching' | 'answered_recently' | 'no_barcode' | 'has_photo' | 'not_found';
@@ -38,6 +40,8 @@ export const adminPhotosApi = {
     retry: (ids: string[]) => post('/admin-product-photos/retry', { ids }).then((r) => json<{ results: { id: string; outcome: RetryOutcome; status?: string | null }[]; started: number }>(r)),
     whiten: (id: string, url: string) => post(`/admin-product-photos/${id}/whiten`, { url }).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     accept: (id: string, url: string, also: string[] = [], clean = false, confirmed = false) => post(`/admin-product-photos/${id}/accept`, { url, also, clean, confirmed }).then((r) => json<{ id: string; images: string[]; imageDiscovery: ImageDiscovery | null }>(r)),
+    keepAuto: (ids: string[]) => post('/admin-product-photos/auto/keep', { ids }).then((r) => json<{ kept: number }>(r)),
+    removeAuto: (id: string) => post(`/admin-product-photos/${id}/auto/remove`, {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     dismiss: (id: string, url?: string) => post(`/admin-product-photos/${id}/dismiss`, url ? { url } : {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
 };
 export type { DiscoveryCandidate };

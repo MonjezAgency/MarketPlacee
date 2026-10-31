@@ -91,6 +91,13 @@ export class SupplierCatalogController {
         return this.discovery.whiten(req.user.sub, id, body.url).then((state) => ({ state }));
     }
 
+    /** Take an automatic photo off the product; it's never offered again. */
+    @Post('products/:id/image-discovery/remove-automatic')
+    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    removeAutomatic(@Request() req, @Param('id') id: string) {
+        return this.discovery.removeAutomatic(req.user.sub, id).then((state) => ({ state }));
+    }
+
     /** "Not my product": one photo ({url}) or all of them. */
     @Post('products/:id/image-discovery/dismiss')
     @Throttle({ default: { limit: 60, ttl: 60_000 } })

@@ -52,7 +52,7 @@ function viewProduct(p: any, viewer: Viewer, m: Markups, ownerScoped = false) {
     if (p.imageCredits && typeof p.imageCredits === 'object') {
         p.imageCredits = Object.fromEntries(Object.entries(p.imageCredits).map(([k, c]: [string, any]) => {
             if (!c || typeof c !== 'object') return [k, c];
-            const { approvedBy, approvedByRole, chosenBy, ...open } = c;
+            const { approvedBy, approvedByRole, chosenBy, auto, reviewedBy, reviewedByRole, reviewedAt, ...open } = c;
             return [k, open];
         }));
     }

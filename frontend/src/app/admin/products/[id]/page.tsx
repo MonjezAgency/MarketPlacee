@@ -95,10 +95,11 @@ function ReviewView({ params }: { params: { id: string } }) {
     const value = (v: unknown, fmtFn?: (x: any) => React.ReactNode) => (v === null || v === undefined || v === '' ? <span className="text-ink-4">{tp('notProvided')}</span> : fmtFn ? fmtFn(v) : String(v));
     const canPublish = status !== 'APPROVED' && status !== 'REJECTED';
     // Photo checks from stored facts only (count, generated placeholder, borrowed database photo); nothing is inferred from pixels.
-    const credits = (p.imageCredits || {}) as Record<string, { source?: string }>;
+    const credits = (p.imageCredits || {}) as Record<string, { source?: string; chosenBy?: string; reviewedAt?: string }>;
     const imageWarnings = [
         ...(p.images?.length === 0 ? [tp(p.placeholderOnly ? 'imgPlaceholder' : 'imgNone')] : []),
         ...(p.images?.length === 1 ? [tp('imgOnlyOne')] : []),
+        ...(p.images?.some((u: string) => credits[u]?.chosenBy === 'auto' && !credits[u]?.reviewedAt) ? [tp('imgAutomatic')] : []),
         ...(p.images?.some((u: string) => credits[u]) ? [tp('imgFromDatabase', { source: Object.values(credits).map((c) => c?.source).filter(Boolean)[0] || '—' })] : []),
     ];
     const supplier = p.supplier;

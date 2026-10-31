@@ -19,9 +19,12 @@ import { useDiscoveryReason } from '@/components/supplier/ImageDiscoveryPanel';
  * the reason. Ali FMCG Catalog products can be searched again and — by an
  * owner or admin — given the photos found. Supplier products are listed for
  * their status only: the supplier chooses their own photos (server-enforced).
+ * The exception is the "Automatic photos" group, on both tabs: photos the AI
+ * check put on a product, shown large so a person can go down the list and keep
+ * or remove them.
  */
 const TONE: Record<PhotoBucket, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
-    review: 'success', no_clean_background: 'info', searching: 'info', not_searched: 'neutral', no_barcode: 'warning', invalid_barcode: 'danger',
+    auto: 'info', review: 'success', no_clean_background: 'info', searching: 'info', not_searched: 'neutral', no_barcode: 'warning', invalid_barcode: 'danger',
     not_in_database: 'warning', mismatch: 'danger', no_photo: 'warning', unavailable: 'danger', dismissed: 'neutral',
 };
 
@@ -66,7 +69,7 @@ export default function ProductPhotosWorkspace() {
 
     const rows = data?.items || [];
     const pages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
-    const retryable = (r: PhotoRow) => !!r.ean && r.bucket !== 'invalid_barcode' && r.bucket !== 'no_barcode' && r.bucket !== 'searching' && (scope === 'catalog' || !r.hasPhoto);
+    const retryable = (r: PhotoRow) => !!r.ean && r.bucket !== 'auto' && r.bucket !== 'invalid_barcode' && r.bucket !== 'no_barcode' && r.bucket !== 'searching' && (scope === 'catalog' || !r.hasPhoto);
     const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
     const retry = async (ids: string[]) => {
@@ -81,7 +84,25 @@ export default function ProductPhotosWorkspace() {
         finally { setBusy(null); }
     };
 
+    const keepAuto = async (ids: string[]) => {
+        setBusy(ids.length === 1 ? `k${ids[0]}` : 'bulk');
+        try {
+            const r = await adminPhotosApi.keepAuto(ids);
+            toast.success(tp('toastAutoKept', { count: fmt.number(r.kept) }));
+            await load(true);
+        } catch (e: any) { toast.error(e?.message || String(e)); }
+        finally { setBusy(null); }
+    };
+    const removeAuto = async (id: string) => {
+        setBusy(`x${id}`);
+        try { await adminPhotosApi.removeAuto(id); toast.success(tp('toastAutoRemoved')); await load(true); }
+        catch (e: any) { toast.error(e?.message || String(e)); }
+        finally { setBusy(null); }
+    };
+    const autoRows = rows.filter((r) => r.automatic);
+
     const bucketText = (r: PhotoRow) => {
+        if (r.automatic) return tp(r.automatic.held ? 'autoLive' : 'bucketHelp_auto');
         const d = r.discovery;
         if (r.bucket === 'review' && scope === 'submissions') return tp('waitingSupplier', { count: fmt.number(d?.found || 0) });
         const codes = d?.reasons?.length ? d.reasons : d?.reason ? [d.reason] : [];
@@ -142,7 +163,7 @@ export default function ProductPhotosWorkspace() {
                                             <li key={r.id} className={cn('flex flex-wrap items-center gap-3 px-3 sm:px-4 py-2.5', selected.has(r.id) && 'bg-teal-soft/50')}>
                                                 <input type="checkbox" aria-label={tp('selectName', { name: r.name })} disabled={!retryable(r)} checked={selected.has(r.id)} onChange={() => toggle(r.id)} className="w-4 h-4 accent-[#0E7C74] disabled:opacity-40" />
                                                 <Link href={`/admin/products/${r.id}`} className="flex items-center gap-3 min-w-0 flex-1 group">
-                                                    <Thumb src={r.photo || found[0]?.previewUrl || null} size={44} />
+                                                    <Thumb src={r.automatic?.url || r.photo || found[0]?.previewUrl || null} size={r.automatic ? 96 : 44} />
                                                     <span className="min-w-0">
                                                         <span className="block truncate font-medium text-ink group-hover:underline">{r.name}</span>
                                                         <span className="block truncate text-[12px] text-ink-3">{r.brand || tp('noBrand')}{r.ean ? <> · <bdi dir="ltr" className="font-mono text-[11.5px]">{r.ean}</bdi></> : null}{r.supplier ? ` · ${r.supplier}` : ''}</span>
@@ -154,6 +175,10 @@ export default function ProductPhotosWorkspace() {
                                                     {d?.checkedAt && <p className="text-[11.5px] text-ink-4">{t('imageDiscovery', 'checkedOn', { date: fmt.date(d.checkedAt, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) })}</p>}
                                                 </div>
                                                 <div className="flex gap-1.5 ms-auto">
+                                                    {r.automatic && canApply && <>
+                                                        <Button size="sm" variant="primary" loading={busy === `k${r.id}`} disabled={!!busy} onClick={() => keepAuto([r.id])}>{tp('autoKeep')}</Button>
+                                                        <Button size="sm" variant="ghost" loading={busy === `x${r.id}`} disabled={!!busy} onClick={() => removeAuto(r.id)}>{tp('autoRemove')}</Button>
+                                                    </>}
                                                     {found.length > 0 && <Button size="sm" variant="primary" icon={<Images size={13} />} onClick={() => setOpen(r)}>{tp('reviewPhotos')}</Button>}
                                                     {retryable(r) && <Button size="sm" variant="secondary" icon={<ScanBarcode size={13} />} loading={busy === `r${r.id}`} disabled={!!busy} onClick={() => retry([r.id])}>{t('imageDiscovery', 'retry')}</Button>}
                                                 </div>
@@ -162,6 +187,11 @@ export default function ProductPhotosWorkspace() {
                                     })}
                                 </ul>
                             )}
+                {bucket === 'auto' && canApply && autoRows.length > 1 && (
+                    <div className="flex justify-end p-3 border-t border-line">
+                        <Button size="sm" variant="secondary" loading={busy === 'bulk'} disabled={!!busy} onClick={() => keepAuto(autoRows.map((r) => r.id))}>{tp('autoKeepPage')}</Button>
+                    </div>
+                )}
                 {data && pages > 1 && (
                     <div className="flex items-center justify-between gap-2 p-3 border-t border-line text-[12.5px] text-ink-3">
                         <span className="tabular-nums">{tp('pageOf', { page: fmt.number(page), pages: fmt.number(pages) })}</span>

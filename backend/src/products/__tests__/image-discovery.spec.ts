@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { ImageDiscoveryService, RETRY_COOLDOWN_MS } from '../image-discovery.service';
+import { ImageDiscoveryService, RETRY_COOLDOWN_MS, autoWaiting, bucketOf } from '../image-discovery.service';
 import { ImportEnrichmentService, pickPhotos } from '../import-enrichment.service';
 import { HostQueue, buildProviders, lookupPlan, openFactsElsewhere, photoSize, type ProductDataProvider, type ProviderPhoto, type ProviderRecord, type ProviderResult } from '../product-data-providers';
 
@@ -56,10 +56,11 @@ function setup(rows: any[], providers: ProductDataProvider[]) {
         store: jest.fn(async () => ({ url: 'https://cdn.example.com/white.png' })),
     };
     const photoroom: any = { testMode: false, whiteBackground: jest.fn(async () => Buffer.from('png')) };
-    const webImages: any = { find: jest.fn(async () => ({ status: 'off', candidates: [] })) };
-    const svc = new ImageDiscoveryService(db.prisma, products, enrichment, imageLookup, photoroom, webImages);
+    const webImages: any = { enabled: true, remaining: jest.fn(async () => 200), find: jest.fn(async () => ({ status: 'off', candidates: [] })) };
+    const photoCheck: any = { enabled: false, check: jest.fn(async () => ({ status: 'unavailable' })) };
+    const svc = new ImageDiscoveryService(db.prisma, products, enrichment, imageLookup, photoroom, webImages, photoCheck);
     const settle = async () => { while (svc.running.size) await Promise.all([...svc.running.values()]); };
-    return { svc, db, products, imageLookup, enrichment, settle, photoroom, webImages };
+    return { svc, db, products, imageLookup, enrichment, settle, photoroom, webImages, photoCheck };
 }
 
 const takis = '5941143028849';
@@ -674,5 +675,132 @@ describe('rate-limited queue', () => {
         const res = await Promise.all([0, 1, 2].map(() => q.fetch('https://world.openfoodfacts.org/api/v3/product/1.json', { timeoutMs: 60 })));
         expect(res.map((r) => r.status)).toEqual([200, 200, 200]);
         expect(seen).toEqual([false, false, false]);   // the third waited ~200 ms but was not aborted
+    });
+});
+
+describe('automatic decision', () => {
+    const code = '5061013941402';
+    const row = { id: 'p1', supplierId: 's1', ean: code, name: 'Monster Energy Zero Green 500ml', brand: 'Monster', status: 'DRAFT' };
+    const white = { analysed: true as const, width: 800, height: 800, background: 'white' as const, whiteBorder: 1, lightBorder: 1, borderSpread: 0, cleanCorners: 4, touches: [], fit: 'margin' as const, coverage: 0.3 };
+    const web = { url: 'https://cdn.example.com/w.png', previewUrl: 'https://cdn.example.com/w.png', webImage: 'https://shop.example/w.png', source: 'Shop', sourceUrl: 'https://shop.example/p', license: '', licenseUrl: '', attribution: 'Shop', kind: 'other', language: null, width: 800, height: 800, productName: 'Monster Zero Green', brand: null, quantity: null, confidence: 'needs_confirmation', reasons: ['web_search'], visual: white };
+    const yes = { status: 'checked', check: { ok: true, confidence: 0.97, why: [], read: 'Monster', model: 'm', at: 'now' } };
+    const no = { status: 'checked', check: { ok: false, confidence: 0.4, why: ['ai_variant'], read: 'Monster Ultra', model: 'm', at: 'now' } };
+    const barcode = () => provider('off', 'food', { [code]: { status: 'found', record: rec(code, 'Monster Energy Zero Green 500ml', 'Monster', '500 ml') } }).p;
+    const empty = () => provider('off', 'food', {}).p;
+    const auto = (rows: any[], p: ProductDataProvider, apply = true) => {
+        const s = setup(rows, [p]);
+        s.svc.inspectImage = async () => white;
+        s.svc.autoApply = apply;
+        s.photoCheck.enabled = true;
+        return s;
+    };
+    const go = async (s: ReturnType<typeof setup>, id = 'p1') => { s.svc.trigger(id); await new Promise((r) => setTimeout(r, 0)); await s.settle(); return s.db.byId.get(id)!; };
+
+    it('a confirmed barcode photo goes on by itself, marked automatic, and the status stays; the web stays out of it', async () => {
+        const s = auto([row], barcode());
+        s.photoCheck.check.mockResolvedValue(yes);
+        const p = await go(s);
+        expect(p.images).toHaveLength(1);
+        expect(p.status).toBe('DRAFT');
+        expect(s.webImages.find).not.toHaveBeenCalled();
+        const credit = Object.values((s.products.setImageCredits as jest.Mock).mock.calls[0][1])[0];
+        expect(credit).toMatchObject({ chosenBy: 'auto', auto: { ok: true } });
+        expect(credit).not.toHaveProperty('approvedBy');
+    });
+
+    it('a photo the check doubts is never applied; it tries on to the web, which is confirmed', async () => {
+        const s = auto([row], barcode());
+        s.webImages.find.mockResolvedValue({ status: 'found', candidates: [web] });
+        s.photoCheck.check.mockResolvedValueOnce(no).mockResolvedValue(yes);
+        const p = await go(s);
+        expect(p.images).toEqual([web.url]);
+        expect(s.imageLookup.accept).not.toHaveBeenCalled();
+    });
+
+    it('all doubtful: nothing applied, the photos and the answers stay for a person', async () => {
+        const s = auto([row], barcode());
+        s.webImages.find.mockResolvedValue({ status: 'found', candidates: [web] });
+        s.photoCheck.check.mockResolvedValue(no);
+        const p = await go(s);
+        expect(p.images).toEqual([]);
+        expect(p.imageDiscovery).toMatchObject({ status: 'found_review', auto: { outcome: 'no_match' } });
+        expect(p.imageDiscovery.candidates.some((c: any) => c.aiCheck?.why.includes('ai_variant'))).toBe(true);
+        expect(s.products.supplierUpdate).not.toHaveBeenCalled();
+    });
+
+    it('a broken check spends no web search and is tried again', async () => {
+        const s = auto([row], barcode());
+        s.photoCheck.check.mockResolvedValue({ status: 'unavailable' });
+        const p = await go(s);
+        expect(s.webImages.find).not.toHaveBeenCalled();
+        expect(p.images).toEqual([]);
+        expect(p.imageDiscovery.auto.outcome).toBe('check_down');
+        s.db.prisma.product.findMany.mockResolvedValue([{ id: 'p1', imageDiscovery: p.imageDiscovery }]);
+        s.photoCheck.check.mockResolvedValue(yes);
+        expect(await s.svc.sweep()).toBe(1);
+        await s.settle();
+        expect(s.db.byId.get('p1')!.images).toHaveLength(1);
+    });
+
+    it('a month used up waits, and the sweep only comes back when searches are left', async () => {
+        const s = auto([row], empty());
+        s.webImages.find.mockResolvedValue({ status: 'limit_reached', candidates: [] });
+        const p = await go(s);
+        expect(p.imageDiscovery.auto.outcome).toBe('waiting_month');
+        s.db.prisma.product.findMany.mockResolvedValue([{ id: 'p1', imageDiscovery: p.imageDiscovery }]);
+        s.webImages.remaining.mockResolvedValue(0);
+        expect(await s.svc.sweep()).toBe(0);
+        s.webImages.remaining.mockResolvedValue(10);
+        expect(await s.svc.sweep()).toBe(1);
+    });
+
+    it('a live product waits for staff: buyers see nothing until they accept', async () => {
+        const s = auto([{ ...row, status: 'APPROVED' }], barcode());
+        s.photoCheck.check.mockResolvedValue(yes);
+        const p = await go(s);
+        expect(p.images).toEqual([]);
+        expect(p.imageDiscovery.auto.outcome).toBe('held');
+        expect(bucketOf(p)).toBe('auto');
+        expect((await s.svc.staffKeepAuto({ id: 'a', role: 'ADMIN' }, ['p1'])).kept).toBe(1);
+        expect(s.db.byId.get('p1')!.images).toHaveLength(1);
+        expect((s.products.setImageCredits as jest.Mock).mock.calls[0][1]).toEqual(expect.anything());
+        expect(Object.values((s.products.setImageCredits as jest.Mock).mock.calls[0][1])[0]).toMatchObject({ chosenBy: 'staff', approvedBy: 'a', reviewedBy: 'a' });
+    });
+
+    it('turned off, the check answers but nothing changes', async () => {
+        const s = auto([row], barcode(), false);
+        s.photoCheck.check.mockResolvedValue(yes);
+        const p = await go(s);
+        expect(p.images).toEqual([]);
+        expect(p.imageDiscovery.auto.outcome).toBe('dry_run');
+    });
+
+    it('removing an automatic photo takes it off for good', async () => {
+        const s = auto([row], barcode());
+        s.photoCheck.check.mockResolvedValue(yes);
+        const p = await go(s);
+        const url = p.images[0];
+        s.db.save('p1', { imageCredits: { [url]: { chosenBy: 'auto', originalUrl: 'orig' } } });
+        const st = await s.svc.removeAutomatic('s1', 'p1');
+        expect(s.db.byId.get('p1')!.images).toEqual([]);
+        expect(st).toMatchObject({ status: 'not_found', reason: 'dismissed', auto: { outcome: 'no_match' } });
+        expect(st!.dismissed).toEqual(expect.arrayContaining(['orig', url]));
+        await expect(s.svc.removeAutomatic('s1', 'p1')).rejects.toThrow(/no automatic photo/);
+    });
+
+    it('a product with a photo is left alone', async () => {
+        const s = auto([{ ...row, images: ['https://cdn.example.com/mine.jpg'] }], barcode());
+        await go(s);
+        expect(s.photoCheck.check).not.toHaveBeenCalled();
+        expect(s.products.supplierUpdate).not.toHaveBeenCalled();
+    });
+
+    it('reviewed or accepted for sale, it leaves the staff list', () => {
+        const u = 'https://cdn.example.com/a.jpg';
+        const base = { ean: code, images: [u], imageDiscovery: null, status: 'PENDING' };
+        const auto1 = { chosenBy: 'auto', auto: { ok: true } };
+        expect(bucketOf({ ...base, imageCredits: { [u]: auto1 } })).toBe('auto');
+        expect(autoWaiting({ ...base, imageCredits: { [u]: { ...auto1, reviewedAt: 'now' } } })).toBeNull();
+        expect(autoWaiting({ ...base, status: 'APPROVED', imageCredits: { [u]: auto1 } })).toBeNull();
     });
 });
