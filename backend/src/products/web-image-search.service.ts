@@ -4,7 +4,7 @@ import * as https from 'https';
 import { BlockList, isIP } from 'net';
 import { PrismaService } from '../common/prisma.service';
 import { MAX_ANALYSE_BYTES, MIN_PRIMARY_LONG_SIDE, analyseBuffer, decodeImage, isWideBanner, type Visual, type VisualReport } from './image-quality';
-import { ImageLookupService, similarScore, webTitleMatches } from './image-lookup.service';
+import { ImageLookupService, similarScore, webTitleMatches, withoutNotes } from './image-lookup.service';
 import type { RankedCandidate } from './import-enrichment.service';
 import { USER_AGENT } from './product-data-providers';
 
@@ -170,6 +170,7 @@ export class WebImageSearchService {
 
 /** Brand, name and size. The barcode isn't used: Google answers it with unrelated products. */
 export function searchQuery(it: { name: string; brand?: string; weight?: string }) {
-    const has = (s: string) => it.name.toLowerCase().includes(s.toLowerCase());
-    return [it.brand && !has(it.brand) ? it.brand : '', it.name, it.weight && !has(it.weight) ? it.weight : ''].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const name = withoutNotes(it.name);
+    const has = (s: string) => name.toLowerCase().includes(s.toLowerCase());
+    return [it.brand && !has(it.brand) ? it.brand : '', name, it.weight && !has(it.weight) ? it.weight : ''].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 }

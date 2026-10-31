@@ -209,8 +209,12 @@ export function similarScore(supplier: { name?: string; brand?: string; weight?:
 /** A title selling several units: "24 x 500ml", "4х500", "12 pack", "24 Uds", "confezione da 24", in any shop's language. */
 const MULTIPACK = /\d\s*[x×х*]\s*\d|\b\d+\s*[x×х]\b|\b\d+\s*(?:uds?|units?|packs?|pk|pcs|pieces|pezzi|st(?:ü|ue)ck|stk|cans|bottles|count|ct)\b|\bpack of\b|\bcase of\b|multipack|confezione|\btray\b|\bbox of\b|\/\s*carton/i;
 
+/** A supplier's note in brackets, like "(black-green)", is not part of a product's name. A size in brackets is kept. */
+export const withoutNotes = (name: string) => name.replace(/\([^)\d]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+
 /** All a web photo has is its page's title, so the title must say this product: all of the name's words but one (shops often drop a word: "Zero Green" is sold as "Zero Sugar"), nothing contradicting it, not a multipack. */
-export function webTitleMatches(supplier: { name?: string; brand?: string; weight?: string }, title: string): boolean {
+export function webTitleMatches(item: { name?: string; brand?: string; weight?: string }, title: string): boolean {
+    const supplier = { ...item, name: withoutNotes(item.name || '') };
     const source = { name: title, brands: null, quantity: null };
     if (!similarScore(supplier, source) || comparePack(supplier, source).match === false) return false;
     if (MULTIPACK.test(title) && !MULTIPACK.test(`${supplier.name || ''} ${supplier.weight || ''}`)) return false;
