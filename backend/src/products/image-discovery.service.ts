@@ -170,7 +170,7 @@ export class ImageDiscoveryService implements OnModuleInit {
      */
     @Cron('0 3 * * *')
     async sweep(limit = SWEEP_LIMIT) {
-        if (!this.photoCheck.enabled) return 0;
+        if (!(await this.photoCheck.ready())) return 0;
         const webLeft = this.webImages.enabled ? await this.webImages.remaining() : 0;
         const rows = await this.prisma.product.findMany({
             where: { status: { not: 'REJECTED' }, ean: { not: null }, images: { isEmpty: true } } as any,
@@ -260,7 +260,9 @@ export class ImageDiscoveryService implements OnModuleInit {
         let usable = fresh0.filter((c) => !c.reasons.some((r) => CONTRADICTIONS.has(r)));
         let webNote: string | null = null;
         const item = { ean: code, name: p0.name, brand: p0.brand || undefined, weight: p0.weight || undefined };
-        const auto = mode === 'fill' && this.photoCheck.enabled && p0.status !== 'REJECTED';
+        const wanted = mode === 'fill' && this.photoCheck.enabled && p0.status !== 'REJECTED';
+        // Without a working check nothing is searched on its behalf: the web allowance isn't spent on photos nobody can decide on.
+        const auto = wanted && await this.photoCheck.ready();
         const checks = new Map<string, PhotoCheck>();
         const verdict: { confirmed: string | null; down: boolean } = { confirmed: null, down: false };
         const nothingForBarcode = out.status === 'not_found' && !out.candidates.length;
@@ -323,7 +325,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         if (!p || normaliseBarcode(p.ean) !== code) return;
         if (mode === 'fill' && realImages(p.images).length) { if (asState(p.imageDiscovery)) await this.write(p, null); return; }
         const live = p.status === 'APPROVED';
-        const outcome = !auto ? null : verdict.confirmed ? (!this.autoApply ? 'dry_run' : live ? 'held' : 'applied') : verdict.down ? 'check_down' : webNote === 'web_limit_reached' ? 'waiting_month' : 'no_match';
+        const outcome = !wanted ? null : !auto ? 'check_down' : verdict.confirmed ? (!this.autoApply ? 'dry_run' : live ? 'held' : 'applied') : verdict.down ? 'check_down' : webNote === 'web_limit_reached' ? 'waiting_month' : 'no_match';
         if (outcome) state.auto = { at: this.iso(), outcome };
         await this.write(p, state);
         if (outcome === 'applied') {

@@ -56,6 +56,25 @@ describe('PhotoCheckService', () => {
         delete process.env.OPENROUTER_API_KEY;
         expect(await svc.check(item, 'u')).toEqual({ status: 'unavailable' });
     });
+    it('remembers a refused key: nothing is searched until it works', async () => {
+        const svc = new PhotoCheckService(db());
+        svc.get = jest.fn(async () => { throw { response: { status: 401 } }; });
+        expect(await svc.ready()).toBe(false);
+        expect(await svc.ready()).toBe(false);
+        expect(svc.get).toHaveBeenCalledTimes(1);
+        let t = Date.now() + 11 * 60 * 1000;
+        svc.now = () => t;
+        svc.get = jest.fn(async () => ({}));
+        expect(await svc.ready()).toBe(true);
+    });
+    it('a refusal during a check counts too; an outage of the key address does not', async () => {
+        const svc = new PhotoCheckService(db());
+        svc.get = jest.fn(async () => { throw new Error('timeout'); });
+        expect(await svc.ready()).toBe(true);
+        svc.post = jest.fn(async () => { throw { response: { status: 402 } }; });
+        await svc.check(item, 'u');
+        expect(await svc.ready()).toBe(false);
+    });
     it('stops at the monthly limit without calling the model', async () => {
         const svc = new PhotoCheckService(db(PHOTO_CHECK_MONTHLY_LIMIT));
         svc.post = jest.fn();

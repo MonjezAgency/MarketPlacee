@@ -8,6 +8,9 @@ export const PHOTO_CHECK_MONTHLY_LIMIT = 5000;
 /** Below this the model is unsure, and an unsure answer is a "no". */
 export const PHOTO_CHECK_MIN_CONFIDENCE = 0.9;
 const DEFAULT_MODEL = 'google/gemini-3.5-flash-lite';
+const KEY_CHECK_MS = 10 * 60 * 1000;
+/** Bad key, no credit, or not allowed: no point trying again until someone fixes it. */
+const REFUSED = new Set([401, 402, 403]);
 
 export interface PhotoCheck {
     ok: boolean;
@@ -67,11 +70,25 @@ export class PhotoCheckService {
     private readonly logger = new Logger(PhotoCheckService.name);
     now = () => Date.now();
     post: (url: string, body: any, config: any) => Promise<{ data: any }> = (url, body, config) => axios.post(url, body, config);
+    get: (url: string, config: any) => Promise<unknown> = (url, config) => axios.get(url, config);
+    /** The last word on the key, so a dead one isn't discovered after paying for a web search. */
+    private key: { at: number; ok: boolean } | null = null;
 
     constructor(private readonly prisma: PrismaService) {}
 
     get enabled() { return !!process.env.OPENROUTER_API_KEY; }
     private get model() { return process.env.PHOTO_CHECK_MODEL || process.env.SUPPORT_AI_MODEL || DEFAULT_MODEL; }
+
+    /** Can the check answer right now? Asked before anything is spent on a search. Free, and remembered for a while. */
+    async ready(): Promise<boolean> {
+        if (!this.enabled) return false;
+        if (this.key && this.now() - this.key.at < KEY_CHECK_MS) return this.key.ok;
+        const status = await this.get('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` }, timeout: 10_000 }).then(() => 200, (e: any) => e?.response?.status);
+        const ok = !REFUSED.has(status);
+        if (!ok) this.logger.warn(`[photo-check] the AI service refused the key (${status})`);
+        this.key = { at: this.now(), ok };
+        return ok;
+    }
 
     async check(item: CheckItem, imageUrl: string): Promise<PhotoCheckResult> {
         if (!this.enabled) return { status: 'unavailable' };
@@ -94,6 +111,7 @@ export class PhotoCheckService {
             this.logger.log(`[photo-check] ${item.ean || ''} "${item.name}" ${verdict.ok ? 'YES' : `NO ${verdict.why.join(',')}`} ${verdict.confidence} read="${verdict.read.slice(0, 120)}" cost=${cost ?? '?'} ${imageUrl}`);
             return { status: 'checked', check: { ...verdict, model, at: new Date(this.now()).toISOString() } };
         } catch (e: any) {
+            if (REFUSED.has(e?.response?.status)) this.key = { at: this.now(), ok: false };
             // The request headers hold the key, so only the status or message is logged, never the error object.
             this.logger.warn(`[photo-check] ${item.ean || ''}: check failed (${e?.response?.status ?? e?.message ?? 'error'})`);
             return { status: 'unavailable' };

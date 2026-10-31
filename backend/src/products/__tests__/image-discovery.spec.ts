@@ -57,7 +57,7 @@ function setup(rows: any[], providers: ProductDataProvider[]) {
     };
     const photoroom: any = { testMode: false, whiteBackground: jest.fn(async () => Buffer.from('png')) };
     const webImages: any = { enabled: true, remaining: jest.fn(async () => 200), find: jest.fn(async () => ({ status: 'off', candidates: [] })) };
-    const photoCheck: any = { enabled: false, check: jest.fn(async () => ({ status: 'unavailable' })) };
+    const photoCheck: any = { enabled: false, ready: jest.fn(async () => true), check: jest.fn(async () => ({ status: 'unavailable' })) };
     const svc = new ImageDiscoveryService(db.prisma, products, enrichment, imageLookup, photoroom, webImages, photoCheck);
     const settle = async () => { while (svc.running.size) await Promise.all([...svc.running.values()]); };
     return { svc, db, products, imageLookup, enrichment, settle, photoroom, webImages, photoCheck };
@@ -740,6 +740,17 @@ describe('automatic decision', () => {
         expect(await s.svc.sweep()).toBe(1);
         await s.settle();
         expect(s.db.byId.get('p1')!.images).toHaveLength(1);
+    });
+
+    it('with the AI service refusing the key, no search is spent, on a save or in the sweep', async () => {
+        const s = auto([row], barcode());
+        s.photoCheck.ready.mockResolvedValue(false);
+        const p = await go(s);
+        expect(s.webImages.find).not.toHaveBeenCalled();
+        expect(s.photoCheck.check).not.toHaveBeenCalled();
+        expect(p.imageDiscovery.auto.outcome).toBe('check_down');
+        s.db.prisma.product.findMany.mockResolvedValue([{ id: 'p1', imageDiscovery: p.imageDiscovery }]);
+        expect(await s.svc.sweep()).toBe(0);
     });
 
     it('a month used up waits, and the sweep only comes back when searches are left', async () => {
