@@ -164,7 +164,7 @@ export function scoreCandidate(c: { confidence: 'verified' | 'needs_confirmation
     const lines: ScoreLine[] = [];
     const add = (key: string, points: number) => lines.push({ key, points });
     const identity = c.confidence === 'verified';
-    if (!c.reasons.includes('barcode_differs')) add('barcode_exact', 40);
+    if (!c.reasons.includes('barcode_differs') && !c.reasons.includes('different_barcode')) add('barcode_exact', 40);
     if (c.reasons.includes('name_matches')) add('name_matches', 10);
     if (c.reasons.includes('brand_matches')) add('brand_matches', 10);
     if (c.reasons.includes('size_matches')) add('size_matches', 10);

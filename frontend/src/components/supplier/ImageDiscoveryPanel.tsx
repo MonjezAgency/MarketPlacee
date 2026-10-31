@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 /** Reason codes the server sends (backend import-enrichment / image-discovery); each has a `reason_<code>` text. */
 const REASONS = new Set(['not_in_database', 'no_photo', 'source_unavailable', 'invalid_barcode', 'internal_code', 'variable_measure', 'dismissed',
     'name_matches', 'brand_matches', 'size_matches', 'barcode_differs', 'name_differs', 'brand_differs', 'size_differs', 'nothing_to_compare',
-    'kind_unknown', 'second_source_needed', 'case_code', 'case_of_unit', 'low_resolution']);
+    'kind_unknown', 'second_source_needed', 'case_code', 'case_of_unit', 'low_resolution', 'different_barcode', 'no_exact_match']);
 /** Codes added with photo ranking (texts in the productPhotos section). */
 const RANKING_REASONS = new Set(['record_mismatch', 'variant_differs', 'no_clean_background', 'identity_unconfirmed', 'already_in_gallery']);
 
@@ -79,7 +79,7 @@ export default function ImageDiscoveryPanel({ productId, product, ean, hasImages
     const restore = () => run('restore', async () => { const r = await supplierApi.retryImageDiscovery(productId!, true); setState(r.state); });
     const whiten = (c: DiscoveryCandidate) => run(`w${c.url}`, async () => { const r = await supplierApi.whitenDiscoveredImage(productId!, c.url); setState(r.state); });
     const accept = (c: DiscoveryCandidate, also: string[] = [], clean = false) => run(also.length ? 'all' : clean ? `c${c.url}` : c.url, async () => {
-        const p = await supplierApi.acceptDiscoveredImage(productId!, c.url, also, clean);
+        const p = await supplierApi.acceptDiscoveredImage(productId!, c.url, also, clean, c.role === 'similar');
         onAccepted(p);
         setState(p.imageDiscovery ?? null);
         toast.success(ti('toastAccepted'));
@@ -143,21 +143,31 @@ export default function ImageDiscoveryPanel({ productId, product, ean, hasImages
     const primary = st.candidates.find((c) => c.role === 'primary');
     const gallery = st.candidates.filter((c) => c.role === 'gallery' && c.confidence === 'verified').map((c) => c.url);
     const why = (st.reasons || []).map(reason).filter(Boolean) as string[];
+    const similar = st.candidates.filter((c) => c.role === 'similar');
+    const exact = st.candidates.filter((c) => c.role !== 'similar');
+    const card = (c: DiscoveryCandidate) => <PhotoCandidateCard key={c.url} c={c} barcode={st.barcode} busy={busy} canApply onUse={(x, clean) => accept(x, [], clean)} onDismiss={dismiss} onWhiten={whiten} dismissLabel={ti('notMyProduct')} />;
     return frame(<>
-        <div>
+        {exact.length > 0 && <div>
             <p className="text-[13px] font-medium text-ink">{ti('foundTitle')}</p>
             <p className="text-[12.5px] text-ink-3">{adding ? tp('moreFoundBody') : ti('foundBody')}</p>
             {why.map((w) => <p key={w} className="text-[12.5px] text-amber-800">{w}</p>)}
-        </div>
+        </div>}
         {!adding && primary && primary.confidence === 'verified' && gallery.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 p-2.5">
                 <p className="text-[12.5px] text-ink-2 flex-1 min-w-[12rem]">{tp('galleryHint')}</p>
                 <Button size="sm" variant="primary" icon={<Images size={13} />} loading={busy === 'all'} disabled={!!busy} onClick={() => accept(primary, gallery)}>{tp('useWithGallery')}</Button>
             </div>
         )}
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {st.candidates.map((c) => <PhotoCandidateCard key={c.url} c={c} barcode={st.barcode} busy={busy} canApply onUse={(x, clean) => accept(x, [], clean)} onDismiss={dismiss} onWhiten={whiten} dismissLabel={ti('notMyProduct')} />)}
-        </ul>
+        {exact.length > 0 && <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{exact.map(card)}</ul>}
+        {similar.length > 0 && (
+            <section aria-label={ti('similarTitle')} className="space-y-2">
+                <div>
+                    <p className="text-[13px] font-medium text-ink">{ti('similarTitle')}</p>
+                    <p className="text-[12.5px] text-amber-800">{ti('similarBody')}</p>
+                </div>
+                <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{similar.map(card)}</ul>
+            </section>
+        )}
         <p className={cn('text-[12px] text-ink-3')}>{ti('licenseNote', { license: st.candidates[0].license })}{checked ? ` · ${checked}` : ''}</p>
         <div className="flex flex-wrap gap-2">{retryBtn}{uploadBtn}</div>
     </>);

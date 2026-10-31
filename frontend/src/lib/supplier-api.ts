@@ -12,13 +12,15 @@ export interface DiscoveryCandidate {
     /** The same photo on pure white. watermarked = made in test mode: a preview that can't be saved. */
     clean?: { url: string; watermarked: boolean; at: string };
     productName?: string | null; brand?: string | null; quantity?: string | null;
+    /** The barcode of the record, for a photo found by name (role `similar`). */
+    sourceBarcode?: string;
     /** 1 white background · 2 plain light background · 3 other photo of this exact product · null identity to check (backend image-quality.ts). */
     tier?: 1 | 2 | 3 | null;
     score?: number;
     /** Score lines (keys translated in the productPhotos section as score_<key>). */
     breakdown?: { key: string; points: number }[];
     visual?: { analysed: boolean; background?: 'white' | 'light_neutral' | 'busy'; touches?: string[]; reason?: string } | null;
-    role?: 'primary' | 'gallery' | 'review';
+    role?: 'primary' | 'gallery' | 'review' | 'similar';
 }
 export interface ImageDiscovery {
     status: 'searching' | 'found_review' | 'not_found' | 'unavailable' | 'invalid_barcode';
@@ -102,7 +104,7 @@ export const supplierApi = {
     retryImageDiscovery: (id: string, restore = false) => post(`/supplier-catalog/products/${id}/image-discovery/retry`, restore ? { restore: true } : {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     /** Use a found photo (and `also`: more confirmed photos for the gallery): the server copies them, adds them and records their licence. Returns the saved product. */
     whitenDiscoveredImage: (id: string, url: string) => post(`/supplier-catalog/products/${id}/image-discovery/whiten`, { url }).then((r) => json<{ state: ImageDiscovery | null }>(r)),
-    acceptDiscoveredImage: (id: string, url: string, also: string[] = [], clean = false) => post(`/supplier-catalog/products/${id}/image-discovery/accept`, { url, also, clean }).then((r) => json<SupplierProduct>(r)),
+    acceptDiscoveredImage: (id: string, url: string, also: string[] = [], clean = false, confirmed = false) => post(`/supplier-catalog/products/${id}/image-discovery/accept`, { url, also, clean, confirmed }).then((r) => json<SupplierProduct>(r)),
     dismissDiscoveredImage: (id: string, url?: string) => post(`/supplier-catalog/products/${id}/image-discovery/dismiss`, url ? { url } : {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     acceptImage: (url: string) => post('/supplier-catalog/image-lookup/accept', { url }).then((r) => json<{ url: string }>(r)),
     preferences: () => apiFetch('/supplier-catalog/preferences', { cache: 'no-store' }).then((r) => json<{ defaultCurrency: string | null; suggestedCurrency: string; effectiveCurrency: string; country: string | null; currencies: string[]; rates: Record<string, number> }>(r)),

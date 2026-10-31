@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { barcodeProblem, normaliseBarcode } from './catalog-rules';
-import { brandInName, caseOfUnit, compareBrands, compareNames, comparePack, variantConflict } from './image-lookup.service';
+import { brandInName, caseOfUnit, compareBrands, compareNames, comparePack, similarScore, variantConflict } from './image-lookup.service';
 import { HostQueue, buildProviders, kindOf, lookupPlan, sameGtin, type ProductDataProvider, type ProductKind, type ProviderPhoto, type ProviderRecord, type ProviderResult } from './product-data-providers';
 
 /**
@@ -27,7 +27,7 @@ export interface PhotoCandidate {
     kind?: ProviderPhoto['kind']; language?: string | null; width?: number; height?: number; imgid?: string;
 }
 /** A candidate photo with how far it can be trusted for this product. */
-export interface RankedCandidate extends PhotoCandidate { confidence: 'verified' | 'needs_confirmation'; reasons: string[] }
+export interface RankedCandidate extends PhotoCandidate { confidence: 'verified' | 'needs_confirmation'; reasons: string[]; sourceBarcode?: string }
 export interface LookupOutcome {
     status: 'found' | 'not_found' | 'unavailable' | 'invalid_barcode';
     /** Why nothing usable was found (codes the browser translates). Empty when candidates exist. */
@@ -52,6 +52,8 @@ interface Records { found: Found[]; unavailable: boolean; viaInner: boolean; cod
 export const MAX_ENRICH_ITEMS = 500;
 /** Photos offered per product: a few front packshots (languages differ) and one packaging photo. */
 export const MAX_CANDIDATES = 4;
+/** Records read after a search by name, each giving one photo. */
+export const MAX_SIMILAR = 3;
 /** Below this many pixels on the long side a photo is shown as low resolution and ranked after sharper ones. */
 export const MIN_LONG_SIDE = 500;
 const JOB_TTL = 60 * 60 * 1000;
@@ -173,6 +175,34 @@ export class ImportEnrichmentService {
         if (barcodeProblem(ean)) return { status: 'invalid_barcode', reasons: ['invalid_barcode'], candidates: [] };
         const kind = kindOf(it.category);
         return this.assess({ ...it, ean, key: ean }, kind, await this.records(ean, kind, opts));
+    }
+
+    /**
+     * The barcode is in no database: photos of records with the same name under another barcode (another market's code,
+     * usually). These are a similar product until a person says otherwise, so they are never "verified".
+     */
+    async similarByName(it: Omit<EnrichItem, 'key'>): Promise<RankedCandidate[]> {
+        const name = String(it.name || '').trim();
+        const p = this.providers.find((x) => x.search && x.covers(kindOf(it.category)));
+        if (!p || !name) return [];
+        const brand = String(it.brand || '').trim();
+        const query = (brand && !name.toLowerCase().includes(brand.toLowerCase()) ? `${brand} ${name}` : name).replace(/\d+([.,]\d+)?\s*(kg|g|gr|ml|cl|l)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+        const hits = await p.search!(query).catch(() => []);
+        const best = hits.map((h) => ({ h, score: similarScore(it, h) })).filter((x) => x.score > 0 && !sameGtin(x.h.code, it.ean))
+            .sort((a, b) => b.score - a.score).slice(0, MAX_SIMILAR);
+        const out: RankedCandidate[] = [];
+        for (const { h } of best) {
+            const r = await this.lookupCached(p, h.code, {});
+            if (r.status !== 'found' || !similarScore(it, { name: r.record.name, brands: r.record.brands, quantity: r.record.quantity })) continue;
+            const ph = pickPhotos(r.record.photos)[0];
+            if (!ph || out.some((c) => c.url === ph.url)) continue;
+            const single = comparePack(it, { name: r.record.name, quantity: r.record.quantity }).match === false;
+            out.push({
+                ...this.toCandidate(p, r.record, ph, normaliseBarcode(it.ean)), sourceBarcode: h.code, confidence: 'needs_confirmation',
+                reasons: ['different_barcode', ...(single ? ['case_of_unit'] : []), ...(lowResolution(ph) ? ['low_resolution'] : [])],
+            });
+        }
+        return out;
     }
 
     /** Ask the databases for a barcode: the ones for this kind of product, then wherever the shared index points. */

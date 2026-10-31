@@ -37,7 +37,7 @@ export const adminPhotosApi = {
     },
     retry: (ids: string[]) => post('/admin-product-photos/retry', { ids }).then((r) => json<{ results: { id: string; outcome: RetryOutcome; status?: string | null }[]; started: number }>(r)),
     whiten: (id: string, url: string) => post(`/admin-product-photos/${id}/whiten`, { url }).then((r) => json<{ state: ImageDiscovery | null }>(r)),
-    accept: (id: string, url: string, also: string[] = [], clean = false) => post(`/admin-product-photos/${id}/accept`, { url, also, clean }).then((r) => json<{ id: string; images: string[]; imageDiscovery: ImageDiscovery | null }>(r)),
+    accept: (id: string, url: string, also: string[] = [], clean = false, confirmed = false) => post(`/admin-product-photos/${id}/accept`, { url, also, clean, confirmed }).then((r) => json<{ id: string; images: string[]; imageDiscovery: ImageDiscovery | null }>(r)),
     dismiss: (id: string, url?: string) => post(`/admin-product-photos/${id}/dismiss`, url ? { url } : {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
 };
 export type { DiscoveryCandidate };

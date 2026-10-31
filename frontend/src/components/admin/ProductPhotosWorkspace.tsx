@@ -193,7 +193,7 @@ function ReviewDialog({ row, canApply, onClose, onChanged }: { row: PhotoRow; ca
     };
     const whiten = (c: DiscoveryCandidate) => run(`w${c.url}`, async () => { const r = await adminPhotosApi.whiten(row.id, c.url); if (r.state) setState(r.state); });
     const use = (c: DiscoveryCandidate, also: string[] = [], clean = false) => run(also.length ? 'all' : clean ? `c${c.url}` : c.url, async () => {
-        await adminPhotosApi.accept(row.id, c.url, also, clean);
+        await adminPhotosApi.accept(row.id, c.url, also, clean, c.role === 'similar');
         toast.success(t('imageDiscovery', 'toastAccepted'));
         onChanged();
     });

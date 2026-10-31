@@ -76,11 +76,11 @@ export class SupplierCatalogController {
     /** Use stored candidates as the product photos (copied to storage and credited; never replaces a photo). */
     @Post('products/:id/image-discovery/accept')
     @Throttle({ default: { limit: 30, ttl: 60_000 } })
-    acceptImageDiscovery(@Request() req, @Param('id') id: string, @Body() body: { url?: string; also?: unknown; clean?: unknown }) {
+    acceptImageDiscovery(@Request() req, @Param('id') id: string, @Body() body: { url?: string; also?: unknown; clean?: unknown; confirmed?: unknown }) {
         if (!body?.url || typeof body.url !== 'string') throw new BadRequestException('Choose a photo.');
         // `also`: more photos of the same product for the gallery, after the main one.
         const also = Array.isArray(body.also) ? body.also.filter((x): x is string => typeof x === 'string') : [];
-        return this.discovery.accept(req.user.sub, id, body.url, also, body.clean === true);
+        return this.discovery.accept(req.user.sub, id, body.url, also, body.clean === true, body.confirmed === true);
     }
 
     /** Make the white-background version of a found photo (one Photoroom call, kept on the photo). */

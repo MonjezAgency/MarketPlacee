@@ -371,6 +371,39 @@ describe('lookup engine: barcode forms, databases, photo choice', () => {
         expect((await look(can, 'Red Bull Energy Drink 24x500ml')).reasons).toContain('size_differs');
     });
 
+    it('a barcode no database has: a person\'s search offers same-name photos apart, and only a stated confirmation uses one', async () => {
+        const mine = '5061013941402', other = '5061013941563', ultra = '0070847015208', other2 = '5060947549487';
+        const off = provider('off', 'food', {
+            [other]: { status: 'found', record: rec(other, 'Monster Energy Zero Sugar', 'Monster', '500 ml', [photo(other)], ['en:energy-drinks']) },
+            [other2]: { status: 'found', record: rec(other2, 'Monster Energy Zero Sugar', 'Monster', '250 ml', [photo(other2)], ['en:energy-drinks']) },
+        });
+        (off.p as any).search = async () => [
+            { code: ultra, name: 'Monster energy zero ultra', brands: 'Monster Energy', quantity: '473 ml' },
+            { code: other2, name: 'Monster Energy Zero Sugar', brands: 'Monster', quantity: '250 ml' },
+            { code: other, name: 'Monster Energy Zero Sugar', brands: 'Monster', quantity: null },
+            { code: mine, name: 'Monster Energy Zero Sugar', brands: 'Monster', quantity: null },
+        ];
+        const row = { ...takisRow, ean: mine, name: 'Monster Energy Zero Green 500ml', brand: 'Monster', weight: null };
+        const { svc, db, settle } = setup([row], [off.p]);
+        const accept = jest.spyOn((svc as any).imageLookup, 'accept');
+        // A save alone never searches by name.
+        await svc.enqueue('p1');
+        await settle();
+        expect(db.byId.get('p1')!.imageDiscovery).toMatchObject({ status: 'not_found', reason: 'not_in_database' });
+        let t = Date.now() + RETRY_COOLDOWN_MS + 1;
+        svc.now = () => t;
+        await svc.retry('s1', 'p1');
+        await settle();
+        const st = db.byId.get('p1')!.imageDiscovery;
+        expect(st).toMatchObject({ status: 'found_review', reasons: ['no_exact_match'] });
+        expect(st.candidates).toHaveLength(1);
+        expect(st.candidates[0]).toMatchObject({ role: 'similar', confidence: 'needs_confirmation', tier: null, sourceBarcode: other, reasons: expect.arrayContaining(['different_barcode']) });
+        await expect(svc.accept('s1', 'p1', st.candidates[0].url)).rejects.toThrow(/different barcode/);
+        expect(accept).not.toHaveBeenCalled();
+        await svc.accept('s1', 'p1', st.candidates[0].url, [], false, true);
+        expect(accept).toHaveBeenCalledTimes(1);
+    });
+
     it('reads the v3 API: sizes from images metadata, full-size URLs, "elsewhere" 404s, outages', async () => {
         const bodies: Record<string, [number, any]> = {
             '9002490100070': [200, { status: 'success', product: { code: '9002490100070', product_name: 'Energy Drink', brands: 'Red Bull GmbH', quantity: '250ml', categories_tags: ['en:beverages'],

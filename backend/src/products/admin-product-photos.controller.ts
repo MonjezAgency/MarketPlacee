@@ -46,10 +46,10 @@ export class AdminProductPhotosController {
     @Post(':id/accept')
     @Roles(Role.ADMIN, Role.OWNER)
     @Throttle({ default: { limit: 30, ttl: 60_000 } })
-    accept(@Request() req, @Param('id') id: string, @Body() body: { url?: unknown; also?: unknown; clean?: unknown }) {
+    accept(@Request() req, @Param('id') id: string, @Body() body: { url?: unknown; also?: unknown; clean?: unknown; confirmed?: unknown }) {
         if (typeof body?.url !== 'string' || !body.url) throw new BadRequestException('Choose a photo.');
         const also = Array.isArray(body.also) ? body.also.filter((x): x is string => typeof x === 'string') : [];
-        return this.discovery.staffAccept({ id: req.user.sub, role: String(req.user.role || '').toUpperCase() }, id, body.url, also, body.clean === true);
+        return this.discovery.staffAccept({ id: req.user.sub, role: String(req.user.role || '').toUpperCase() }, id, body.url, also, body.clean === true, body.confirmed === true);
     }
 
     /** White-background version of a found photo (one Photoroom call). Ali FMCG Catalog only. */

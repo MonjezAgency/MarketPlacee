@@ -76,7 +76,7 @@ function specs(s: string | null | undefined): Map<string, Set<number>> {
 /** Words that name a kind of product rather than this product ("Energy Drink", "Ice Cream"): no evidence either way. */
 const GENERIC = new Set(['drink', 'drinks', 'energy', 'ice', 'cream', 'water', 'glas', 'glass']);
 /** Words that make a different variant of the same line (Coca-Cola vs Coca-Cola Zero). */
-const VARIANT = new Set(['zero', 'light', 'lite', 'diet', 'decaf', 'white', 'dark']);
+const VARIANT = new Set(['zero', 'ultra', 'light', 'lite', 'diet', 'decaf', 'white', 'dark']);
 
 /**
  * Do two product names agree? true / false (a different variant or size) / null (nothing to compare).
@@ -189,6 +189,21 @@ export function caseOfUnit(supplier: { name?: string; weight?: string }, source:
         return [...vals].some((v) => [...other].some((o) => o > 0 && v >= 2 * o && Math.abs(v / o - Math.round(v / o)) < 1e-6));
     }
     return false;
+}
+
+/**
+ * How close a record found by name (another barcode) is to the supplier's listing. 0 = not offered: another variant,
+ * size or brand, or too little in common. Higher = closer. Only ranks: a person always decides.
+ */
+export function similarScore(supplier: { name?: string; brand?: string; weight?: string }, source: { name: string | null; brands: string | null; quantity: string | null }): number {
+    if (variantConflict(supplier.name, source.name, [supplier.brand, source.brands])) return 0;
+    if (comparePack(supplier, source).match === false && !caseOfUnit(supplier, source)) return 0;
+    if (compareBrands(supplier.brand, source.brands) === false && !brandInName(supplier.brand, source.name)) return 0;
+    const words = (s: string) => new Set(tokens(s).filter((t) => !GENERIC.has(t)));
+    const a = words(`${supplier.brand || ''} ${supplier.name || ''}`), b = words(`${source.brands || ''} ${source.name || ''}`);
+    const shared = [...a].filter((t) => b.has(t)).length;
+    if (a.size < 2 || shared < 2) return 0;
+    return shared - [...b].filter((t) => !a.has(t)).length / 4;
 }
 
 /** Upgrade an OFF display image URL (…/front_en.12.400.jpg) to the full-size file. */

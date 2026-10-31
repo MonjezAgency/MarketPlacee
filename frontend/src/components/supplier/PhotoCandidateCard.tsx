@@ -48,6 +48,7 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
                     <Badge>{c.kind === 'front' ? ti('kindFront') : c.kind === 'packaging' ? ti('kindPackaging') : ti('kindPhoto')}{c.language ? <> · <bdi dir="ltr">{String(c.language).toUpperCase()}</bdi></> : null}</Badge>
                     {c.role === 'primary' && <Badge tone="success">{tp('rolePrimary')}</Badge>}
                     {c.role === 'gallery' && <Badge>{tp('roleGallery')}</Badge>}
+                    {c.role === 'similar' && <Badge tone="warning">{ti('similarTitle')}</Badge>}
                     {c.clean && <Badge tone="info">{ti('whitenBadge')}</Badge>}
                 </span>
             </a>
@@ -60,6 +61,7 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
                     {c.reasons.map((r) => { const txt = reason(r); return txt ? <li key={r} className={GOOD.has(r) ? 'text-emerald-700' : 'text-amber-800'}>{txt}</li> : null; })}
                 </ul>
                 <p className="text-ink-2"><span className="text-ink-3">{ti('inDatabase')}</span> <bdi>{[c.brand, c.productName || ti('noName'), c.quantity].filter(Boolean).join(' · ')}</bdi></p>
+                {c.sourceBarcode && <p className="text-ink-3">{ti('similarBarcode', { barcode: c.sourceBarcode })}</p>}
                 {c.width && c.height ? <p className="text-ink-3 tabular-nums">{ti('size', { width: fmt.number(c.width), height: fmt.number(c.height) })}</p> : null}
                 <p className="text-ink-3"><a href={c.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-teal hover:underline inline-flex items-center gap-0.5">{c.source} <ExternalLink size={11} /></a> · <a href={c.licenseUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{c.license}</a></p>
                 {lines.length > 0 && (
@@ -79,7 +81,7 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
                 {needsTick && canApply && (
                     <label className="flex items-start gap-2 pt-1 text-ink-2 cursor-pointer">
                         <input type="checkbox" className="mt-0.5 accent-[#0E7C74]" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />
-                        <span>{ti('confirmCheck')}</span>
+                        <span>{ti(c.role === 'similar' ? 'confirmSimilar' : 'confirmCheck')}</span>
                     </label>
                 )}
             </div>

@@ -53,6 +53,8 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
   offered), then pixels (tier 1 white background, 2 plain background, 3 other photo). Nothing is applied automatically and a found photo never
   replaces one; credits (CC BY-SA, origin, approver) live in `Product.imageCredits`. Staff list: `/admin/products/photos` (Atlantis Catalog photos
   applied by OWNER/ADMIN only; supplier products show status only).
+  When a person searches and no database has the barcode, the product name is searched too (`similarByName`): those photos are shown apart as
+  "Different barcode: similar product" (role `similar`) and the server refuses them without the person's `confirmed`. Never on a background search.
   "Make background white" (`photoroom.service.ts`, key `PHOTOROOM_API_KEY` on the server only) keeps its result on the found photo; a `sandbox_` key
   gives a watermarked preview that `apply` refuses to save, so a watermark can't reach a product page.
 - Product bulk actions: `POST /products/admin/bulk`, per-row rules in `backend/src/products/admin-bulk.ts`; every skip is reported.

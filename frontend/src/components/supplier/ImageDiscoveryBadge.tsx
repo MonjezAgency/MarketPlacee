@@ -59,7 +59,7 @@ export default function ImageDiscoveryBadge({ product, onAccepted }: { product: 
     };
     return (
         <span className="inline-flex flex-wrap items-center gap-1.5">
-            {line(<ScanBarcode size={12} aria-hidden />, ti('badgeReview'), 'text-teal')}
+            {line(<ScanBarcode size={12} aria-hidden />, ti(best.role === 'similar' ? 'badgeSimilar' : 'badgeReview'), 'text-teal')}
             <a href={best.url} target="_blank" rel="noopener noreferrer" className="w-7 h-7 rounded bg-white ring-1 ring-line flex items-center justify-center overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={best.previewUrl} alt={ti('altFound', { barcode: state.barcode })} className="max-w-full max-h-full object-contain" referrerPolicy="no-referrer" loading="lazy" />

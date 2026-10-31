@@ -26,6 +26,11 @@ import { ProductsService } from './products.service';
  * The outcome is stored on the product (`Product.imageDiscovery`) so it
  * survives reloads and restarts.
  *
+ * When a person searches and no database has the barcode, the product's name
+ * is searched too. Those photos carry another barcode: they are shown apart as
+ * a similar product (role `similar`), never ranked as a match, and only used
+ * after the person states they show exactly this product (`confirmed`).
+ *
  * Nothing is ever applied automatically: a found photo waits for a person's
  * "Use this photo" (the supplier, or for Ali FMCG Catalog products, staff).
  * A product that has a photo is never searched in the background, and a found
@@ -47,8 +52,10 @@ export interface DiscoveryCandidate {
     breakdown?: ScoreLine[];
     /** What the pixels showed, or why they couldn't be read. */
     visual?: Visual | null;
-    /** primary = suggested main photo · gallery = another photo of the same product · review = identity to be checked. */
-    role?: 'primary' | 'gallery' | 'review';
+    /** primary = suggested main photo · gallery = another photo of the same product · review = identity to be checked · similar = found by name under another barcode. */
+    role?: 'primary' | 'gallery' | 'review' | 'similar';
+    /** The barcode of the record a `similar` photo belongs to. */
+    sourceBarcode?: string;
     /** The same photo on pure white (Photoroom). watermarked = made with a sandbox key: a preview that can't be saved. */
     clean?: { url: string; watermarked: boolean; at: string };
 }
@@ -194,7 +201,12 @@ export class ImageDiscoveryService implements OnModuleInit {
         const fresh0 = out.candidates.filter((c) => !dismissed.has(c.url) && !inGallery.has(c.url));
         // Identity first: a record that says it's another flavour, size or brand is not this product.
         const rejected = fresh0.filter((c) => c.reasons.some((r) => CONTRADICTIONS.has(r)));
-        const usable = fresh0.filter((c) => !c.reasons.some((r) => CONTRADICTIONS.has(r)));
+        let usable = fresh0.filter((c) => !c.reasons.some((r) => CONTRADICTIONS.has(r)));
+        // Only a person's search, for a product with no photo, and only when the barcode gave nothing at all.
+        if (fresh && mode === 'fill' && out.status === 'not_found' && !out.candidates.length) {
+            const similar = await this.enrichment.similarByName({ ean: code, name: p0.name, brand: p0.brand || undefined, weight: p0.weight || undefined, category: p0.category }).catch(() => []);
+            usable = similar.filter((c) => !dismissed.has(c.url) && !inGallery.has(c.url));
+        }
         const scored = await Promise.all(usable.map(async (c) => {
             const visual = await this.visualFor(c.previewUrl);
             return { ...stored(c), ...scoreCandidate(c, visual) };
@@ -202,7 +214,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         const ranked = rankScored(scored);
         let primaryGiven = mode === 'add';
         const candidates: DiscoveryCandidate[] = ranked.map((c) => {
-            const role: DiscoveryCandidate['role'] = c.tier === null ? 'review' : !primaryGiven ? 'primary' : 'gallery';
+            const role: DiscoveryCandidate['role'] = c.reasons.includes('different_barcode') ? 'similar' : c.tier === null ? 'review' : !primaryGiven ? 'primary' : 'gallery';
             if (role === 'primary') primaryGiven = true;
             return { ...c, role };
         });
@@ -210,7 +222,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         const base = { barcode: code, mode, startedAt: cur?.startedAt, checkedAt: this.iso(), ...(dismissed.size ? { dismissed: [...dismissed] } : {}), attempts: cur?.attempts, ...(cur?.requestedBy ? { requestedBy: cur.requestedBy } : {}) };
         let state: DiscoveryState;
         if (candidates.length) {
-            const reasons = !exact.length ? ['identity_unconfirmed'] : exact.some((c) => c.tier === 1) ? [] : ['no_clean_background'];
+            const reasons = candidates.every((c) => c.role === 'similar') ? ['no_exact_match'] : !exact.length ? ['identity_unconfirmed'] : exact.some((c) => c.tier === 1) ? [] : ['no_clean_background'];
             state = { ...base, status: 'found_review', reasons, candidates };
         } else if (rejected.length) {
             const r = rejected[0];
@@ -271,9 +283,9 @@ export class ImageDiscoveryService implements OnModuleInit {
      * exact-match photos for the gallery), each copied into Ali FMCG storage
      * and credited (licence, attribution, source page, who approved it).
      */
-    async accept(supplierId: string, id: string, url: string, also: string[] = [], clean = false) {
+    async accept(supplierId: string, id: string, url: string, also: string[] = [], clean = false, confirmed = false) {
         const p = await this.own(supplierId, id);
-        return this.apply(p, url, also, { id: supplierId, role: 'SUPPLIER' }, supplierId, clean);
+        return this.apply(p, url, also, { id: supplierId, role: 'SUPPLIER' }, supplierId, clean, confirmed);
     }
 
     /** Make the white-background version of a found photo, for the supplier to look at before using it. */
@@ -361,11 +373,11 @@ export class ImageDiscoveryService implements OnModuleInit {
         return this.makeClean(p, url);
     }
 
-    async staffAccept(actor: DiscoveryActor, id: string, url: string, also: string[] = [], clean = false) {
+    async staffAccept(actor: DiscoveryActor, id: string, url: string, also: string[] = [], clean = false, confirmed = false) {
         const p = await this.load(id);
         if (!p) throw new NotFoundException('Product not found');
         if (!(await this.isCatalog(p))) throw new ForbiddenException({ code: 'SUPPLIER_OWNED', message: 'This product belongs to a supplier. Only the supplier can choose its photos.' });
-        return this.apply(p, url, also, actor, p.supplierId, clean);
+        return this.apply(p, url, also, actor, p.supplierId, clean, confirmed);
     }
 
     async staffDismiss(id: string, url?: string) {
@@ -402,13 +414,14 @@ export class ImageDiscoveryService implements OnModuleInit {
         }
     }
 
-    private async apply(p: Row, url: string, also: string[], actor: DiscoveryActor, ownerId: string, clean = false) {
+    private async apply(p: Row, url: string, also: string[], actor: DiscoveryActor, ownerId: string, clean = false, confirmed = false) {
         const st = asState(p.imageDiscovery);
         const mode = st?.mode || 'fill';
         if (mode === 'fill' && realImages(p.images).length) throw new ConflictException({ code: 'HAS_PHOTO', message: 'This product already has a photo, so a found photo can’t be added here.' });
         const find = (u: string) => (st?.status === 'found_review' ? st.candidates.find((c) => c.url === u || c.previewUrl === u) : undefined);
         const main = find(url);
         if (!st || !main) throw new BadRequestException({ code: 'NOT_A_CANDIDATE', message: 'Only a photo found for this product’s barcode can be used here.' });
+        if (main.role === 'similar' && !confirmed) throw new BadRequestException({ code: 'NOT_CONFIRMED', message: 'This photo has a different barcode. Confirm it shows exactly your product first.' });
         if (clean && !main.clean) throw new BadRequestException({ code: 'NOT_WHITENED', message: 'Make the white background first.' });
         // A sandbox result carries a watermark: it must never reach a product page.
         if (clean && main.clean?.watermarked) throw new ConflictException({ code: 'TEST_MODE', message: 'This white background was made in test mode and has a watermark, so it can’t be saved.' });
@@ -448,6 +461,7 @@ export class ImageDiscoveryService implements OnModuleInit {
             barcode: st.barcode, originalUrl: cand.url, origin: 'discovery', chosenBy: actor.role === 'SUPPLIER' ? 'supplier' : 'staff',
             approvedBy: actor.id, approvedByRole: actor.role, approvedAt: at, addedAt: at,
             ...(cand.tier !== undefined ? { tier: cand.tier } : {}), ...(cand.imgid ? { imgid: cand.imgid } : {}),
+            ...(cand.sourceBarcode ? { sourceBarcode: cand.sourceBarcode } : {}),
             ...(clean && cand === main ? { edited: 'Background changed to white (Photoroom)' } : {}),
         }]))).catch((e) => this.logger.warn(`[discovery] credit for ${p.id}: ${e?.message}`));
         const after = await this.load(p.id);
@@ -566,5 +580,5 @@ const stored = (c: RankedCandidate): DiscoveryCandidate => ({
     url: c.url, previewUrl: c.previewUrl, source: c.source, sourceUrl: c.sourceUrl, license: c.license, licenseUrl: c.licenseUrl, attribution: c.attribution,
     confidence: c.confidence, reasons: c.reasons, kind: c.kind, language: c.language ?? null,
     ...(c.width && c.height ? { width: c.width, height: c.height } : {}), ...(c.imgid ? { imgid: c.imgid } : {}),
-    productName: c.productName, brand: c.brand, quantity: c.quantity,
+    productName: c.productName, brand: c.brand, quantity: c.quantity, ...(c.sourceBarcode ? { sourceBarcode: c.sourceBarcode } : {}),
 });

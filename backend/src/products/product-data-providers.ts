@@ -53,7 +53,10 @@ export interface ProductDataProvider {
      */
     canVerify(kind: ProductKind): boolean;
     lookup(barcode: string): Promise<ProviderResult>;
+    /** Records found by product name, best first. Only for a person's explicit search: never the proof of identity. */
+    search?(query: string): Promise<SearchHit[]>;
 }
+export interface SearchHit { code: string; name: string | null; brands: string | null; quantity: string | null }
 
 const CATEGORY_KIND: Record<string, ProductKind> = {
     'Beverages': 'food', 'Soft Drinks': 'food', 'Energy Drinks': 'food', 'Coffee & Tea': 'food', 'Snacks & Biscuits': 'food', 'Chocolates & Sweets': 'food',
@@ -121,10 +124,11 @@ export class HostQueue {
 const CONTACT = process.env.PRODUCT_DATA_CONTACT || 'info@atlantisfmcg.com';
 export const USER_AGENT = `AtlantisFMCG/1.0 (${CONTACT})`;
 // `images` carries the pixel size of each selected photo, so the largest usable one can be preferred.
+const SEARCH_HITS = 20;
 const FIELDS = 'code,product_name,product_name_en,brands,quantity,categories_tags,selected_images,image_front_url,image_packaging_url,images';
 
 /** Open Food Facts family: same API (v3), same licence, separate databases. */
-function openFactsProvider(o: { id: string; label: string; site: string; productType: string; covers: ProductKind[]; verifies: ProductKind[] }, queue: HostQueue): ProductDataProvider {
+function openFactsProvider(o: { id: string; label: string; site: string; productType: string; covers: ProductKind[]; verifies: ProductKind[]; searchSite?: string }, queue: HostQueue): ProductDataProvider {
     const host = new URL(o.site).host.replace(/^world\./, '');
     return {
         id: o.id, label: o.label, productType: o.productType,
@@ -132,6 +136,16 @@ function openFactsProvider(o: { id: string; label: string; site: string; product
         imageHosts: [`images.${host}`, `static.${host}`],
         covers: (k) => o.covers.includes(k),
         canVerify: (k) => o.verifies.includes(k),
+        ...(o.searchSite ? { search: async (query: string) => {
+            const res = await queue.fetch(`${o.searchSite}/search?q=${encodeURIComponent(query)}&page_size=${SEARCH_HITS}&fields=code,product_name,brands,quantity,image_front_url`, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' }, timeoutMs: 20_000 });
+            if (!res.ok) return [];
+            const j: any = await res.json().catch(() => null);
+            const hits: any[] = Array.isArray(j?.hits) ? j.hits : [];
+            return hits.filter((h) => /^\d{8,14}$/.test(String(h?.code || '')) && h?.image_front_url).map((h): SearchHit => ({
+                code: String(h.code), name: h.product_name || null, brands: Array.isArray(h.brands) ? h.brands.filter(Boolean).join(', ') || null : h.brands || null,
+                quantity: typeof h.quantity === 'string' && h.quantity.trim() ? h.quantity.trim() : null,
+            }));
+        } } : {}),
         async lookup(barcode) {
             let res: Response;
             try {
@@ -179,7 +193,7 @@ function openFactsProvider(o: { id: string; label: string; site: string; product
 export function buildProviders(queue: HostQueue): ProductDataProvider[] {
     return [
         // Food and drink: the main use. Verifies food only.
-        openFactsProvider({ id: 'openfoodfacts', label: 'Open Food Facts', site: 'https://world.openfoodfacts.org', productType: 'food', covers: ['food', 'other'], verifies: ['food', 'other'] }, queue),
+        openFactsProvider({ id: 'openfoodfacts', label: 'Open Food Facts', site: 'https://world.openfoodfacts.org', searchSite: 'https://search.openfoodfacts.org', productType: 'food', covers: ['food', 'other'], verifies: ['food', 'other'] }, queue),
         // Cosmetics / cleaning / pet food: asked, but never the only proof — always "check this photo".
         openFactsProvider({ id: 'openbeautyfacts', label: 'Open Beauty Facts', site: 'https://world.openbeautyfacts.org', productType: 'beauty', covers: ['beauty'], verifies: [] }, queue),
         openFactsProvider({ id: 'openproductsfacts', label: 'Open Products Facts', site: 'https://world.openproductsfacts.org', productType: 'product', covers: ['household'], verifies: [] }, queue),
