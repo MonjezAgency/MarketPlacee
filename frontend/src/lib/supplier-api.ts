@@ -13,7 +13,7 @@ export interface DiscoveryCandidate {
     clean?: { url: string; watermarked: boolean; at: string };
     productName?: string | null; brand?: string | null; quantity?: string | null;
     /** The barcode of the record, for a photo found by name (role `similar`). */
-    sourceBarcode?: string;
+    sourceBarcode?: string; webImage?: string;
     /** 1 white background · 2 plain light background · 3 other photo of this exact product · null identity to check (backend image-quality.ts). */
     tier?: 1 | 2 | 3 | null;
     score?: number;

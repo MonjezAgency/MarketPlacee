@@ -48,7 +48,7 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
                     <Badge>{c.kind === 'front' ? ti('kindFront') : c.kind === 'packaging' ? ti('kindPackaging') : ti('kindPhoto')}{c.language ? <> · <bdi dir="ltr">{String(c.language).toUpperCase()}</bdi></> : null}</Badge>
                     {c.role === 'primary' && <Badge tone="success">{tp('rolePrimary')}</Badge>}
                     {c.role === 'gallery' && <Badge>{tp('roleGallery')}</Badge>}
-                    {c.role === 'similar' && <Badge tone="warning">{ti('similarTitle')}</Badge>}
+                    {c.role === 'similar' && <Badge tone="warning">{ti(c.webImage ? 'webTitle' : 'similarTitle')}</Badge>}
                     {c.clean && <Badge tone="info">{ti('whitenBadge')}</Badge>}
                 </span>
             </a>
@@ -60,10 +60,10 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
                 <ul className="space-y-0.5">
                     {c.reasons.map((r) => { const txt = reason(r); return txt ? <li key={r} className={GOOD.has(r) ? 'text-emerald-700' : 'text-amber-800'}>{txt}</li> : null; })}
                 </ul>
-                <p className="text-ink-2"><span className="text-ink-3">{ti('inDatabase')}</span> <bdi>{[c.brand, c.productName || ti('noName'), c.quantity].filter(Boolean).join(' · ')}</bdi></p>
+                <p className="text-ink-2"><span className="text-ink-3">{ti(c.webImage ? 'webPageTitle' : 'inDatabase')}</span> <bdi>{[c.brand, c.productName || ti('noName'), c.quantity].filter(Boolean).join(' · ')}</bdi></p>
                 {c.sourceBarcode && <p className="text-ink-3">{ti('similarBarcode', { barcode: c.sourceBarcode })}</p>}
                 {c.width && c.height ? <p className="text-ink-3 tabular-nums">{ti('size', { width: fmt.number(c.width), height: fmt.number(c.height) })}</p> : null}
-                <p className="text-ink-3"><a href={c.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-teal hover:underline inline-flex items-center gap-0.5">{c.source} <ExternalLink size={11} /></a> · <a href={c.licenseUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{c.license}</a></p>
+                <p className="text-ink-3"><a href={c.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-teal hover:underline inline-flex items-center gap-0.5">{c.source} <ExternalLink size={11} /></a>{c.license ? <> · <a href={c.licenseUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{c.license}</a></> : null}</p>
                 {lines.length > 0 && (
                     <details className="text-ink-3">
                         <summary className="cursor-pointer text-ink-2 hover:text-ink">{tp('whyTitle')}{c.score !== undefined ? <> · <span className="tabular-nums">{tp('scoreTotal', { score: fmt.number(c.score) })}</span></> : null}</summary>
@@ -81,7 +81,7 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
                 {needsTick && canApply && (
                     <label className="flex items-start gap-2 pt-1 text-ink-2 cursor-pointer">
                         <input type="checkbox" className="mt-0.5 accent-[#0E7C74]" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />
-                        <span>{ti(c.role === 'similar' ? 'confirmSimilar' : 'confirmCheck')}</span>
+                        <span>{ti(c.webImage ? 'confirmWeb' : c.role === 'similar' ? 'confirmSimilar' : 'confirmCheck')}</span>
                     </label>
                 )}
             </div>
@@ -89,7 +89,7 @@ export default function PhotoCandidateCard({ c, barcode, busy, canApply, onUse, 
                 <div className="flex flex-wrap gap-2 p-3 pt-0">
                     {c.clean && !c.clean.watermarked && <Button size="sm" variant="primary" icon={<Sparkles size={13} />} loading={busy === `c${c.url}`} disabled={!!busy || (needsTick && !ticked)} onClick={() => onUse(c, true)}>{ti('whitenUse')}</Button>}
                     <Button size="sm" variant={c.clean && !c.clean.watermarked ? 'secondary' : 'primary'} icon={<Check size={13} />} loading={busy === c.url} disabled={!!busy || (needsTick && !ticked)} onClick={() => onUse(c)}>{ti('useThisPhoto')}</Button>
-                    {!c.clean && c.tier !== 1 && <Button size="sm" variant="secondary" icon={<Sparkles size={13} />} loading={busy === `w${c.url}`} disabled={!!busy} onClick={() => onWhiten(c)}>{ti('whitenButton')}</Button>}
+                    {!c.clean && !c.webImage && c.tier !== 1 && <Button size="sm" variant="secondary" icon={<Sparkles size={13} />} loading={busy === `w${c.url}`} disabled={!!busy} onClick={() => onWhiten(c)}>{ti('whitenButton')}</Button>}
                     <Button size="sm" variant="secondary" icon={<X size={13} />} loading={busy === `x${c.url}`} disabled={!!busy} onClick={() => onDismiss(c)}>{dismissLabel}</Button>
                 </div>
             )}

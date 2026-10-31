@@ -17,6 +17,7 @@ import { SupplierImportService } from './supplier-import.service';
 import { ImageLookupService } from './image-lookup.service';
 import { ImportEnrichmentService } from './import-enrichment.service';
 import { ImageDiscoveryService } from './image-discovery.service';
+import { WebImageSearchService } from './web-image-search.service';
 import { PhotoroomService } from './photoroom.service';
 import { SupplierOverviewService } from './supplier-overview.service';
 import { PriceHistoryService } from './price-history.service';
@@ -35,7 +36,7 @@ import { EmailModule } from '../email/email.module';
 
 @Module({
     imports: [PricingModule, AiAgentModule, StorageModule, NotificationsModule, EmailModule],
-    providers: [PhotoroomService, ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService, SupplierImportService, ImageLookupService, ImportEnrichmentService, ImageDiscoveryService, SupplierOverviewService, PriceHistoryService, TargetPricesService, SupplierUpdatesService, OfferCompareService, ProductReviewService, AdminProductsService],
+    providers: [PhotoroomService, ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService, SupplierImportService, ImageLookupService, ImportEnrichmentService, ImageDiscoveryService, WebImageSearchService, SupplierOverviewService, PriceHistoryService, TargetPricesService, SupplierUpdatesService, OfferCompareService, ProductReviewService, AdminProductsService],
     controllers: [AdminCatalogController, AdminProductPhotosController, SupplierCatalogController, CatalogFieldsController, PriceHistoryController, TargetPricesController, ProductsController, PlacementController, ReviewsController, AdminReviewsController],
     exports: [ProductsService, PlacementService, PriceHistoryService, ProductReviewService],
 })

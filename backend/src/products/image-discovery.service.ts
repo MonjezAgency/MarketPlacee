@@ -9,6 +9,7 @@ import { ImportEnrichmentService, type RankedCandidate } from './import-enrichme
 import { USER_AGENT } from './product-data-providers';
 import { MAX_ANALYSE_BYTES, analyseBuffer, rankScored, scoreCandidate, type ScoreLine, type Tier, type Visual } from './image-quality';
 import { ProductsService } from './products.service';
+import { WebImageSearchService } from './web-image-search.service';
 
 /**
  * Background photo search for products saved without a photo.
@@ -30,6 +31,8 @@ import { ProductsService } from './products.service';
  * is searched too. Those photos carry another barcode: they are shown apart as
  * a similar product (role `similar`), never ranked as a match, and only used
  * after the person states they show exactly this product (`confirmed`).
+ * If that finds nothing either, one person's search may fall back to the web
+ * (web-image-search.service.ts): white-background photos with the same care.
  *
  * Nothing is ever applied automatically: a found photo waits for a person's
  * "Use this photo" (the supplier, or for Ali FMCG Catalog products, staff).
@@ -56,6 +59,8 @@ export interface DiscoveryCandidate {
     role?: 'primary' | 'gallery' | 'review' | 'similar';
     /** The barcode of the record a `similar` photo belongs to. */
     sourceBarcode?: string;
+    /** Where a web photo came from; `url` is our stored copy. */
+    webImage?: string;
     /** The same photo on pure white (Photoroom). watermarked = made with a sandbox key: a preview that can't be saved. */
     clean?: { url: string; watermarked: boolean; at: string };
 }
@@ -121,6 +126,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         private readonly enrichment: ImportEnrichmentService,
         private readonly imageLookup: ImageLookupService,
         private readonly photoroom: PhotoroomService,
+        private readonly webImages: WebImageSearchService,
     ) {}
 
     /** Searches cut short by a restart are picked up again (the cache is gone, the queue keeps the pace). */
@@ -143,9 +149,10 @@ export class ImageDiscoveryService implements OnModuleInit {
      * state now stored. `force` = a person asked to search again (skips cached
      * "not found" answers; never runs twice at once). `add` = a person asked
      * for more photos of a product that already has some. `restore` = a person
-     * takes back their "Not my product" answers for this barcode.
+     * takes back their "Not my product" answers for this barcode. `web` = this
+     * one search may use the paid web fallback.
      */
-    async enqueue(productId: string, opts: { force?: boolean; add?: boolean; restore?: boolean; by?: DiscoveryActor } = {}): Promise<DiscoveryState | null> {
+    async enqueue(productId: string, opts: { force?: boolean; add?: boolean; restore?: boolean; web?: boolean; by?: DiscoveryActor } = {}): Promise<DiscoveryState | null> {
         const p = await this.load(productId);
         if (!p) return null;
         const state = asState(p.imageDiscovery);
@@ -180,14 +187,14 @@ export class ImageDiscoveryService implements OnModuleInit {
         };
         await this.write(p, next);
         this.inflight.set(p.id, code);
-        const job = this.run(p.id, code, !!opts.force, mode)
+        const job = this.run(p.id, code, !!opts.force, mode, !!opts.web)
             .catch((e) => this.logger.warn(`[discovery] ${p.id}: ${e?.message}`))
             .finally(() => { if (this.inflight.get(p.id) === code) this.inflight.delete(p.id); this.running.delete(p.id); });
         this.running.set(p.id, job);
         return next;
     }
 
-    private async run(id: string, code: string, fresh: boolean, mode: 'fill' | 'add') {
+    private async run(id: string, code: string, fresh: boolean, mode: 'fill' | 'add', web = false) {
         const p0 = await this.load(id);
         if (!p0) return;
         const out = await this.enrichment.lookupOne({ ean: code, name: p0.name, brand: p0.brand || undefined, weight: p0.weight || undefined, category: p0.category }, { fresh });
@@ -202,10 +209,19 @@ export class ImageDiscoveryService implements OnModuleInit {
         // Identity first: a record that says it's another flavour, size or brand is not this product.
         const rejected = fresh0.filter((c) => c.reasons.some((r) => CONTRADICTIONS.has(r)));
         let usable = fresh0.filter((c) => !c.reasons.some((r) => CONTRADICTIONS.has(r)));
+        let webNote: string | null = null;
         // Only a person's search, for a product with no photo, and only when the barcode gave nothing at all.
         if (fresh && mode === 'fill' && out.status === 'not_found' && !out.candidates.length) {
             const similar = await this.enrichment.similarByName({ ean: code, name: p0.name, brand: p0.brand || undefined, weight: p0.weight || undefined, category: p0.category }).catch(() => []);
             usable = similar.filter((c) => !dismissed.has(c.url) && !inGallery.has(c.url));
+            // Nothing left to try for free: the web, last.
+            if (web && !usable.length) {
+                const found = await this.webImages.find({ ean: code, name: p0.name, brand: p0.brand || undefined, weight: p0.weight || undefined }, new Set([...dismissed, ...inGallery]));
+                found.candidates.forEach((c) => this.visuals.set(c.previewUrl, Promise.resolve(c.visual)));
+                usable = found.candidates;
+                if (found.status === 'no_white') webNote = 'web_no_white';
+                if (found.status === 'limit_reached') webNote = 'web_limit_reached';
+            }
         }
         const scored = await Promise.all(usable.map(async (c) => {
             const visual = await this.visualFor(c.previewUrl);
@@ -214,7 +230,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         const ranked = rankScored(scored);
         let primaryGiven = mode === 'add';
         const candidates: DiscoveryCandidate[] = ranked.map((c) => {
-            const role: DiscoveryCandidate['role'] = c.reasons.includes('different_barcode') ? 'similar' : c.tier === null ? 'review' : !primaryGiven ? 'primary' : 'gallery';
+            const role: DiscoveryCandidate['role'] = c.reasons.includes('different_barcode') || c.reasons.includes('web_search') ? 'similar' : c.tier === null ? 'review' : !primaryGiven ? 'primary' : 'gallery';
             if (role === 'primary') primaryGiven = true;
             return { ...c, role };
         });
@@ -230,7 +246,7 @@ export class ImageDiscoveryService implements OnModuleInit {
             state = { ...base, status: 'not_found', reason: 'record_mismatch', reasons: ['record_mismatch', ...why], candidates: [], record: { productName: r.productName, brand: r.brand, quantity: r.quantity, sourceUrl: r.sourceUrl } };
         } else {
             const dropped = out.candidates.length > 0;   // everything found was dismissed or is already in the gallery
-            state = { ...base, status: out.status === 'unavailable' ? 'unavailable' : out.status === 'invalid_barcode' ? 'invalid_barcode' : 'not_found', reason: dropped ? (mode === 'add' && !dismissed.size ? 'already_in_gallery' : 'dismissed') : out.reasons[0] || 'not_in_database', reasons: dropped ? [mode === 'add' && !dismissed.size ? 'already_in_gallery' : 'dismissed'] : out.reasons, candidates: [] };
+            state = { ...base, status: out.status === 'unavailable' ? 'unavailable' : out.status === 'invalid_barcode' ? 'invalid_barcode' : 'not_found', reason: dropped ? (mode === 'add' && !dismissed.size ? 'already_in_gallery' : 'dismissed') : out.reasons[0] || 'not_in_database', reasons: dropped ? [mode === 'add' && !dismissed.size ? 'already_in_gallery' : 'dismissed'] : [...out.reasons, ...(webNote ? [webNote] : [])], candidates: [] };
         }
         p = await this.load(id);
         if (!p || normaliseBarcode(p.ean) !== code) return;
@@ -275,7 +291,7 @@ export class ImageDiscoveryService implements OnModuleInit {
     async retry(supplierId: string, id: string, restore = false): Promise<DiscoveryState | null> {
         const p = await this.own(supplierId, id);
         if (!normaliseBarcode(p.ean)) throw new BadRequestException({ code: 'NO_BARCODE', message: 'Add the product’s barcode and save it first.' });
-        return this.enqueue(id, { force: true, restore, add: realImages(p.images).length > 0, by: { id: supplierId, role: 'SUPPLIER' } });
+        return this.enqueue(id, { force: true, restore, add: realImages(p.images).length > 0, web: true, by: { id: supplierId, role: 'SUPPLIER' } });
     }
 
     /**
@@ -351,7 +367,8 @@ export class ImageDiscoveryService implements OnModuleInit {
             // Looking for more photos of a supplier's product is the supplier's call.
             if (hasPhoto && !staff.has(p.supplierId)) { out.push({ id, outcome: 'has_photo' }); continue; }
             const before = asState(p.imageDiscovery);
-            const s = await this.enqueue(id, { force: true, add: hasPhoto, by: actor });
+            // The web fallback costs a search: one product at a time, never a whole list.
+            const s = await this.enqueue(id, { force: true, add: hasPhoto, web: unique.length === 1, by: actor });
             const started = s?.status === 'searching' && s.startedAt !== before?.startedAt;
             out.push({ id, outcome: started ? 'started' : s?.status === 'searching' ? 'searching' : 'answered_recently', status: s?.status ?? null });
         }
@@ -394,6 +411,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         const st = asState(p.imageDiscovery);
         const cand = st?.status === 'found_review' ? st.candidates.find((c) => c.url === url || c.previewUrl === url) : undefined;
         if (!st || !cand) throw new BadRequestException({ code: 'NOT_A_CANDIDATE', message: 'Only a photo found for this product’s barcode can be used here.' });
+        if (cand.webImage) throw new BadRequestException({ code: 'ALREADY_WHITE', message: 'This photo is already on a white background.' });
         if (cand.clean) return st;
         const key = `${p.id}:${cand.url}`;
         if (this.cleaning.has(key)) throw new ConflictException({ code: 'ALREADY_RUNNING', message: 'This photo is already being processed.' });
@@ -438,6 +456,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         const saved: { cand: DiscoveryCandidate; url: string }[] = [];
         for (const cand of picked) {
             if (clean && cand === main) { saved.push({ cand, url: main.clean!.url }); continue; }
+            if (cand.webImage) { saved.push({ cand, url: cand.url }); continue; }   // copied here when it was found
             // The download's timeout starts when it leaves the queue, not while it waits its turn.
             const s = await this.imageLookup.accept(cand.url, ((u: any, i: any) => { const { signal, ...rest } = i || {}; void signal; return this.enrichment.imageQueue.fetch(String(u), { ...rest, timeoutMs: 15_000 }); }) as typeof fetch);
             saved.push({ cand, url: s.url });
@@ -450,7 +469,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         const images = [...existing, ...saved.map((s) => s.url).filter((u) => !existing.includes(u))];
         const who = actor.role === 'SUPPLIER' ? 'the supplier' : `Ali FMCG (${actor.role.toLowerCase()})`;
         const wasLive = latest.status === 'APPROVED';
-        let product: any = await this.products.supplierUpdate(p.id, ownerId, { images, changeReason: `${saved.length === 1 ? 'Photo' : `${saved.length} photos`} from ${main.source} (${main.license}), chosen by ${who}` });
+        let product: any = await this.products.supplierUpdate(p.id, ownerId, { images, changeReason: `${saved.length === 1 ? 'Photo' : `${saved.length} photos`} from ${main.source}${main.license ? ` (${main.license})` : ''}, chosen by ${who}` });
         // Staff adding a photo to a live Ali FMCG Catalog product is itself the review: keep it live.
         if (actor.role !== 'SUPPLIER' && wasLive && product?.status === 'PENDING') {
             product = await this.products.updateStatus(p.id, 'APPROVED' as any, '', { id: actor.id, role: actor.role }, { notify: false }).catch(() => product);
@@ -458,7 +477,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         const at = new Date(this.now()).toISOString();
         await this.products.setImageCredits(p.id, Object.fromEntries(saved.map(({ cand, url: u }) => [u, {
             source: cand.source, license: cand.license, licenseUrl: cand.licenseUrl, attribution: cand.attribution, sourceUrl: cand.sourceUrl,
-            barcode: st.barcode, originalUrl: cand.url, origin: 'discovery', chosenBy: actor.role === 'SUPPLIER' ? 'supplier' : 'staff',
+            barcode: st.barcode, originalUrl: cand.webImage || cand.url, origin: 'discovery', chosenBy: actor.role === 'SUPPLIER' ? 'supplier' : 'staff',
             approvedBy: actor.id, approvedByRole: actor.role, approvedAt: at, addedAt: at,
             ...(cand.tier !== undefined ? { tier: cand.tier } : {}), ...(cand.imgid ? { imgid: cand.imgid } : {}),
             ...(cand.sourceBarcode ? { sourceBarcode: cand.sourceBarcode } : {}),
@@ -482,7 +501,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         if (!st || st.status !== 'found_review') return st;
         const drop = url ? st.candidates.filter((c) => c.url === url || c.previewUrl === url) : st.candidates;
         if (url && !drop.length) throw new BadRequestException({ code: 'NOT_A_CANDIDATE', message: 'That photo isn’t one of the photos found for this product.' });
-        const dismissed = [...new Set([...(st.dismissed || []), ...drop.map((c) => c.url)])].slice(-50);
+        const dismissed = [...new Set([...(st.dismissed || []), ...drop.flatMap((c) => [c.url, ...(c.webImage ? [c.webImage] : [])])])].slice(-50);
         const left = st.candidates.filter((c) => !dismissed.includes(c.url));
         const next: DiscoveryState = left.length
             ? { ...st, candidates: left, dismissed }
@@ -580,5 +599,5 @@ const stored = (c: RankedCandidate): DiscoveryCandidate => ({
     url: c.url, previewUrl: c.previewUrl, source: c.source, sourceUrl: c.sourceUrl, license: c.license, licenseUrl: c.licenseUrl, attribution: c.attribution,
     confidence: c.confidence, reasons: c.reasons, kind: c.kind, language: c.language ?? null,
     ...(c.width && c.height ? { width: c.width, height: c.height } : {}), ...(c.imgid ? { imgid: c.imgid } : {}),
-    productName: c.productName, brand: c.brand, quantity: c.quantity, ...(c.sourceBarcode ? { sourceBarcode: c.sourceBarcode } : {}),
+    productName: c.productName, brand: c.brand, quantity: c.quantity, ...(c.sourceBarcode ? { sourceBarcode: c.sourceBarcode } : {}), ...(c.webImage ? { webImage: c.webImage } : {}),
 });

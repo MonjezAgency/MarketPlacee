@@ -57,6 +57,9 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
   "Different barcode: similar product" (role `similar`) and the server refuses them without the person's `confirmed`. Never on a background search.
   "Make background white" (`photoroom.service.ts`, key `PHOTOROOM_API_KEY` on the server only) keeps its result on the found photo; a `sandbox_` key
   gives a watermarked preview that `apply` refuses to save, so a watermark can't reach a product page.
+  Last resort, on one person's search only, after the barcode and name search found nothing: `web-image-search.service.ts` (SerpApi Google Images, key `SERPAPI_API_KEY`
+  on the server only, unset = off). It searches the name (the barcode returns unrelated products), keeps only a title that says this product and a whole pack on pure white, so no
+  Photoroom. At most 200 searches a month for the whole site (`AppConfig`, one answer per barcode kept 30 days). Shown apart as `similar`, used only after `confirmed`; no licence.
 - Product bulk actions: `POST /products/admin/bulk`, per-row rules in `backend/src/products/admin-bulk.ts`; every skip is reported.
 - Notifications: persisted per user; `data.kind` + `data.params` let the bell (`components/ui/NotificationBell.tsx`,
   `lib/notifications.ts`) render them in the reader's language (keys in `locales/sections/notificationsCenter.ts`);

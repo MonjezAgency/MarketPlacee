@@ -140,6 +140,24 @@ export function analysePixels(img: { width: number; height: number; data: Uint8A
     return { analysed: true, width: w, height: h, background, whiteBorder: r2(whiteBorder), lightBorder: r2(lightBorder), borderSpread: Math.round(spread * 10) / 10, cleanCorners, touches, fit, coverage: r2(coverage) };
 }
 
+/**
+ * An advert or web banner placed on white: a wide picture with straight edges, every side of it solid to the
+ * corners. A can, bottle or bag has a rounded or uneven outline, so it passes, as does a tall box.
+ */
+export function isWideBanner(img: { width: number; height: number; data: Uint8Array }): boolean {
+    const { width: w, height: h, data } = img;
+    const inked = (x: number, y: number) => { const i = (y * w + x) * 4; return data[i + 3] > 128 && Math.min(data[i], data[i + 1], data[i + 2]) < 225; };
+    const gs = Math.max(1, Math.floor(Math.min(w, h) / 300));
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y += gs) for (let x = 0; x < w; x += gs) if (inked(x, y)) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+    const bw = maxX - minX, bh = maxY - minY;
+    if (bw <= 0 || bh <= 0 || bw < bh * 1.15) return false;
+    const solid = (n: number, at: (i: number) => [number, number]) => { let ink = 0; for (let i = 0; i < n; i++) if (inked(...at(i))) ink++; return ink / n >= 0.95; };
+    const inset = gs + 2;
+    return solid(100, (i) => [minX + Math.floor(bw * i / 100), minY + inset]) && solid(100, (i) => [minX + Math.floor(bw * i / 100), maxY - inset])
+        && solid(100, (i) => [minX + inset, minY + Math.floor(bh * i / 100)]) && solid(100, (i) => [maxX - inset, minY + Math.floor(bh * i / 100)]);
+}
+
 export function analyseBuffer(buf: Buffer): Visual {
     if (buf.length > MAX_ANALYSE_BYTES) return { analysed: false, reason: 'too_large' };
     const img = decodeImage(buf);
@@ -164,7 +182,7 @@ export function scoreCandidate(c: { confidence: 'verified' | 'needs_confirmation
     const lines: ScoreLine[] = [];
     const add = (key: string, points: number) => lines.push({ key, points });
     const identity = c.confidence === 'verified';
-    if (!c.reasons.includes('barcode_differs') && !c.reasons.includes('different_barcode')) add('barcode_exact', 40);
+    if (!c.reasons.some((r) => r === 'barcode_differs' || r === 'different_barcode' || r === 'web_search')) add('barcode_exact', 40);
     if (c.reasons.includes('name_matches')) add('name_matches', 10);
     if (c.reasons.includes('brand_matches')) add('brand_matches', 10);
     if (c.reasons.includes('size_matches')) add('size_matches', 10);

@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 /** Reason codes the server sends (backend import-enrichment / image-discovery); each has a `reason_<code>` text. */
 const REASONS = new Set(['not_in_database', 'no_photo', 'source_unavailable', 'invalid_barcode', 'internal_code', 'variable_measure', 'dismissed',
     'name_matches', 'brand_matches', 'size_matches', 'barcode_differs', 'name_differs', 'brand_differs', 'size_differs', 'nothing_to_compare',
-    'kind_unknown', 'second_source_needed', 'case_code', 'case_of_unit', 'low_resolution', 'different_barcode', 'no_exact_match']);
+    'kind_unknown', 'second_source_needed', 'case_code', 'case_of_unit', 'low_resolution', 'different_barcode', 'no_exact_match', 'web_search', 'web_no_white', 'web_limit_reached']);
 /** Codes added with photo ranking (texts in the productPhotos section). */
 const RANKING_REASONS = new Set(['record_mismatch', 'variant_differs', 'no_clean_background', 'identity_unconfirmed', 'already_in_gallery']);
 
@@ -145,6 +145,7 @@ export default function ImageDiscoveryPanel({ productId, product, ean, hasImages
     const why = (st.reasons || []).map(reason).filter(Boolean) as string[];
     const similar = st.candidates.filter((c) => c.role === 'similar');
     const exact = st.candidates.filter((c) => c.role !== 'similar');
+    const fromWeb = similar.some((c) => c.webImage);
     const card = (c: DiscoveryCandidate) => <PhotoCandidateCard key={c.url} c={c} barcode={st.barcode} busy={busy} canApply onUse={(x, clean) => accept(x, [], clean)} onDismiss={dismiss} onWhiten={whiten} dismissLabel={ti('notMyProduct')} />;
     return frame(<>
         {exact.length > 0 && <div>
@@ -160,15 +161,15 @@ export default function ImageDiscoveryPanel({ productId, product, ean, hasImages
         )}
         {exact.length > 0 && <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{exact.map(card)}</ul>}
         {similar.length > 0 && (
-            <section aria-label={ti('similarTitle')} className="space-y-2">
+            <section aria-label={ti(fromWeb ? 'webTitle' : 'similarTitle')} className="space-y-2">
                 <div>
-                    <p className="text-[13px] font-medium text-ink">{ti('similarTitle')}</p>
-                    <p className="text-[12.5px] text-amber-800">{ti('similarBody')}</p>
+                    <p className="text-[13px] font-medium text-ink">{ti(fromWeb ? 'webTitle' : 'similarTitle')}</p>
+                    <p className="text-[12.5px] text-amber-800">{ti(fromWeb ? 'webBody' : 'similarBody')}</p>
                 </div>
                 <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{similar.map(card)}</ul>
             </section>
         )}
-        <p className={cn('text-[12px] text-ink-3')}>{ti('licenseNote', { license: st.candidates[0].license })}{checked ? ` · ${checked}` : ''}</p>
+        <p className={cn('text-[12px] text-ink-3')}>{st.candidates[0].license ? ti('licenseNote', { license: st.candidates[0].license }) : ti('webNote')}{checked ? ` · ${checked}` : ''}</p>
         <div className="flex flex-wrap gap-2">{retryBtn}{uploadBtn}</div>
     </>);
 }

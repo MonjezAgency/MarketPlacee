@@ -214,7 +214,7 @@ function ReviewDialog({ row, canApply, onClose, onChanged }: { row: PhotoRow; ca
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {state.candidates.map((c) => <PhotoCandidateCard key={c.url} c={c} barcode={state.barcode} busy={busy} canApply={canApply} onUse={(x, clean) => use(x, [], clean)} onDismiss={dismiss} onWhiten={whiten} dismissLabel={tp('notThisProduct')} />)}
             </ul>
-            <p className="mt-3 text-[12px] text-ink-3">{t('imageDiscovery', 'licenseNote', { license: state.candidates[0]?.license || 'CC BY-SA 3.0' })}</p>
+            <p className="mt-3 text-[12px] text-ink-3">{state.candidates[0]?.webImage ? t('imageDiscovery', 'webNote') : t('imageDiscovery', 'licenseNote', { license: state.candidates[0]?.license || 'CC BY-SA 3.0' })}</p>
         </Dialog>
     );
 }

@@ -27,7 +27,7 @@ export interface PhotoCandidate {
     kind?: ProviderPhoto['kind']; language?: string | null; width?: number; height?: number; imgid?: string;
 }
 /** A candidate photo with how far it can be trusted for this product. */
-export interface RankedCandidate extends PhotoCandidate { confidence: 'verified' | 'needs_confirmation'; reasons: string[]; sourceBarcode?: string }
+export interface RankedCandidate extends PhotoCandidate { confidence: 'verified' | 'needs_confirmation'; reasons: string[]; sourceBarcode?: string; webImage?: string }
 export interface LookupOutcome {
     status: 'found' | 'not_found' | 'unavailable' | 'invalid_barcode';
     /** Why nothing usable was found (codes the browser translates). Empty when candidates exist. */

@@ -206,6 +206,19 @@ export function similarScore(supplier: { name?: string; brand?: string; weight?:
     return shared - [...b].filter((t) => !a.has(t)).length / 4;
 }
 
+/** A title selling several units: "24 x 500ml", "4х500", "12 pack", "24 Uds", "confezione da 24", in any shop's language. */
+const MULTIPACK = /\d\s*[x×х*]\s*\d|\b\d+\s*[x×х]\b|\b\d+\s*(?:uds?|units?|packs?|pk|pcs|pieces|pezzi|st(?:ü|ue)ck|stk|cans|bottles|count|ct)\b|\bpack of\b|\bcase of\b|multipack|confezione|\btray\b|\bbox of\b/i;
+
+/** All a web photo has is its page's title, so the title must say this product: nearly all of the name's words, nothing contradicting it, not a multipack. */
+export function webTitleMatches(supplier: { name?: string; brand?: string; weight?: string }, title: string): boolean {
+    const source = { name: title, brands: null, quantity: null };
+    if (!similarScore(supplier, source) || comparePack(supplier, source).match === false) return false;
+    if (MULTIPACK.test(title) && !MULTIPACK.test(`${supplier.name || ''} ${supplier.weight || ''}`)) return false;
+    const words = (s: string) => new Set(tokens(s).filter((t) => !GENERIC.has(t)));
+    const wanted = [...words(`${supplier.brand || ''} ${supplier.name || ''}`)], have = words(title);
+    return wanted.filter((t) => have.has(t)).length / wanted.length >= 0.8;
+}
+
 /** Upgrade an OFF display image URL (…/front_en.12.400.jpg) to the full-size file. */
 const fullSize = (u: string) => u.replace(/\.(\d+)\.(100|200|400)\.(jpg|png)$/i, '.$1.full.$3');
 
