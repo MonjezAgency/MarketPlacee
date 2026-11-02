@@ -118,8 +118,6 @@ export class ImagePipeline {
             if (!scored.length) return null;
             state.scored.push(...scored);
             state.scored.sort((a, b) => b.score - a.score);
-            const down = await this.deps.vision.unavailable();
-            if (down) return done('needs_review', visionDown(down), { top: state.scored.slice(0, TOP) });
             return this.judge(scored, identity, opts, trace, state, done);
         };
 

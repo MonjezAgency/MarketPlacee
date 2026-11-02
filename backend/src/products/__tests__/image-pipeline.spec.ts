@@ -380,6 +380,16 @@ describe('free vision only', () => {
         expect(fetcher).toHaveBeenCalledTimes(1);
         expect(second.reason).toMatch(/^vision_quota/);
     });
+    it('a verdict already given still stands once the day\'s limit is reached', async () => {
+        const fetcher = jest.fn(async () => reply(answer())) as any;
+        const cache = new MemoryCache();
+        const pipeline = new ImagePipeline({ lookups: source(), searches: [], cache, vision: new VisionGate(cache, fetcher, { pause: noop, dailyLimit: async () => 1 }), download: async () => ({ ok: true, bytes: images }) });
+        const first = await pipeline.run(row);
+        const again = await pipeline.run(row);
+        expect(fetcher).toHaveBeenCalledTimes(1);
+        expect(again.reason).not.toMatch(/^vision_quota/);
+        expect(again.status).toBe(first.status);
+    });
     it('malformed JSON from both models never approves', async () => {
         const { pipeline, fetcher } = build({ [url]: await pack() }, { lookups: source() }, () => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'Looks right to me {not json' } }] }) }));
         const r = await pipeline.run(row);
