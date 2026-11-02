@@ -209,6 +209,40 @@ function requestFrom(buf: Buffer, file: string, extra: Partial<ImportRequest> = 
     return { fileName: file, sheets: a.sheets.map((s) => ({ name: s.name, columns: s.columns, rows: s.rows })), mapping, settings: { currency: 'EUR', moqUnit: 'CASE' }, ...extra };
 }
 
+describe('import with the image pipeline on', () => {
+    const sheet = (rows: any[][]) => {
+        const head = ['Product name', 'Brand', 'Category', 'EAN', 'Country of origin', 'EXW location', 'Weight', 'Price per case', 'Stock', 'Pieces per case', 'Cases per pallet', 'Unit', 'MOQ', 'MOQ unit'];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([head, ...rows]), 'Products');
+        return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+    };
+    const line = (name: string, ean: string, stock: string | number) => [name, 'Acme', 'Beverages', ean, 'Spain', 'Madrid', '500 ml', 24, stock, 12, 80, 'piece', 10, 'case'];
+    const withJobs = () => {
+        const f = fakes();
+        const jobs = { enabled: true, openUpload: jest.fn(async () => ({ id: 'u1' })), enqueue: jest.fn(async () => undefined), closeUpload: jest.fn(async () => undefined), kick: jest.fn() };
+        (f.svc as any).jobs = jobs;
+        return { ...f, jobs };
+    };
+
+    it('a wrong barcode still comes in, without the barcode, so the supplier can fix it on the row', async () => {
+        const { svc, jobs, created } = withJobs();
+        const req = requestFrom(sheet([line('Acme Lemon 500ml', '5061013943988', 100)]), 'file.xlsx', { uploadId: 'u1', last: true } as any);
+        req.mapping.ean = 'ean';
+        const v = await svc.validate('sup', req);
+        expect(v.rows[0]).toMatchObject({ state: 'ready', errors: [] });
+        await svc.commit('sup', req);
+        expect(created[0].ean).toBeFalsy();
+        expect(jobs.enqueue).toHaveBeenCalledWith(expect.objectContaining({ ean: '5061013943988' }));
+    });
+
+    it('a blank cell the product would store as 0 is carried to the row, so it does not publish', async () => {
+        const { svc, jobs } = withJobs();
+        const req = requestFrom(sheet([line('Acme Lemon 500ml', '5449000000439', '')]), 'file.xlsx', { uploadId: 'u1', last: true } as any);
+        await svc.commit('sup', req);
+        expect(jobs.enqueue).toHaveBeenCalledWith(expect.objectContaining({ blank: expect.arrayContaining(['Stock (cases)']) }));
+    });
+});
+
 describe('import review', () => {
     it('applies the supplier’s sources and reports what is missing — nothing is invented', async () => {
         const { svc } = fakes();

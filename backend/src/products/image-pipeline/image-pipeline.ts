@@ -151,7 +151,8 @@ export class ImagePipeline {
         if (free) return free;
         // Only a row with no good photo gets a search, and nothing could judge what one finds without vision.
         const down = await this.deps.vision.unavailable();
-        if (down) return end('pending_vision', visionDown(down), { top: state.scored.slice(0, TOP) });
+        // With no photo and no search left there is nothing to wait for: the row goes on to "not found".
+        if (down && (state.scored.length || searches.length)) return end('pending_vision', visionDown(down), { top: state.scored.slice(0, TOP) });
         for (const source of searches) {
             for (const q of searchQueries(identity)) {
                 const found = await source.search(q.query, identity.ean, q.language, trace.calls).catch(() => []);

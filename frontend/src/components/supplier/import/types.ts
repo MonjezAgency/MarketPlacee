@@ -91,7 +91,7 @@ export interface ReviewRow {
 
 export interface Review {
     rows: ReviewRow[];
-    summary: { total: number; ready: number; draft: number; update: number; unchanged: number; skip: number; error: number; create: number; withWarnings: number; photosFromFile: number; missingImages: number; photosFromLookup?: number; newBrands?: string[] };
+    summary: { pipeline?: boolean; total: number; ready: number; draft: number; update: number; unchanged: number; skip: number; error: number; create: number; withWarnings: number; photosFromFile: number; missingImages: number; photosFromLookup?: number; newBrands?: string[] };
     mapping: { key: string; field: string; label: string; stored: boolean }[];
     notProvided: string[];
 }

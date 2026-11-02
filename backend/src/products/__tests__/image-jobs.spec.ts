@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { decide } from '../image-pipeline/image-outcome';
 import { backfillBgPending } from '../image-pipeline/image-backfill';
 import { ImageJobsService, ownStorageDownload } from '../image-pipeline/image-jobs.service';
@@ -143,6 +144,15 @@ describe('uploads and rows', () => {
     });
 });
 
+describe('a blank cell from the file', () => {
+    it('is kept for the row, and cleared when the supplier asks for a check after filling it in', async () => {
+        const rows = [{ id: 'r1', ownerId: 's1', params: { blank: ['Stock (cases)'] } }];
+        const { service, prisma } = jobs(rows);
+        await service.recheck('r1', 's1');
+        expect(prisma.imageRow.update.mock.calls[0][0].data.params).toBe(Prisma.DbNull);
+    });
+});
+
 describe('backfill of crops, with a mocked Photoroom', () => {
     const cut = async (image: Buffer) => {
         const { data, info } = await sharp(image).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -219,6 +229,11 @@ describe('staff control after publishing', () => {
         expect(s.prisma.product.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'PAUSED', adminNotes: 'Pack shown is the old design' } }));
         expect(s.review.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'PAUSED', actor }));
         expect(s.notificationsService.notifyUser.mock.calls[0][4]).toMatchObject({ kind: 'PRODUCT_PAUSED', params: { reason: 'Pack shown is the old design' } });
+    });
+    it('a paused product still waiting for vision can go back on the placeholder, one with no photo for any other reason cannot', async () => {
+        const full = { name: 'Acme Lemon', brand: 'Acme', category: 'Beverages', ean: '5449000000439', origin: 'Spain', exwLocation: 'Madrid', weight: '500 ml', price: 10, stock: 5, unitsPerCase: 12, casesPerPallet: 80, unit: 'piece', moq: 1, moqUnit: 'CASE', images: [] };
+        await expect(svc({ ...live, ...full, status: 'PAUSED', imageStatus: 'pending_vision' }).republish('p', actor)).resolves.toMatchObject({ status: 'APPROVED' });
+        await expect(svc({ ...live, ...full, status: 'PAUSED', imageStatus: 'not_found' }).republish('p', actor)).rejects.toMatchObject({ status: 400 });
     });
     it('remove keeps the record', async () => {
         const s = svc(live);

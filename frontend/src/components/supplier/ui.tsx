@@ -282,7 +282,7 @@ export function Thumb({ src, alt = '', size = 40 }: { src?: string | null; alt?:
     return (
         <span className="relative shrink-0 rounded-lg bg-white ring-1 ring-line overflow-hidden flex items-center justify-center" style={{ width: size, height: size }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {ok ? <img src={src!} alt={alt} loading="lazy" className="max-w-[88%] max-h-[88%] object-contain" /> : <span className="text-[10px] font-medium text-ink-4">{t('supplierShell', 'noPhoto')}</span>}
+            {ok ? <img src={src!} alt={alt} loading="lazy" className="max-w-[88%] max-h-[88%] object-contain" /> : <span className="text-[10px] leading-tight text-center font-medium text-ink-4">{t('supplierShell', 'noPhoto')}</span>}
         </span>
     );
 }

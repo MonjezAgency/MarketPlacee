@@ -7,6 +7,8 @@ import toast from 'react-hot-toast';
 import { AlertCircle, ArrowLeft, CheckCircle2, Euro, ExternalLink, EyeOff, MessageSquare, Pencil, Trash2, Upload, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/lib/auth';
+import { canDo } from '@/lib/admin-access';
 import { adminApi, type AdminProductReview } from '@/lib/admin-api';
 import { Badge, Button, Card, ConfirmProvider, Dialog, ErrorState, Field, Notice, PRODUCT_STATUS, Skeleton, inputCls, useConfirm } from '@/components/supplier/ui';
 import { categoryLabel, statusLabel } from '@/components/supplier/import/types';
@@ -32,6 +34,7 @@ function ReviewView({ params }: { params: { id: string } }) {
     const router = useRouter();
     const confirm = useConfirm();
     const { t, fmt } = useLanguage();
+    const { user } = useAuth();
     const tp = (k: string, v?: Record<string, string | number>) => t('adminProducts', k, v);
     const [data, setData] = React.useState<AdminProductReview | null>(null);
     const [error, setError] = React.useState<string | null>(null);
@@ -222,7 +225,7 @@ function ReviewView({ params }: { params: { id: string } }) {
                             {!isCatalog && !['REJECTED', 'PAUSED', 'REMOVED'].includes(status) && <Button variant="danger" icon={<XCircle size={15} />} disabled={!!busy} onClick={() => { setText(''); setDialog('reject'); }}>{tp('reject')}</Button>}
                             {isCatalog && status === 'APPROVED' && <Button icon={<EyeOff size={15} />} loading={busy === 'offline'} disabled={!!busy} onClick={() => act('offline')}>{tp('takeOffline')}</Button>}
                             {isCatalog && status !== 'REJECTED' && <Button icon={<Euro size={15} />} onClick={() => setPriceOpen(true)}>{tp('updatePrice')}</Button>}
-                            <ProductTakeDown product={{ id: p.id, name: p.name, status }} onDone={load} />
+                            {canDo(user?.role, 'takeDownProducts') && <ProductTakeDown product={{ id: p.id, name: p.name, status }} onDone={load} />}
                             {isCatalog && <Link href={editHref}><Button className="w-full" icon={<Pencil size={15} />}>{tp('editDetails')}</Button></Link>}
                             {!data.canApprove && canPublish && <p className="text-[12.5px] text-amber-800">{tp('approveBlocked')}</p>}
                             {status === 'REJECTED' && <p className="text-[12.5px] text-ink-3">{tp('rejectedFinal')}</p>}

@@ -48,7 +48,7 @@ export default function ReviewStep({ target = 'supplier', review, fields, multi,
     const stored = review.mapping.filter((m) => m.stored);
     const recordOnly = review.mapping.filter((m) => !m.stored && !['rowNumber', 'orderQty'].includes(m.field));
     const tiles: [string, number, Tone, Filter][] = [
-        [(target === 'catalog' ? t('adminProducts', 'impTileNewPublish') : tc('tileNewReview')), s.ready, 'success', 'ready'], [tc('tileNewDrafts'), s.draft, 'warning', 'draft'],
+        [s.pipeline ? t('imageUpload', 'tileChecked') : (target === 'catalog' ? t('adminProducts', 'impTileNewPublish') : tc('tileNewReview')), s.ready, 'success', 'ready'], [s.pipeline ? t('imageUpload', 'tileIncomplete') : tc('tileNewDrafts'), s.draft, 'warning', 'draft'],
         [(target === 'catalog' ? t('adminProducts', 'impTileUpdates') : tc('tileUpdates')), s.update, 'info', 'update'], [tc('tileWontImport'), s.error, 'danger', 'error'],
     ];
     const tabs: [Filter, string, number][] = [['all', tc('filterAllRows'), s.total], ['ready', tc('filterReady'), s.ready], ['draft', tc('tabDrafts'), s.draft], ['update', tc('filterUpdates'), s.update], ['error', tc('filterErrors'), s.error], ['warnings', tc('filterWarnings'), s.withWarnings], ...(existingCount ? [['existing', tc('filterExisting'), existingCount] as [Filter, string, number]] : [])];
@@ -82,7 +82,7 @@ export default function ReviewStep({ target = 'supplier', review, fields, multi,
                 {review.notProvided.length > 0 && <p className="mt-1.5 text-[12.5px] text-amber-800"><Trans text={tc('notProvided', { fields: listJoin(review.notProvided, meta.intl) })} tags={{ b: (c) => <b>{c}</b> }} /></p>}
             </Card>
 
-            <PhotoSearchPanel review={review} state={photos} picks={picks} onStart={onFindPhotos} updateExisting={onExisting === 'update'} />
+            {!s.pipeline && <PhotoSearchPanel review={review} state={photos} picks={picks} onStart={onFindPhotos} updateExisting={onExisting === 'update'} />}
 
             {/* Brands not on Ali FMCG yet: importing is the supplier's confirmation (catalogFields section). */}
             {(s.newBrands?.length ?? 0) > 0 && (
@@ -181,7 +181,7 @@ export default function ReviewStep({ target = 'supplier', review, fields, multi,
                     </div>
                 </div>
             )}
-            {s.missingImages > 0 && <Notice tone="info">{tc('missingImagesNotice', { count: s.missingImages })}</Notice>}
+            {s.missingImages > 0 && !s.pipeline && <Notice tone="info">{tc('missingImagesNotice', { count: s.missingImages })}</Notice>}
         </div>
     );
 }

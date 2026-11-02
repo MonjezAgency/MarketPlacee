@@ -175,6 +175,20 @@ describe('licence settings', () => {
 });
 
 describe('the vision service failing', () => {
+    it('nothing to wait for: no photo and no search left is not found, not pending', async () => {
+        delete process.env.OPENROUTER_API_KEY;
+        const r = await build({}, { lookups: [db([])] }, () => reply(answer())).pipeline.run(row);
+        expect(r.status).toBe('not_found');
+    });
+
+    it('a search still to come waits for vision, and is not spent meanwhile', async () => {
+        delete process.env.OPENROUTER_API_KEY;
+        const source = search([]);
+        const r = await build({}, { lookups: [db([])], searches: [source] }, () => reply(answer())).pipeline.run(row);
+        expect(r.status).toBe('pending_vision');
+        expect(source.search).not.toHaveBeenCalled();
+    });
+
     it('no key: nothing approved, and the reason says so', async () => {
         delete process.env.OPENROUTER_API_KEY;
         const url = 'https://images.openfoodfacts.org/a.jpg';

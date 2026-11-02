@@ -65,6 +65,12 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
   The daily sweep picks up what a broken check held back. 5,000 checks a month. A refused key is one admin alert per run of failures (`image-pipeline/alerts.ts`), and nothing is applied until it works.
   Budget (`image-pipeline/budget.ts`, `sources/README.md`): vision uses free OpenRouter models only, anything not ending in `:free` is refused, `PHOTO_CHECK_MODEL` included. Free sources first, Serper last, `SERPER_MONTHLY_CAP` (200) a month, 2 per product.
   ean-search.org is gone. No paid cut-outs: a right photo that isn't white is `needs_bg_removal`, unless `PHOTOROOM_LIVE=true` and a live key.
+- Image pipeline (`backend/src/products/image-pipeline/`), behind `IMAGE_PIPELINE_ENABLED` (default off): a new import row is created at once and queued
+  (`ImageRow`, `image-jobs.service.ts`, 4 at a time, a minute cron resumes). `image-outcome.ts decide()` says what a result means: a verified picture is attached and a complete row is
+  published with no staff queue, a row with no verified picture stays a draft (the image is a required field) and the supplier is told at `/supplier/products/import/status/[id]`, with one summary
+  notification per upload. Only a row waiting for the vision quota goes live on the placeholder (`pending_vision`) and returns to a draft if its photo then fails. A right product on a non-white
+  background is cropped and kept as `bg_pending`; with `PHOTOROOM_LIVE=true`, `npm run images:backfill` replaces those. Staff control comes after publishing: pause, remove, re-publish
+  (`POST /products/admin/:id/take-down|republish`, comment required, statuses `PAUSED`/`REMOVED`, supplier reads the comment). Staff see the trace on the review page and use in `/admin/products/photos`.
 - Product bulk actions: `POST /products/admin/bulk`, per-row rules in `backend/src/products/admin-bulk.ts`; every skip is reported.
 - Notifications: persisted per user; `data.kind` + `data.params` let the bell (`components/ui/NotificationBell.tsx`,
   `lib/notifications.ts`) render them in the reader's language (keys in `locales/sections/notificationsCenter.ts`);

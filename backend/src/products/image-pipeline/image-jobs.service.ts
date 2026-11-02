@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../common/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -65,8 +66,9 @@ export class ImageJobsService {
         return this.prisma.imageUpload.create({ data: { ...(safe ? { id: safe } : {}), ownerId, catalog: !!info.catalog, fileName: info.fileName?.slice(0, 200) } });
     }
 
-    enqueue(row: { uploadId: string; productId: string; ownerId: string; sheet?: string; rowNumber?: number; name: string; ean?: string | null; photos?: string[] }) {
-        return this.prisma.imageRow.create({ data: { ...row, ean: row.ean || null, photos: row.photos ?? [] } });
+    /** `blank` is what the file left empty that the product can't show: a blank stock cell is stored as 0, which is a valid stock. */
+    enqueue({ blank, ...row }: { uploadId: string; productId: string; ownerId: string; sheet?: string; rowNumber?: number; name: string; ean?: string | null; photos?: string[]; blank?: string[] }) {
+        return this.prisma.imageRow.create({ data: { ...row, ean: row.ean || null, photos: row.photos ?? [], ...(blank?.length ? { params: { blank } } : {}) } });
     }
 
     async closeUpload(id: string) {
@@ -120,7 +122,8 @@ export class ImageJobsService {
         const hasPhoto = realImages(product.images).length > 0;
         // A real picture is never replaced, so with one there is nothing to look for: only the required fields are read again.
         const result = hasPhoto ? null : await this.engine.pipeline.run({ ean: row.ean ?? '', name: product.name, brand: product.brand, weight: product.weight, category: product.category, supplierImages: row.photos.map((url) => ({ url })) }, { policy: 'open', upload: row.uploadId ?? row.id });
-        const missing = missingForPublish(product).filter((m) => m.field !== 'images').map((m) => m.label);
+        const blank: string[] = (row.params as any)?.blank ?? [];
+        const missing = [...new Set([...missingForPublish(product).filter((m) => m.field !== 'images').map((m) => m.label), ...blank])];
         const d = decide({ status: result?.status ?? 'approved', hasPhoto, missing, wentLiveWaiting: product.imageStatus === 'pending_vision' });
         const attached = d.attach && result ? await this.attach(product.id, result) : false;
         if (d.publish) await this.products.publishFromPipeline(product.id, { withoutPhoto: d.withoutPhoto && !attached });
@@ -134,7 +137,7 @@ export class ImageJobsService {
             where: { id },
             data: {
                 state: d.waiting ? 'waiting_vision' : 'done', outcome, imageState: d.image, reason: d.reason ?? (outcome === 'needs_attention' ? 'missing_fields' : null),
-                params: { ean: row.ean, missing }, detail: result?.reason.slice(0, 500) ?? 'photo_kept', ...(result ? { trace: JSON.parse(JSON.stringify(result.trace)) } : {}), finishedAt: new Date(),
+                params: { ean: row.ean, missing, ...(blank.length ? { blank } : {}) }, detail: result?.reason.slice(0, 500) ?? 'photo_kept', ...(result ? { trace: JSON.parse(JSON.stringify(result.trace)) } : {}), finishedAt: new Date(),
                 visionCalls: { increment: calls.filter((c) => c.source === 'vision' && c.status !== 'cached').length },
                 searches: { increment: calls.filter((c) => c.source === 'serper' && c.status === 200).length },
             },
@@ -225,7 +228,7 @@ export class ImageJobsService {
     /** After the missing fields were filled in on the product. */
     async recheck(id: string, ownerId: string | null) {
         await this.ownRow(id, ownerId);
-        return this.again(id, {});
+        return this.again(id, { params: Prisma.DbNull });
     }
 
     /** The supplier's own photo goes through the same compose and checks as any other, and is tried first. */

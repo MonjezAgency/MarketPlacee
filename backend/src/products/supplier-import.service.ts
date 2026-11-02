@@ -94,6 +94,9 @@ export function brandFromName(name: string, known: string[]): string | null {
 
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
+/** A code that is there and can't be right. A duplicate in the file, or no code at all, is a different problem. */
+const badBarcode = (code: unknown) => !!code && !!barcodeProblem(String(code));
+
 /** A token: the job service reads this file's sniffImage, so the import can't load its class. */
 export const IMAGE_JOBS = 'IMAGE_JOBS';
 
@@ -260,9 +263,18 @@ export class SupplierImportService {
         const exByName = new Map(existing.map((e: any) => [fold(e.name), e]));
         const onExisting = req.onExisting === 'update' ? 'update' : 'skip';
 
+        const pipeline = !!this.jobs?.enabled;
         const rows = items.map((it) => {
             const b = it.built, p = b.product;
             const ex: any = p.ean ? exByEan.get(p.ean) : exByName.get(fold(p.name));
+            if (pipeline && !ex) {
+                // The picture is the pipeline's to find, and a wrong barcode is the supplier's to fix on the upload screen: neither stops the row here.
+                b.missing = b.missing.filter((m) => m.field !== 'images' && m.field !== 'ean');
+                if (b.errors.length && b.errors.every((e) => e.field === 'ean') && badBarcode(p.ean)) {
+                    b.warnings.push(...b.errors.map((e) => e.reason));
+                    b.errors = [];
+                }
+            }
             let changes: { field: string; label: string; from: string; to: string }[] = [];
             if (ex) {
                 const show = (v: any) => (v === null || v === undefined || v === '' ? '—' : String(v));
@@ -307,7 +319,7 @@ export class SupplierImportService {
             create: count('ready') + count('draft'), withWarnings: rows.filter((r) => r.warnings.length).length,
             photosFromFile: rows.filter((r) => r.imageStatus === 'from_file').length, missingImages: rows.filter((r) => r.imageStatus === 'missing').length,
             photosFromLookup: rows.filter((r) => r.imageStatus === 'from_lookup').length,
-            newBrands,
+            newBrands, pipeline,
         };
         // What will be stored where — and what won't be stored at all.
         const usedKeys = new Set(req.sheets.flatMap((s) => (s.columns || []).map((c) => c.key)));
@@ -338,16 +350,15 @@ export class SupplierImportService {
             const r = v.rows[i];
             const it = v.built[i];
             const head = { key: r.key, sheet: r.sheet, row: r.row, name: r.name, ean: r.ean, ...(r.page ? { page: r.page } : {}) };
-            // A wrong barcode alone doesn't stop the row: it is saved as a draft and the supplier fixes the barcode on the upload screen.
-            const fixable = !!upload && r.state === 'error' && r.errors.every((e: any) => e.field === 'ean') && !!r.ean && !!barcodeProblem(r.ean);
-            if (r.state === 'error' && !fixable) { results.push({ ...head, outcome: 'failed', reasons: r.errors.map((e: any) => e.reason) }); continue; }
+            const fixable = !!upload && r.action === 'create' && badBarcode(r.ean);
+            if (r.state === 'error') { results.push({ ...head, outcome: 'failed', reasons: r.errors.map((e: any) => e.reason) }); continue; }
             if (r.state === 'skip') { results.push({ ...head, outcome: 'skipped', productId: r.existing?.id, reasons: [catalog ? 'Already in the Ali FMCG Catalog (you chose to skip these).' : 'Already in your catalog (you chose to skip these).'] }); continue; }
             if (r.state === 'unchanged') { results.push({ ...head, outcome: 'unchanged', productId: r.existing?.id }); continue; }
             const notes: string[] = [];
             try {
                 // Pictures from the file: stored first so a complete product goes straight to review.
                 let images: string[] = it.built.product.images?.length ? it.built.product.images : [];
-                const wantsPhotos = !images.length && r.images.length && (r.action === 'create' || r.action === 'update' || fixable);
+                const wantsPhotos = !images.length && r.images.length && (r.action === 'create' || r.action === 'update');
                 if (wantsPhotos) {
                     if (r.action === 'update') {
                         const ex = await this.products.findOneRaw(r.existing!.id);
@@ -356,12 +367,12 @@ export class SupplierImportService {
                     } else images = await this.storePhotos(r.images, photos, notes);
                 }
                 let credits: Record<string, any> | null = null;
-                if (upload && (r.action === 'create' || fixable)) {
+                if (upload && r.action === 'create') {
                     // Nothing goes on the product unchecked: a photo from the row is the first candidate for the pipeline.
                     const candidates = [...images, ...(it.external ? [it.external.url] : [])];
                     const { ean: _ean, ...row } = it.built.product;
                     const saved = await this.products.create({ ...row, ...(fixable ? {} : { ean: r.ean }), images: [], supplierId } as any, false, true, { submit: false, actorId, actorRole: catalog?.actor.role ?? 'SUPPLIER', noInference: true });
-                    await this.jobs!.enqueue({ uploadId: upload.id, productId: saved.id, ownerId: actorId, sheet: r.sheet, rowNumber: r.row, name: r.name, ean: r.ean, photos: candidates });
+                    await this.jobs!.enqueue({ uploadId: upload.id, productId: saved.id, ownerId: actorId, sheet: r.sheet, rowNumber: r.row, name: r.name, ean: r.ean, photos: candidates, blank: r.missing.map((m) => m.label) });
                     await this.products.recordImportSource(saved.id, actorId, { file: req.fileName, sheet: r.sheet, row: r.row, columns: it.original, ...(it.page ? { page: it.page, extracted: it.source } : {}), ...(it.edited && Object.keys(it.edited).length ? { editedBySupplier: it.edited } : {}) })
                         .catch((e) => this.logger.warn(`[import] source record for ${saved.id}: ${e?.message}`));
                     results.push({ ...head, outcome: 'created', productId: saved.id, status: saved.status, missing: [], imageMissing: false, photoFromLookup: false, notes });

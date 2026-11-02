@@ -897,7 +897,8 @@ export class ProductsService {
         const product = await this.findOne(id);
         if (!product) throw new NotFoundException('Product not found');
         if (product.status !== ProductStatus.PAUSED && product.status !== ProductStatus.REMOVED) throw new BadRequestException({ code: 'NOT_TAKEN_DOWN', message: 'Only a paused or removed product can be re-published.' });
-        const errors = missingForPublish(product).map((m) => m.label);
+        // A product that went live on the placeholder may go back the same way: its photo is still waiting for vision.
+        const errors = missingForPublish(product).filter((m) => !(m.field === 'images' && (product as any).imageStatus === 'pending_vision')).map((m) => m.label);
         if (errors.length) throw new BadRequestException({ code: 'INCOMPLETE', message: `Incomplete product cannot be published. Missing: ${errors.join(', ')}.`, errors });
         const updated = await this.prisma.product.update({ where: { id }, data: { status: ProductStatus.APPROVED, adminNotes: null } });
         this.priceHistory.record(id, 'APPROVED').catch(() => {});

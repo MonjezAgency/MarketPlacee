@@ -101,8 +101,8 @@ export default function UploadStatus({ target, id }: { target: ImportTarget; id:
             </p>
             <Card bodyClassName="p-0">
                 <div className="overflow-x-auto">
-                    <table className="w-full min-w-[720px] text-[13.5px]">
-                        <thead>
+                    <table className="w-full lg:min-w-[720px] text-[13.5px]">
+                        <thead className="hidden lg:table-header-group">
                             <tr className="text-start text-[12.5px] text-ink-3 border-b border-line">
                                 <th scope="col" className="px-4 py-2.5 text-start font-medium">{tu('colProduct')}</th>
                                 <th scope="col" className="px-4 py-2.5 text-start font-medium">{tu('colEan')}</th>
@@ -110,23 +110,23 @@ export default function UploadStatus({ target, id }: { target: ImportTarget; id:
                                 <th scope="col" className="px-4 py-2.5 text-start font-medium">{tu('colDetails')}</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-line">
+                        <tbody className="block lg:table-row-group divide-y divide-line">
                             {rows.map((r) => {
                                 const [tone, key] = badge(r);
                                 const text = detail(r);
                                 const attention = !running(r) && !takenDown(r) && r.outcome === 'needs_attention';
                                 const missing = r.reason === 'missing_fields';
                                 return (
-                                    <tr key={r.id} className="align-top">
-                                        <td className="px-4 py-3">
+                                    <tr key={r.id} className="block lg:table-row align-top py-1.5 lg:py-0">
+                                        <td className="block lg:table-cell px-4 py-1.5 lg:py-3">
                                             <span className="flex items-center gap-2.5 min-w-0">
                                                 <Thumb src={r.image} alt="" size={40} />
                                                 <span className="font-medium text-ink break-words" data-no-translate>{r.name}</span>
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 tabular-nums whitespace-nowrap" data-no-translate><bdi dir="ltr">{r.ean || '—'}</bdi></td>
-                                        <td className="px-4 py-3"><Badge tone={tone} dot>{tu(key)}</Badge></td>
-                                        <td className="px-4 py-3 max-w-[22rem]">
+                                        <td className="block lg:table-cell px-4 py-1.5 lg:py-3 tabular-nums whitespace-nowrap" data-no-translate><bdi dir="ltr">{r.ean || '—'}</bdi></td>
+                                        <td className="block lg:table-cell px-4 py-1.5 lg:py-3"><Badge tone={tone} dot>{tu(key)}</Badge></td>
+                                        <td className="block lg:table-cell px-4 py-1.5 lg:py-3 lg:max-w-[22rem]">
                                             {text && <p className="text-ink-2">{text}</p>}
                                             {attention && (
                                                 <div className="mt-2 flex flex-wrap gap-2">

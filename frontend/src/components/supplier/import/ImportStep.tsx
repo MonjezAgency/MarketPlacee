@@ -34,8 +34,8 @@ export default function ImportStep({ target = 'supplier', uploadId, review, onEx
             <div className="max-w-[760px] space-y-4">
                 <Card title={tc('readyToImport')}>
                     <ul className="space-y-1.5 text-[14px]">
-                        <li>{b(tc('sumReady', { count: s.ready, n: fmt.number(s.ready) }))}</li>
-                        <li>{b(tc('sumDraft', { count: s.draft, n: fmt.number(s.draft) }))}</li>
+                        <li>{s.pipeline ? t('imageUpload', 'sumChecked', { n: fmt.number(s.ready) }) : b(tc('sumReady', { count: s.ready, n: fmt.number(s.ready) }))}</li>
+                        <li>{s.pipeline ? t('imageUpload', 'sumIncomplete', { n: fmt.number(s.draft) }) : b(tc('sumDraft', { count: s.draft, n: fmt.number(s.draft) }))}</li>
                         {updates > 0 && <li>{b(tc('sumUpdates', { count: updates, n: fmt.number(updates) }))}</li>}
                         {(s.skip + s.unchanged) > 0 && <li>{b(tc('sumUnchanged', { count: s.skip + s.unchanged, n: fmt.number(s.skip + s.unchanged) }))}</li>}
                         {s.error > 0 && <li className="text-red-700">{b(tc('sumErrors', { count: s.error, n: fmt.number(s.error) }))}</li>}
@@ -44,7 +44,7 @@ export default function ImportStep({ target = 'supplier', uploadId, review, onEx
                     </ul>
                     <label className="mt-4 flex items-start gap-2.5 text-[13.5px] rounded-lg ring-1 ring-line p-3 bg-surface-2/40 cursor-pointer">
                         <input type="checkbox" className="mt-0.5 accent-[#0E7C74]" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-                        <span>{tc('importConfirm')}</span>
+                        <span>{s.pipeline ? t('imageUpload', 'confirmPipeline') : tc('importConfirm')}</span>
                     </label>
                 </Card>
                 {error && <Notice tone="danger">{error}</Notice>}
