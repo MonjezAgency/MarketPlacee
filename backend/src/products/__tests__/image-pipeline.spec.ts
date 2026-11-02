@@ -50,14 +50,18 @@ describe('a row through the pipeline', () => {
         expect(r.trace.cost.total).toBe(0);
     });
 
-    it('a shelf photo is stopped at vision', async () => {
+    it('a shelf photo is a fallback: no vision call, kept for a person to see, never published', async () => {
         const url = 'https://shop.tesco.com/shelf.jpg';
-        const { pipeline } = build({ [url]: await shelf() }, { searches: [search([c(url)])] }, () => reply(answer({ hand_shelf_or_lifestyle: true, studio_quality: false, confidence: 0.9, reason: 'on a shelf' })));
+        const { pipeline, fetcher } = build({ [url]: await shelf() }, { searches: [search([c(url)])] }, () => reply(answer()));
         const r = await pipeline.run(row);
-        expect(r.status).toBe('needs_review');
-        expect(r.reason).toMatch(/vision_failed.*hand_shelf_or_lifestyle/);
+        expect(r.status).toBe('needs_better_image');
+        expect(r.reason).toMatch(/busy_background/);
+        expect(r.chosen?.url).toBe(url);
+        expect(r.publishable).toEqual({ A: false, B: false });
         expect(r.output).toBeUndefined();
+        expect(fetcher).not.toHaveBeenCalled();
     });
+
 
     it.each([
         ['Pampers Active Baby', 'Pampers', 'Pampers Pants 4'],
@@ -253,22 +257,30 @@ describe('free sources first', () => {
     const offUrl = 'https://images.openfoodfacts.org/a.jpg';
     const open = (ids: string, list: Candidate[]): LookupSource => ({ ...db(list), id: ids as any });
 
-    it('a free photo vision accepts means no other source and no search', async () => {
+    it('every free source is asked before ranking, and a photo vision accepts means no search', async () => {
         const later = db([]), web = search([c('https://shop.tesco.com/x.jpg')]);
         const { pipeline } = build({ [offUrl]: await pack() }, { lookups: [open('openfoodfacts', [c(offUrl, { licence: 'cc_by_sa' })]), later], searches: [web] }, () => reply(answer()));
         expect((await pipeline.run(row)).status).toBe('approved');
-        expect(later.lookup).not.toHaveBeenCalled();
+        expect(later.lookup).toHaveBeenCalled();
         expect(web.search).not.toHaveBeenCalled();
     });
 
-    it('supplier photos come before any lookup', async () => {
+    it('a phone photo from the first source loses to a studio photo from the last', async () => {
+        const phone = 'https://images.openfoodfacts.org/phone.jpg', studio = 'https://images.openfoodfacts.org/studio.jpg';
+        const { pipeline, fetcher } = build({ [phone]: await shelf(), [studio]: await pack() }, { lookups: [open('openfoodfacts', [c(phone, { licence: 'cc_by_sa' })]), open('upcitemdb', [c(studio, { licence: 'cc_by_sa' })])] }, () => reply(answer()));
+        const r = await pipeline.run(row);
+        expect(r.chosen?.url).toBe(studio);
+        expect(r.status).toBe('approved');
+        expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+
+    it('supplier photos are ranked with the rest', async () => {
         const url = 'https://supplier.example/a.jpg';
         const source = db([]);
         const { pipeline } = build({ [url]: await pack() }, { lookups: [source] }, () => reply(answer()));
         const r = await pipeline.run({ ...row, supplierImages: [{ url }] });
         expect(r.status).toBe('approved');
         expect(r.chosen?.source).toBe('supplier');
-        expect(source.lookup).not.toHaveBeenCalled();
     });
 
     it('a free photo vision turns down does not stop the search: the second photo gets its own call', async () => {
@@ -302,8 +314,8 @@ describe('free sources first', () => {
         const web = search([c('https://shop.tesco.com/1.jpg')]);
         const { pipeline, fetcher } = build({}, { searches: [web] }, () => reply(answer()), 0);
         const r = await pipeline.run(row);
-        expect(r).toMatchObject({ status: 'needs_review' });
-        expect(r.reason).toMatch(/^vision_quota/);
+        expect(r.status).toBe('not_found');
+        expect(r.reason).toMatch(/search waits for vision \(vision_quota\)/);
         expect(web.search).not.toHaveBeenCalled();
         expect(fetcher).not.toHaveBeenCalled();
     });
@@ -376,7 +388,7 @@ describe('free vision only', () => {
         const cache = new MemoryCache();
         const pipeline = new ImagePipeline({ lookups: source(), searches: [], cache, vision: new VisionGate(cache, fetcher, { budget, pause: noop, dailyLimit: async () => 1 }), download: async () => ({ ok: true, bytes: images }) });
         await pipeline.run(row);
-        const second = await pipeline.run({ ...row, name: 'Acme Lemon Drink 1l' });
+        const second = await pipeline.run({ ...row, ean: '5449000000996' });
         expect(fetcher).toHaveBeenCalledTimes(1);
         expect(second.reason).toMatch(/^vision_quota/);
     });
@@ -389,6 +401,43 @@ describe('free vision only', () => {
         expect(fetcher).toHaveBeenCalledTimes(1);
         expect(again.reason).not.toMatch(/^vision_quota/);
         expect(again.status).toBe(first.status);
+    });
+    it('top three only, in one call, each judged on its own: the second may win', async () => {
+        const urls = [0, 1, 2, 3].map((i) => `https://images.openfoodfacts.org/${i}.jpg`);
+        const images = Object.fromEntries(await Promise.all(urls.map(async (u, i) => [u, await pack({ boxWidth: 300 + i * 150, colour: ['#114477', '#774411', '#117744', '#771144'][i], stripe: i })])));
+        const { pipeline, fetcher } = build(images, { lookups: [db(urls.map((u) => c(u, { licence: 'cc_by_sa' })))] }, (body) => {
+            const sent = body.messages[0].content.filter((x: any) => x.type === 'image_url').length;
+            expect(sent).toBeLessThanOrEqual(4);
+            return reply({ images: [{ index: 0, ...answer({ studio_quality: false }) }, { index: 1, ...answer() }, { index: 2, ...answer({ same_variant: false }) }] });
+        });
+        const r = await pipeline.run(row);
+        expect(fetcher).toHaveBeenCalledTimes(1);
+        expect(r.trace.vision).toHaveLength(3);
+        expect(r.status).toBe('approved');
+        expect(r.chosen?.url).toBe(r.ranked?.[0].url);
+        expect(r.ranked?.[0].why).toBe('winner');
+        expect(r.ranked?.slice(1).map((x) => x.why)).toEqual(expect.arrayContaining(['vision: studio_quality', 'vision: same_variant']));
+    });
+    it('a photo already judged for this barcode is not sent again, whatever else has changed', async () => {
+        const fetcher = jest.fn(async () => reply(answer({ studio_quality: false }))) as any;
+        const cache = new MemoryCache();
+        const pipeline = new ImagePipeline({ lookups: source(), searches: [], cache, vision: new VisionGate(cache, fetcher, { pause: noop, dailyLimit: async () => 50 }), download: async () => ({ ok: true, bytes: images }) });
+        await pipeline.run(row);
+        const again = await pipeline.run({ ...row, name: 'Acme Lemon Soda 500ml' });
+        expect(fetcher).toHaveBeenCalledTimes(1);
+        expect(again.status).toBe('needs_better_image');
+    });
+    it('a plan spends nothing and says what a run would', async () => {
+        const fetcher = jest.fn(async () => reply(answer())) as any;
+        const cache = new MemoryCache();
+        const web = search([]);
+        const shelfBytes = await shelf();
+        const on = new ImagePipeline({ lookups: source(), searches: [{ ...web, cacheKey: (q: string) => q }], cache, vision: new VisionGate(cache, fetcher, { pause: noop, dailyLimit: async () => 50 }), download: async () => ({ ok: true, bytes: images }) });
+        const phone = new ImagePipeline({ lookups: source(), searches: [{ ...web, cacheKey: (q: string) => q }], cache, vision: new VisionGate(cache, fetcher, { pause: noop, dailyLimit: async () => 50 }), download: async () => ({ ok: true, bytes: shelfBytes }) });
+        expect((await on.run(row, { plan: true })).plan).toEqual({ finalists: 1, visionCalls: 1, visionCallsAfterSearch: 1, searches: 0, searchesIfRejected: 2 });
+        expect((await phone.run(row, { plan: true })).plan).toEqual({ finalists: 0, visionCalls: 0, visionCallsAfterSearch: 1, searches: 2, searchesIfRejected: 0 });
+        expect(fetcher).not.toHaveBeenCalled();
+        expect(web.search).not.toHaveBeenCalled();
     });
     it('malformed JSON from both models never approves', async () => {
         const { pipeline, fetcher } = build({ [url]: await pack() }, { lookups: source() }, () => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'Looks right to me {not json' } }] }) }));

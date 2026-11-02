@@ -21,13 +21,13 @@ import { normaliseBarcode } from './catalog-rules';
 export type ProductKind = 'food' | 'beauty' | 'household' | 'pet' | 'other';
 
 export interface ProviderPhoto {
-    url: string; previewUrl: string; kind: 'front' | 'packaging' | 'other'; language: string | null;
+    url: string; previewUrl: string; kind: 'front' | 'packaging' | 'other' | 'back'; language: string | null;
     /** Pixel size of the full-size file, when the record says (Open*Facts `images` metadata). */
     width?: number; height?: number;
     /** The uploaded photo this selection was cut from (Open*Facts `imgid`): two selections of one upload are one photo. */
     imgid?: string;
 }
-export interface ProviderRecord { code: string; name: string | null; brands: string | null; quantity: string | null; categories: string[]; photos: ProviderPhoto[]; pageUrl: string }
+export interface ProviderRecord { code: string; name: string | null; brands: string | null; quantity: string | null; categories: string[]; photos: ProviderPhoto[]; /** Every other upload the record holds. */ uploads?: ProviderPhoto[]; pageUrl: string }
 export type ProviderResult =
     | { status: 'found'; record: ProviderRecord }
     | { status: 'not_found' }
@@ -183,7 +183,7 @@ function openFactsProvider(o: { id: string; label: string; site: string; product
                 record: {
                     code: String(p.code || j.code || ''), name: p.product_name_en || p.product_name || null, brands: p.brands || null,
                     quantity: typeof p.quantity === 'string' && p.quantity.trim() ? p.quantity.trim() : null,
-                    categories: Array.isArray(p.categories_tags) ? p.categories_tags.slice(0, 20) : [], photos, pageUrl: `${o.site}/product/${barcode}`,
+                    categories: Array.isArray(p.categories_tags) ? p.categories_tags.slice(0, 20) : [], photos, uploads: uploadedPhotos(p.images, `https://images.${host}`, String(p.code || barcode)), pageUrl: `${o.site}/product/${barcode}`,
                 },
             };
         },
@@ -207,6 +207,32 @@ export function openFactsElsewhere(j: any): string | null {
     const e = (Array.isArray(j?.errors) ? j.errors : []).find((x: any) => x?.field?.id === 'product_type');
     const v = String(e?.field?.value || '').trim();
     return /^[a-z]{3,20}$/.test(v) ? v : null;
+}
+
+const MAX_UPLOADS = 24;
+const NEWEST_UPLOADS = 16;
+const MIN_UPLOAD_SIDE = 800;
+
+/**
+ * Every upload of a record, not only the ones picked as the front: a cleaner shot
+ * often sits in another language or an older revision. An old product has hundreds,
+ * so the newest come first with a spread of the older ones. Uploads picked as the
+ * ingredients or nutrition photo are marked, since those show the back.
+ */
+export function uploadedPhotos(images: any, base: string, code: string): ProviderPhoto[] {
+    if (!images || typeof images !== 'object') return [];
+    const back = new Set(Object.entries<any>(images).filter(([k]) => /^(ingredients|nutrition)_/.test(k)).map(([, v]) => String(v?.imgid)));
+    const padded = code.length <= 8 ? code : code.padStart(13, '0');
+    const folder = padded.length <= 8 ? padded : padded.replace(/^(.{3})(.{3})(.{3})(.+)$/, '$1/$2/$3/$4');
+    const all = Object.entries<any>(images).filter(([k, v]) => /^\d{1,6}$/.test(k) && Math.max(Number(v?.sizes?.full?.w) || 0, Number(v?.sizes?.full?.h) || 0) >= MIN_UPLOAD_SIDE)
+        .sort(([a, x], [b, y]) => Number(y?.uploaded_t) - Number(x?.uploaded_t) || Number(b) - Number(a));
+    const older = all.slice(NEWEST_UPLOADS);
+    const step = Math.max(1, Math.ceil(older.length / (MAX_UPLOADS - NEWEST_UPLOADS)));
+    const picked = [...all.slice(0, NEWEST_UPLOADS), ...older.filter((_, i) => i % step === 0)].slice(0, MAX_UPLOADS);
+    return picked.map(([id, v]) => ({
+        url: `${base}/images/products/${folder}/${id}.jpg`, previewUrl: `${base}/images/products/${folder}/${id}.400.jpg`, kind: back.has(id) ? 'back' as const : 'other' as const,
+        language: null, width: Number(v.sizes.full.w), height: Number(v.sizes.full.h), imgid: id,
+    }));
 }
 
 /** Full-size pixel size of a selected photo (…/front_en.14.400.jpg → images.front_en of the same revision), and the upload it was cut from. */

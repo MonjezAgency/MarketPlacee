@@ -1,6 +1,10 @@
 /**
  * The Checkpoint B smoke set. Local only: reads ../qa/smoke-rows.csv, writes ../qa/smoke/ and ../qa/compare.jpg.
  * Touches neither the database nor Supabase. Answers are cached in a local file, so a second run costs nothing.
+ *
+ *   --plan      free sources only: writes the ranking to ../qa/alternatives/ and says what a full run would spend
+ *   --search    allows Serper, only after a --plan whose total fits what is left of the month
+ *   --rows FILE another row list, same columns as qa/smoke-rows.csv
  */
 import 'dotenv/config';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -13,7 +17,11 @@ import type { PipelineResult } from '../src/products/image-pipeline/types';
 
 const QA = join(process.cwd(), '..', 'qa');
 const OUT = join(QA, 'smoke');
-const AT_ONCE = 4;
+const ALTERNATIVES = join(QA, 'alternatives');
+const PLAN_FILE = join(OUT, 'plan.json');
+const flag = (name: string) => process.argv.includes(name);
+const option = (name: string) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
+const AT_ONCE = 3;
 const THUMB = 300;
 const PER_PAGE = 8;
 type Item = { row: Record<string, string>; r: PipelineResult };
@@ -67,6 +75,34 @@ async function sheet(pairs: Item[], file: string) {
     await sharp({ create: { width: columns * W + 12, height: rows * H + 24, channels: 3, background: '#ffffff' } }).composite(layers).jpeg({ quality: 82 }).toFile(file);
 }
 
+/** The top six of one product and why each lost, so a better photo that wasn't chosen can be seen. */
+async function alternativesSheet(row: Record<string, string>, r: PipelineResult) {
+    const list = r.ranked ?? [];
+    if (!list.length || !row.ean) return;
+    const W = THUMB + 20, H = THUMB + 74, columns = 3, head = 34;
+    const rows = Math.max(1, Math.ceil(list.length / columns));
+    const layers: { input: Buffer; left: number; top: number }[] = [{ input: Buffer.from(`<svg width="${W * columns}" height="${head}"><text x="12" y="23" font-family="Arial" font-size="16" fill="#111">${esc(cut(`#${row.n} ${row.ean} ${row.brand} ${row.name} ${row.size} · ${r.status}`.replace(/\s+/g, ' '), 96))}</text></svg>`), left: 0, top: 0 }];
+    for (const [i, p] of list.entries()) {
+        const left = (i % columns) * W + 10, top = Math.floor(i / columns) * H + head;
+        layers.push({ input: await tile(p.bytes, ''), left, top });
+        const lines = [`${i + 1}. ${p.source} · ${p.width}x${p.height} · score ${p.score}`, cut(p.why, 50), cut(p.why.slice(49), 50)];
+        layers.push({ input: Buffer.from(`<svg width="${THUMB}" height="66">${lines.map((l, n) => `<text x="0" y="${18 + n * 19}" font-family="Arial" font-size="13" fill="#222">${esc(l)}</text>`).join('')}</svg>`), left, top: top + THUMB + 4 });
+    }
+    await sharp({ create: { width: columns * W + 10, height: rows * H + head, channels: 3, background: '#ffffff' } }).composite(layers).jpeg({ quality: 80 }).toFile(join(ALTERNATIVES, `${row.ean}.jpg`));
+}
+
+function planText(items: Item[], left: number) {
+    const plans = items.flatMap((x) => (x.r.plan ? [x.r.plan] : []));
+    const sum = (k: keyof NonNullable<PipelineResult['plan']>) => plans.reduce((a, p) => a + p[k], 0);
+    const total = sum('searches') + sum('searchesIfRejected');
+    const out = {
+        rows: plans.length, withStudioFinalists: plans.filter((p) => p.finalists).length, visionCallsNow: sum('visionCalls'), visionCallsAfterSearch: sum('visionCallsAfterSearch'),
+        serperCertain: sum('searches'), serperIfVisionRejects: sum('searchesIfRejected'), serperTotal: total, serperLeft: left, fits: total <= left,
+    };
+    writeFileSync(PLAN_FILE, JSON.stringify(out, null, 1));
+    return out;
+}
+
 async function compareSheets(items: Item[]) {
     const pairs = items.filter((x) => x.row.reference || x.r.output || x.r.chosen || x.r.top.length);
     await sheet(pairs, join(QA, 'compare.jpg'));
@@ -109,23 +145,33 @@ function summary(items: Item[], searches: { used: number; cap: number }) {
 
 async function main() {
     mkdirSync(OUT, { recursive: true });
-    const rows = parseCsv(readFileSync(join(QA, 'smoke-rows.csv'), 'utf8')).map((row, i) => ({ ...row, n: String(i + 1) }));
+    mkdirSync(ALTERNATIVES, { recursive: true });
+    const rows = parseCsv(readFileSync(option('--rows') ?? join(QA, 'smoke-rows.csv'), 'utf8')).map((row, i) => ({ ...row, n: String(i + 1) }));
     const budget = new FileBudget(join(process.cwd(), '.image-budget.json'));
-    const { pipeline } = buildPipeline(new FileCache(join(OUT, 'cache.json')), budget);
+    const left = serperCap() - await budget.used('serper', 'month');
+    const plan = flag('--plan');
+    if (flag('--search')) {
+        const known = existsSync(PLAN_FILE) ? JSON.parse(readFileSync(PLAN_FILE, 'utf8')) : null;
+        if (!known) throw new Error('run --plan first: the number of searches must be known before any is spent');
+        if (known.serperTotal > left) throw new Error(`the plan needs ${known.serperTotal} searches and ${left} are left this month`);
+    }
+    const { pipeline } = buildPipeline(new FileCache(join(OUT, 'cache.json')), budget, plan || flag('--search') ? {} : { searches: [] });
     const items: Item[] = new Array(rows.length);
     let next = 0;
     await Promise.all(Array.from({ length: AT_ONCE }, async () => {
         while (next < rows.length) {
             const i = next++;
             const row = rows[i];
-            const r = await pipeline.run({ ean: row.ean, name: row.name, brand: row.brand, weight: row.size, category: row.category }, { upload: 'smoke' });
+            const r = await pipeline.run({ ean: row.ean, name: row.name, brand: row.brand, weight: row.size, category: row.category }, { upload: 'smoke', plan });
             items[i] = { row, r };
             console.log(`${String(i + 1).padStart(2)}/${rows.length} ${row.ean || '(none)'} ${r.status} ${cut(r.reason, 90)}`);
-            const { top: _t, chosen: _c, output: _o, preview: _p, ...plain } = r;
+            await alternativesSheet(row, r);
+            const { top: _t, chosen: _c, output: _o, preview: _p, ranked: _r, ...plain } = r;
             writeFileSync(join(OUT, `${String(i + 1).padStart(2, '0')}-${row.ean || 'none'}.json`), JSON.stringify(plain, null, 1));
             if (r.output) writeFileSync(join(OUT, `${String(i + 1).padStart(2, '0')}-${row.ean}.jpg`), r.output.jpeg);
         }
     }));
+    if (plan) { console.log(JSON.stringify(planText(items, left), null, 1)); return; }
     await compareSheets(items);
     const text = summary(items, { used: await budget.used('serper', 'month'), cap: serperCap() });
     writeFileSync(join(OUT, 'summary.md'), text);

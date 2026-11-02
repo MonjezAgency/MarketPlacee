@@ -1,3 +1,4 @@
+import { isStudioBackdrop } from '../image-pipeline/pixels';
 import { unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -13,11 +14,16 @@ import { gs1Country } from '../image-pipeline/gs1-prefixes';
 import { parseGtin, sameCode, toGtin14 } from '../image-pipeline/gtin';
 import { blockedDomain, domainClass, licenceOf, mayPublish } from '../image-pipeline/licensing';
 import { cleanName } from '../image-pipeline/name';
-import { domainPoints, identityTextPoints, resolutionPoints, total } from '../image-pipeline/scoring';
+import { domainPoints, flawsOf, identityTextPoints, isStudio, resolutionPoints, total } from '../image-pipeline/scoring';
+import { fingerprint } from '../image-pipeline/pixels';
+import { uploadedPhotos } from '../product-data-providers';
+import { perImage } from '../image-pipeline/vision';
 import { sharp } from '../image-pipeline/sharp';
 import { judgeAnswer } from '../image-pipeline/vision';
 import { checkDigit } from '../product-data-providers';
-import { ean13Png, pack } from './image-pipeline-fixtures';
+import { ean13Png, pack, shelf } from './image-pipeline-fixtures';
+
+const studioBackdropCases: [number[], boolean][] = [[[255, 255, 255], true], [[136, 170, 204], true], [[200, 20, 30], false], [[25, 22, 20], false]];
 
 describe('barcodes in every form', () => {
     it('refuses a wrong check digit', () => {
@@ -89,8 +95,8 @@ describe('the points', () => {
         expect(identityTextPoints({ url: 'x', title: 'Red Bull' }, id, [])).toBe(0);
     });
     it('caps at 100', () => {
-        expect(total({ white: 30, resolution: 20, identityText: 20, visual: 15, domain: 10, framing: 5, barcode: 15 })).toBe(100);
-        expect(total({ white: 30, resolution: 14, identityText: 8, visual: 0, domain: 2, framing: 5, barcode: 0 })).toBe(59);
+        expect(total({ white: 30, resolution: 20, identityText: 20, visual: 15, domain: 10, framing: 5, barcode: 15, penalty: 0 })).toBe(100);
+        expect(total({ white: 30, resolution: 14, identityText: 8, visual: 0, domain: 2, framing: 5, barcode: 0, penalty: 0 })).toBe(59);
     });
 });
 
@@ -193,6 +199,60 @@ describe('the house layout', () => {
     });
 });
 
+describe('what speaks against a photo', () => {
+    const good = { plain: true, studioBackdrop: true, ring: 1, fill: 0.8, sharpness: 900, contrast: 120, canvasAspect: 1.2 } as any;
+    it('a clean packshot has no flaws', () => expect(flawsOf(good, {}, '')).toEqual([]));
+    it('names each failure', () => {
+        expect(flawsOf({ ...good, plain: false }, {}, '')).toEqual(['busy_background']);
+        expect(flawsOf({ ...good, studioBackdrop: false }, {}, '')).toEqual(['busy_background']);
+        expect(flawsOf({ ...good, ring: 0.45 }, {}, '')).toEqual(['close_up']);
+        expect(flawsOf({ ...good, canvasAspect: 3.4 }, {}, '')).toEqual(['close_up']);
+        expect(flawsOf({ ...good, fill: 0.4 }, {}, '')).toEqual(['small_in_frame']);
+        expect(flawsOf({ ...good, sharpness: 100 }, {}, '')).toEqual(['blurry']);
+        expect(flawsOf({ ...good, contrast: 20 }, {}, '')).toEqual(['low_contrast']);
+        expect(flawsOf(good, { role: 'back' }, '')).toEqual(['back_of_pack']);
+    });
+    it('a multipack only counts when the row is not one', () => {
+        expect(flawsOf(good, { title: 'Red Bull 24 x 250ml' }, '250 ml')).toEqual(['multipack']);
+        expect(flawsOf(good, { title: 'Red Bull 24 x 250ml' }, '24 x 250 ml')).toEqual([]);
+    });
+    it('a barcode in shot alone does not rule a photo out', () => {
+        expect(isStudio(['shows_barcode'])).toBe(true);
+        expect(isStudio(['shows_barcode', 'blurry'])).toBe(false);
+    });
+    it('white, plain and scene read as they look', async () => {
+        const white = await fingerprint(await pack());
+        expect(white).toMatchObject({ plain: true, touchesEdge: false });
+        expect((await fingerprint(await pack({ background: '#d8d4cc' }))).plain).toBe(true);
+        expect((await fingerprint(await shelf())).plain).toBe(false);
+    });
+});
+
+describe('every upload of a record', () => {
+    const size = (w: number, h: number, t = 1) => ({ sizes: { full: { w, h } }, uploaded_t: t });
+    it('takes the full file, skips small ones and marks the back', () => {
+        const out = uploadedPhotos({ 1: size(2000, 1500), 2: size(400, 300), 3: size(1000, 1000), ingredients_en: { imgid: '3' }, front_en: { imgid: '1' } }, 'https://images.openfoodfacts.org', '3017620422003');
+        expect(out.map((p) => p.url)).toEqual(['https://images.openfoodfacts.org/images/products/301/762/042/2003/3.jpg', 'https://images.openfoodfacts.org/images/products/301/762/042/2003/1.jpg']);
+        expect(out[0].kind).toBe('back');
+    });
+    it('short codes keep one folder', () => expect(uploadedPhotos({ 1: size(900, 900) }, 'https://x', '80052760')[0].url).toBe('https://x/images/products/80052760/1.jpg'));
+    it('a product with hundreds keeps the newest and a spread of the old', () => {
+        const many = Object.fromEntries(Array.from({ length: 300 }, (_, i) => [String(i + 1), size(1000, 1000, i)]));
+        const out = uploadedPhotos(many, 'https://x', '3017620422003');
+        expect(out).toHaveLength(24);
+        expect(out[0].imgid).toBe('300');
+        expect(Number(out[23].imgid)).toBeLessThan(60);
+    });
+});
+
+describe('one answer per photo', () => {
+    it('reads each entry, and a flat answer counts only for the photo it names', () => {
+        expect(perImage({ images: [{ index: 1, a: 1 }, { index: 9 }] }, 3)).toEqual([null, { index: 1, a: 1 }, null]);
+        expect(perImage({ best_index: 2, a: 1 }, 3)).toEqual([null, null, { best_index: 2, a: 1 }]);
+        expect(perImage(null, 2)).toEqual([null, null]);
+    });
+});
+
 describe('brand disagreements', () => {
     const says = (rowBrand: string, sourceBrand: string) => buildIdentity(parseGtin('3017620422003')!, cleanName(`${rowBrand} spread 350g`, rowBrand), [
         { source: 'openfoodfacts', code: '3017620422003', name: null, brand: sourceBrand, quantity: null, imageUrls: [] },
@@ -291,3 +351,5 @@ describe('spending limits', () => {
         expect(searchQueries(identity)).toEqual([{ query: '"5449000000439"', language: 'en' }, { query: 'Acme Lemon 500ml', language: 'de' }]);
     });
 });
+
+it.each(studioBackdropCases)('backdrop %j counts as studio: %s', (colour, expected) => expect(isStudioBackdrop(colour)).toBe(expected));

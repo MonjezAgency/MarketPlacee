@@ -13,7 +13,11 @@ import type { Candidate, IdentityRecord, SourceCall, SourceId } from '../types';
  */
 export interface LookupAnswer { record: IdentityRecord | null; candidates: Candidate[] }
 export interface LookupSource { id: SourceId; keyEnv?: string; enabled(): boolean; lookup(code: string, ean: string, calls: SourceCall[], kind: ProductKind): Promise<LookupAnswer> }
-export interface SearchSource { id: SourceId; keyEnv: string; enabled(): boolean; search(query: string, ean: string, language: string, calls: SourceCall[]): Promise<Candidate[]> }
+export interface SearchSource {
+    id: SourceId; keyEnv: string; enabled(): boolean; search(query: string, ean: string, language: string, calls: SourceCall[]): Promise<Candidate[]>;
+    /** Where an answer to this query is cached, so a plan can tell what a run would spend. */
+    cacheKey?(query: string, language: string): string;
+}
 
 export const UNIT_COST: Partial<Record<SourceId, number>> = { serper: 0.001 };
 export const SERPER_CACHE_DAYS = 90;
@@ -49,11 +53,12 @@ export function openFacts(providers: ProductDataProvider[]): LookupSource {
                 }
                 if (r.status !== 'found') continue;
                 const fronts = r.record.photos.filter((ph) => ph.kind === 'front' || ph.kind === 'packaging');
+                const fromUploads = (r.record.uploads ?? []).filter((up) => !fronts.some((f) => f.imgid === up.imgid));
                 return {
                     record: { source: 'openfoodfacts', code: r.record.code || code, name: r.record.name, brand: r.record.brands, quantity: r.record.quantity, imageUrls: fronts.slice(0, 3).map((ph) => ph.url) },
-                    candidates: fronts.map((ph) => ({
+                    candidates: [...fronts, ...fromUploads].map((ph) => ({
                         url: ph.url, source: 'openfoodfacts', pageUrl: r.record.pageUrl, title: r.record.name ?? undefined, width: ph.width, height: ph.height, foundBy: code,
-                        licence: 'cc_by_sa', licenceLabel: p.license.images, attribution: p.license.attribution,
+                        licence: 'cc_by_sa', licenceLabel: p.license.images, attribution: p.license.attribution, ...(ph.kind === 'back' ? { role: 'back' as const } : {}),
                     })),
                 };
             }
@@ -89,9 +94,10 @@ export function upcItemDb(http: SourceHttp, budget: Budget): LookupSource {
         enabled: () => true,
         async lookup(code, ean, calls) {
             const r = await lookup(http, budget, calls, { source: 'upcitemdb', ean, what: `trial lookup ${code}`, url: `https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`, cacheKey: `upcitemdb:${code}`, gapMs: 10_500 });
-            const it = r.data?.items?.[0];
+            const items: any[] = r.data?.items ?? [];
+            const it = items[0];
             if (!it) return none;
-            const list = urls(it.images || []);
+            const list = urls(items.flatMap((i) => i.images || []));
             return {
                 record: { source: 'upcitemdb', code: it.ean || code, name: it.title || null, brand: it.brand || null, quantity: it.size || null, imageUrls: list },
                 candidates: list.map((url) => ({ url, source: 'upcitemdb', title: it.title, foundBy: code })),
@@ -149,11 +155,13 @@ export function serper(http: SourceHttp, budget: Budget): SearchSource {
         }
         return ok;
     };
+    const hlOf = (language: string) => (/^[a-z]{2}$/.test(language) ? language : 'en');
     return {
         id: 'serper', keyEnv: 'SERPER_API_KEY',
         enabled: () => !!key('SERPER_API_KEY'),
+        cacheKey: (query, language) => `serper:${hlOf(language)}:${query}`,
         async search(query, ean, language, calls) {
-            const hl = /^[a-z]{2}$/.test(language) ? language : 'en';
+            const hl = hlOf(language);
             const r = await http.json({
                 source: 'serper', ean, what: `images "${query}"`, url: 'https://google.serper.dev/images', method: 'POST',
                 headers: { 'X-API-KEY': key('SERPER_API_KEY'), 'Content-Type': 'application/json' },

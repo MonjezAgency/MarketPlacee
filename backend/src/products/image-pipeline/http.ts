@@ -4,6 +4,8 @@ import type { SourceCall, SourceId } from './types';
 /** Every source answer is kept this long, so a re-run costs nothing. */
 export const CACHE_DAYS = 30;
 const TIMEOUT_MS = 15_000;
+/** A full-size upload on a shared host takes its time. */
+const IMAGE_TIMEOUT_MS = 45_000;
 const RETRIES = 2;
 const BACKOFF_MS = 800;
 /** A source that refuses the key isn't asked again for this long: one dead key is one log line, not one per row. */
@@ -138,14 +140,19 @@ export async function downloadImage(url: string, fetcher: typeof fetch = fetch):
         if (!u) return { ok: false, reason: 'unsafe_url' };
         let res: Response;
         try {
-            res = await fetcher(u.toString(), { redirect: 'manual', headers: { 'User-Agent': 'AliFMCG-ImagePipeline/1.0', Accept: 'image/*' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+            res = await fetcher(u.toString(), { redirect: 'manual', headers: { 'User-Agent': 'AliFMCG-ImagePipeline/1.0', Accept: 'image/*' }, signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) });
         } catch (e: any) {
             return { ok: false, reason: e?.name === 'TimeoutError' ? 'download_timeout' : 'download_failed' };
         }
         if (res.status >= 300 && res.status < 400 && res.headers.get('location')) { at = new URL(res.headers.get('location')!, u).toString(); continue; }
         if (!res.ok) return { ok: false, reason: `download_http_${res.status}` };
         if (Number(res.headers.get('content-length') || 0) > MAX_IMAGE_BYTES) return { ok: false, reason: 'too_large' };
-        const bytes = Buffer.from(await res.arrayBuffer());
+        let bytes: Buffer;
+        try {
+            bytes = Buffer.from(await res.arrayBuffer());
+        } catch (e: any) {
+            return { ok: false, reason: e?.name === 'TimeoutError' ? 'download_timeout' : 'download_failed' };
+        }
         if (bytes.length > MAX_IMAGE_BYTES) return { ok: false, reason: 'too_large' };
         return { ok: true, bytes };
     }

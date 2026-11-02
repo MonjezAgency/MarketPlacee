@@ -14,7 +14,7 @@ const KEY_URL = 'https://openrouter.ai/api/v1/key';
 const LONGEST_SENT = 768;
 const TIMEOUT_MS = 180_000;
 /** These models think before they answer, and the thinking counts: too few tokens and the answer never comes. */
-const MAX_TOKENS = 6_000;
+const MAX_TOKENS = 8_000;
 /** The free tier allows 20 calls a minute. */
 const GAP_MS = 3_200;
 const TRIES = 3;
@@ -23,6 +23,8 @@ const MAX_WAIT_MS = 60_000;
 /** What a key that never bought credit gets a day; asked from OpenRouter, this only when it can't be read. */
 const SAFE_DAILY_LIMIT = 50;
 const LIMIT_CHECK_MS = 10 * 60 * 1000;
+/** A verdict on one photo of one barcode is never asked twice. */
+const VERDICT_DAYS = 365;
 
 const MUST_BE_TRUE = ['same_product', 'same_variant', 'same_size_or_count', 'front_face', 'single_product', 'studio_quality', 'matches_reference_style'] as const;
 const MUST_BE_FALSE = ['hand_shelf_or_lifestyle', 'watermark_or_overlay'] as const;
@@ -71,9 +73,9 @@ The product:
 ${said ? `What databases say for this barcode:\n${said}\n` : ''}${identity.conflicts.length ? `Known disagreements: ${identity.conflicts.join('; ')}\n` : ''}
 Images, in order: ${count} numbered candidates (0 to ${count - 1})${referenceCount ? `, then ${referenceCount} database photo(s) of this barcode for identity only` : ''}${styleCount ? `, then ${styleCount} examples of our house studio style (other products: for style only)` : ''}.
 
-Pick the candidate that is the best front photo of exactly this product, then answer about that one. If none qualifies, pick the closest and say why in "reason".
+Judge every candidate on its own and return one entry for each, in order. Say in "reason" what is wrong with it, if anything.
 Reply with one JSON object only:
-{"best_index": 0, "read_text": "brand and words legible on that pack", "same_product": true, "same_variant": true, "same_size_or_count": true, "front_face": true, "single_product": true, "studio_quality": true, "hand_shelf_or_lifestyle": false, "watermark_or_overlay": false, "matches_reference_style": true, "confidence": 0.0, "reason": ""}
+{"images": [{"index": 0, "read_text": "brand and words legible on that pack", "same_product": true, "same_variant": true, "same_size_or_count": true, "front_face": true, "single_product": true, "studio_quality": true, "hand_shelf_or_lifestyle": false, "watermark_or_overlay": false, "matches_reference_style": true, "confidence": 0.0, "reason": ""}]}
 same_product: this brand and product line.
 same_variant: flavour, range and version on the pack are this one. Pants are not Active Baby; Aussie Lemonade is not Mango Loco; Zero is not Original.
 same_size_or_count: the size or count printed on the pack matches, or none is legible and nothing contradicts it. A case or multipack for a single unit is false unless the product is that multipack.
@@ -99,6 +101,20 @@ export function parseAnswer(text: string): VisionAnswer | null {
         return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
     } catch { return null; }
 }
+
+/** One answer per candidate, or null where the model gave none. An answer about one photo only counts for that photo. */
+export function perImage(answer: any, count: number): (VisionAnswer | null)[] {
+    const out: (VisionAnswer | null)[] = new Array(count).fill(null);
+    if (!answer) return out;
+    if (!Array.isArray(answer.images)) {
+        if (Number.isInteger(answer.best_index) && answer.best_index >= 0 && answer.best_index < count) out[answer.best_index] = answer;
+        return out;
+    }
+    for (const a of answer.images) if (a && Number.isInteger(a.index) && a.index >= 0 && a.index < count) out[a.index] = a;
+    return out;
+}
+
+const sha1 = (b: Buffer) => createHash('sha1').update(b).digest('hex');
 
 export interface VisionOptions {
     budget?: Budget;
@@ -150,21 +166,30 @@ export class VisionGate {
         return (await this.budget.used('vision', 'day')) >= (await this.dayLimit()) ? 'vision_quota' : null;
     }
 
-    async check(model: string, identity: Identity, candidates: Buffer[], references: Buffer[], style: Buffer[], calls: SourceCall[]): Promise<VisionVerdict> {
+    private verdictKey(ean: string, photo: Buffer) { return `vision:${ean}:${sha1(photo)}`; }
+
+    /** Has this photo of this barcode been judged already? */
+    async judged(ean: string, photo: Buffer) { return (await this.cache.get(this.verdictKey(ean, photo)).catch(() => undefined)) !== undefined; }
+
+    /** One verdict per candidate, in order. Only photos never judged for this barcode are sent, all in one call. */
+    async check(model: string, identity: Identity, candidates: Buffer[], references: Buffer[], style: Buffer[], calls: SourceCall[]): Promise<VisionVerdict[]> {
         if (!this.enabled) throw new VisionUnavailable('no_key');
         if (!isFreeModel(model)) {
             this.logger.error(`[vision] refused "${model}": only models ending in :free may be called`);
             throw new VisionUnavailable('paid_model_refused');
         }
-        const urls = await Promise.all([...candidates, ...references, ...style].map(dataUrl));
-        const prompt = visionPrompt(identity, candidates.length, references.length, style.length);
-        const digest = createHash('sha256').update(model).update(prompt).update(urls.join('')).digest('hex').slice(0, 32);
-        const cacheKey = `vision:${digest}`;
-        const hit = await this.cache.get(cacheKey).catch(() => undefined) as (VisionAnswer & { answered_by?: string }) | undefined;
-        if (hit) {
+        const keys = candidates.map((c) => this.verdictKey(identity.ean, c));
+        const known = await Promise.all(keys.map((k) => this.cache.get(k).catch(() => undefined))) as ((VisionAnswer & { answered_by?: string }) | undefined)[];
+        const verdicts: VisionVerdict[] = new Array(candidates.length);
+        const fresh: number[] = [];
+        known.forEach((hit, i) => {
+            if (!hit) { fresh.push(i); return; }
             calls.push({ source: 'vision', ean: identity.ean, what: `${hit.answered_by ?? model} (cached)`, status: 'cached', ms: 0, cost: 0 });
-            return this.verdict(hit.answered_by ?? model, hit, candidates.length, identity, 0, true);
-        }
+            verdicts[i] = this.verdict(hit.answered_by ?? model, hit, i, identity, 0, true);
+        });
+        if (!fresh.length) return verdicts;
+        const urls = await Promise.all([...fresh.map((i) => candidates[i]), ...references, ...style].map(dataUrl));
+        const prompt = visionPrompt(identity, fresh.length, references.length, style.length);
         const models = [...new Set([model, FALLBACK_VISION_MODEL])];
         let reply: Reply | null = null;
         for (const m of models) {
@@ -172,8 +197,13 @@ export class VisionGate {
             if (reply?.answer) break;
         }
         if (!reply) throw new VisionUnavailable('rate_limited', 429);
-        if (reply.answer) await this.cache.set(cacheKey, { ...reply.answer, answered_by: reply.model }, 30).catch(() => undefined);
-        return this.verdict(reply.model, reply.answer, candidates.length, identity, reply.cost, false);
+        const answers = perImage(reply.answer, fresh.length);
+        await Promise.all(fresh.map(async (i, n) => {
+            const answer = answers[n];
+            if (answer) await this.cache.set(keys[i], { ...answer, answered_by: reply!.model }, VERDICT_DAYS).catch(() => undefined);
+            verdicts[i] = this.verdict(reply!.model, answer, i, identity, n === 0 ? reply!.cost : 0, false);
+        }));
+        return verdicts;
     }
 
     /** Null means this model can't answer now and the next should try. */
@@ -233,8 +263,8 @@ export class VisionGate {
         return turn;
     }
 
-    private verdict(model: string, answer: VisionAnswer | null, count: number, identity: Identity, cost: number, cached: boolean): VisionVerdict {
-        const j = judgeAnswer(answer, count, identity.brand);
-        return { model, ...j, reason: String(answer?.reason ?? (answer ? '' : 'unreadable answer')).slice(0, 400), answer, cost, cached };
+    private verdict(model: string, answer: VisionAnswer | null, index: number, identity: Identity, cost: number, cached: boolean): VisionVerdict {
+        const j = judgeAnswer(answer && { ...answer, best_index: 0 }, 1, identity.brand);
+        return { model, ...j, index, reason: String(answer?.reason ?? (answer ? '' : 'unreadable answer')).slice(0, 400), answer, cost, cached };
     }
 }

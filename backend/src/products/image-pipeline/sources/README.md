@@ -2,7 +2,7 @@
 
 Official APIs only. No search engine, retailer or stock site is scraped. A source turns on when its key appears.
 
-Order, stopping at the first photo vision accepts: cache, supplier pictures, Open Facts, UPCitemdb, EAN-DB, Go-UPC, Barcode Spider, then Serper.
+Every free source runs first and all their photos are ranked together: cache, supplier pictures, Open Facts (every upload, not just the front), UPCitemdb (every image), EAN-DB, Go-UPC, Barcode Spider. Vision sees only the top 3 studio photos. A phone photo never wins: such a row is `needs_better_image`, and only then, or on no candidate, does Serper run.
 Barcode databases are only called inside their free allowance (`budget.ts`); past it they are skipped, never charged.
 Licence in the pipeline's sense: `unknown` goes to a person under policy A, whatever the score.
 

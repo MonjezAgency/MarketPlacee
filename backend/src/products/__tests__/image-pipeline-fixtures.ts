@@ -1,10 +1,18 @@
 import { sharp } from '../image-pipeline/sharp';
 
 /** Made-up pictures. No real product is in any of them. */
+
+/** Fine lines over the pack, as printed text is on a real one, so a sharp picture measures sharp. */
+async function print(width: number, height: number): Promise<Buffer> {
+    const data = Buffer.alloc(width * height * 4);
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) data[(y * width + x) * 4 + 3] = (x >> 1) % 2 && (y >> 2) % 2 ? 120 : 0;
+    return sharp(data, { raw: { width, height, channels: 4 } }).png().toBuffer();
+}
+
 export async function pack(o: { width?: number; height?: number; boxWidth?: number; boxHeight?: number; colour?: string; background?: string; stripe?: number } = {}): Promise<Buffer> {
     const { width = 1200, height = 1200, boxWidth = 600, boxHeight = 1000, colour = '#1a5fb4', background = '#ffffff', stripe = 0 } = o;
     const box = await sharp({ create: { width: boxWidth, height: boxHeight, channels: 3, background: colour } })
-        .composite([{ input: await sharp({ create: { width: Math.round(boxWidth * 0.6), height: Math.round(boxHeight * 0.12), channels: 3, background: '#f5c211' } }).png().toBuffer(), left: Math.round(boxWidth * 0.2), top: Math.round(boxHeight * (0.1 + stripe * 0.15)) }]).png().toBuffer();
+        .composite([{ input: await print(boxWidth, boxHeight) }, { input: await sharp({ create: { width: Math.round(boxWidth * 0.6), height: Math.round(boxHeight * 0.12), channels: 3, background: '#f5c211' } }).png().toBuffer(), left: Math.round(boxWidth * 0.2), top: Math.round(boxHeight * (0.1 + stripe * 0.15)) }]).png().toBuffer();
     return sharp({ create: { width, height, channels: 3, background } })
         .composite([{ input: box, left: Math.round((width - boxWidth) / 2), top: Math.round((height - boxHeight) / 2) }]).png().toBuffer();
 }

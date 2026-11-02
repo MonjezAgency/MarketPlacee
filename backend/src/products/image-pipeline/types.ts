@@ -2,7 +2,7 @@ import type { Gs1Country } from './gs1-prefixes';
 import type { Gtin } from './gtin';
 import type { CleanName } from './name';
 
-export type ImageStatus = 'pending' | 'searching' | 'approved' | 'needs_bg_removal' | 'needs_review' | 'not_found' | 'invalid_ean' | 'low_res' | 'failed';
+export type ImageStatus = 'pending' | 'searching' | 'approved' | 'needs_bg_removal' | 'needs_better_image' | 'needs_review' | 'not_found' | 'invalid_ean' | 'low_res' | 'failed';
 export type Licence = 'supplier' | 'manufacturer' | 'cc_by_sa' | 'unknown' | 'editorial' | 'stock_licensed';
 export type DomainClass = 'brand' | 'retailer' | 'ean_database' | 'unknown';
 export type SourceId = 'openfoodfacts' | 'ean-db' | 'upcitemdb' | 'go-upc' | 'barcode-spider' | 'serper' | 'shutterstock' | 'supplier';
@@ -57,9 +57,12 @@ export interface Candidate {
     foundBy?: string;
     /** Which search query, for Tier B. */
     query?: string;
+    /** The source itself says this shows the back: ingredients or nutrition. */
+    role?: 'back';
 }
 
-export interface ScoreParts { white: number; resolution: number; identityText: number; visual: number; domain: number; framing: number; barcode: number }
+export type Flaw = 'busy_background' | 'close_up' | 'small_in_frame' | 'blurry' | 'low_contrast' | 'back_of_pack' | 'multipack' | 'shows_barcode';
+export interface ScoreParts { white: number; resolution: number; identityText: number; visual: number; domain: number; framing: number; barcode: number; penalty: number }
 export interface Scored extends Candidate {
     score: number;
     parts: ScoreParts;
@@ -70,7 +73,16 @@ export interface Scored extends Candidate {
     pixelWidth: number;
     pixelHeight: number;
     whiteBackground: boolean;
+    flaws: Flaw[];
+    /** Nothing in the pixels speaks against a studio packshot. Vision still has to agree. */
+    studio: boolean;
 }
+
+/** One line of the contact sheet: a photo and why it did or didn't win. */
+export interface RankedPhoto { url: string; source: string; width: number; height: number; score: number; why: string; bytes: Buffer }
+
+/** What a run would spend, worked out from free sources only. */
+export interface RunPlan { finalists: number; visionCalls: number; visionCallsAfterSearch: number; searches: number; searchesIfRejected: number }
 
 export interface VisionAnswer {
     best_index: number;
@@ -113,8 +125,12 @@ export interface PipelineResult {
     /** Exact reason shown to admins. Never just "no image". */
     reason: string;
     trace: Trace;
-    /** Up to five, best first, for one-click review. */
+    /** Up to six, best first, for one-click review. */
     top: Scored[];
+    /** The same with what lost and why, for the contact sheet. */
+    ranked?: RankedPhoto[];
+    /** Set on a planning run: nothing was judged or searched. */
+    plan?: RunPlan;
     chosen?: Scored;
     /** Would this be published under each licence setting. */
     publishable: { A: boolean; B: boolean };

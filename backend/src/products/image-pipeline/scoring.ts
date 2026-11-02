@@ -1,7 +1,7 @@
 import { sameCode } from './gtin';
 import type { Fingerprint } from './pixels';
 import { similarity } from './pixels';
-import type { Candidate, DomainClass, Identity, ScoreParts } from './types';
+import type { Candidate, DomainClass, Flaw, Identity, ScoreParts } from './types';
 
 /** Longest side below this is thrown out. */
 export const MIN_LONG_SIDE = 800;
@@ -72,5 +72,35 @@ export function framingPoints(print: Fingerprint): number {
 }
 
 export function total(parts: ScoreParts): number {
-    return Math.min(100, Math.round(Object.values(parts).reduce((a, b) => a + b, 0) * 10) / 10);
+    return Math.max(0, Math.min(100, Math.round(Object.values(parts).reduce((a, b) => a + b, 0) * 10) / 10));
 }
+
+/**
+ * What the pixels and the source can say against a photo. Thresholds come from
+ * the 11 house-style references (2 Nov 2026): plain edge 0.92 and up, against 0.33
+ * and under for phone photos; sharpness 668 and up, so half of that is soft;
+ * contrast 77 and up; fill 0.65 and up.
+ */
+const MIN_FILL = 0.5;
+const MIN_EDGE_CLEAR = 0.5;
+const MIN_SHARPNESS = 330;
+const MIN_CONTRAST = 40;
+const MAX_CANVAS_ASPECT = 3;
+export const PENALTY: Record<Flaw, number> = { busy_background: 25, close_up: 20, small_in_frame: 15, blurry: 20, low_contrast: 10, back_of_pack: 30, multipack: 15, shows_barcode: 20 };
+const MULTIPACK = /\b\d+\s*[x×]\s*\d+|\b(pack|case|box|tray) of \d+|\bmulti-?pack\b/i;
+
+export function flawsOf(print: Fingerprint, c: Pick<Candidate, 'role' | 'title'>, size: string): Flaw[] {
+    const flaws: Flaw[] = [];
+    if (!print.plain || !print.studioBackdrop) flaws.push('busy_background');
+    if ((print.plain && print.ring < MIN_EDGE_CLEAR) || print.canvasAspect > MAX_CANVAS_ASPECT) flaws.push('close_up');
+    if (print.plain && print.fill < MIN_FILL) flaws.push('small_in_frame');
+    if (print.sharpness < MIN_SHARPNESS) flaws.push('blurry');
+    if (print.plain && print.contrast < MIN_CONTRAST) flaws.push('low_contrast');
+    if (c.role === 'back') flaws.push('back_of_pack');
+    if (MULTIPACK.test(c.title ?? '') && !/x/i.test(size)) flaws.push('multipack');
+    return flaws;
+}
+
+/** A barcode in shot proves the product and usually means the back: that one alone doesn't rule a photo out, vision does. */
+export const isStudio = (flaws: Flaw[]) => flaws.every((f) => f === 'shows_barcode');
+export const penaltyOf = (flaws: Flaw[]) => -flaws.reduce((sum, f) => sum + PENALTY[f], 0);
