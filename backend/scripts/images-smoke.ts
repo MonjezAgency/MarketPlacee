@@ -46,7 +46,7 @@ async function pairTile(row: Record<string, string>, r: PipelineResult) {
     const refFile = row.reference ? join(QA, 'reference', row.reference) : '';
     const v = r.trace.vision[r.trace.vision.length - 1];
     const lines = [
-        `${row.synthetic === 'yes' ? '[SYNTHETIC] ' : ''}${row.brand} ${row.name} ${row.size} · ${r.status}`,
+        `#${row.n} ${row.ean || 'no barcode'} ${row.synthetic === 'yes' ? '[SYNTHETIC] ' : ''}${row.brand} ${row.name} ${row.size} · ${r.status}`.replace(/\s+/g, ' '),
         `${kind} · source ${r.chosen?.source ?? '-'} · score ${r.chosen?.score ?? '-'} · licence ${r.chosen?.licence ?? '-'} · A ${r.publishable.A || r.wouldPublish?.A ? 'yes' : 'no'} / B ${r.publishable.B || r.wouldPublish?.B ? 'yes' : 'no'}`,
         `vision: ${v ? `${v.passed ? 'pass' : 'fail'} ${v.confidence.toFixed(2)} ${v.reason}` : r.reason}`,
     ].map((l) => cut(l, 88));
@@ -109,7 +109,7 @@ function summary(items: Item[], searches: { used: number; cap: number }) {
 
 async function main() {
     mkdirSync(OUT, { recursive: true });
-    const rows = parseCsv(readFileSync(join(QA, 'smoke-rows.csv'), 'utf8'));
+    const rows = parseCsv(readFileSync(join(QA, 'smoke-rows.csv'), 'utf8')).map((row, i) => ({ ...row, n: String(i + 1) }));
     const budget = new FileBudget(join(process.cwd(), '.image-budget.json'));
     const { pipeline } = buildPipeline(new FileCache(join(OUT, 'cache.json')), budget);
     const items: Item[] = new Array(rows.length);
