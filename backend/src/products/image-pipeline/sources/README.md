@@ -2,7 +2,7 @@
 
 Official APIs only. No search engine, retailer or stock site is scraped. A source turns on when its key appears.
 
-Every free source runs first and all their photos are ranked together: cache, supplier pictures, Open Facts (every upload, not just the front), UPCitemdb (every image), EAN-DB, Go-UPC, Barcode Spider. Vision sees only the top 3 studio photos. A phone photo never wins: such a row is `needs_better_image`, and only then, or on no candidate, does Serper run.
+Every free source runs first and all their photos are ranked together: cache, supplier pictures, Open Facts (every upload, not just the front), UPCitemdb (every image), EAN-DB, Go-UPC, Barcode Spider. A white studio photo is laid out as it is. Otherwise the best ordinary photos go through a vision screen on the raw picture, and only one that passes costs a Photoroom cut-out. Vision always judges the finished 1000×1000 picture. A row with neither gets Serper, without quotes round the barcode (a free account refuses them), and a result naming neither the barcode nor the brand is dropped before download.
 Barcode databases are only called inside their free allowance (`budget.ts`); past it they are skipped, never charged.
 Licence in the pipeline's sense: `unknown` goes to a person under policy A, whatever the score.
 

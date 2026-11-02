@@ -59,6 +59,18 @@ export function identityTextPoints(c: Pick<Candidate, 'title' | 'pageUrl' | 'url
     return Math.round(points * 10) / 10;
 }
 
+/**
+ * A barcode without quotes brings back anything on the web. A result that names
+ * neither the barcode nor the brand isn't worth a download, let alone a vision call.
+ */
+export function namesProduct(c: Pick<Candidate, 'title' | 'pageUrl' | 'url'>, brand: string, codes: string[]): boolean {
+    const text = `${c.title ?? ''} ${c.pageUrl ?? ''}`;
+    if ((text.match(/\d{8,14}/g) || []).some((d) => codes.some((code) => sameCode(d, code)))) return true;
+    const words = tokens(brand);
+    const pool = tokens(text);
+    return words.length > 0 && words.every((w) => fuzzyHas(w, pool));
+}
+
 /** Best match against the photos a database links to this barcode. */
 export function visualPoints(print: Fingerprint, references: Fingerprint[]): number {
     if (!references.length) return 0;

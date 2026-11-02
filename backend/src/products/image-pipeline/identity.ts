@@ -35,9 +35,9 @@ export function buildIdentity(gtin: Gtin, name: CleanName, records: IdentityReco
     };
 }
 
-/** At most two searches: the barcode in quotes, then the brand, name and size. */
+/** At most two searches: the barcode, then the brand, name and size. No quotes round the barcode: Serper refuses them on a free account (400, 2 Nov 2026). */
 export function searchQueries(identity: Identity): { query: string; language: string }[] {
-    const list = [{ query: `"${identity.ean}"`, language: 'en' }];
+    const list = [{ query: identity.ean, language: 'en' }];
     const has = (text: string, part: string) => compact(text).includes(compact(part));
     let words = identity.name;
     if (identity.brand && !has(words, identity.brand)) words = `${identity.brand} ${words}`.trim();

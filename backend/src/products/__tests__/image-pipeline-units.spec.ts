@@ -346,9 +346,9 @@ describe('spending limits', () => {
         expect(source.enabled()).toBe(true);
         delete process.env.BARCODESPIDER_API_KEY; delete process.env.BARCODESPIDER_TRIAL_UNTIL;
     });
-    it('the search words are the barcode in quotes, then brand, name and size once each', () => {
+    it('the search words are the barcode, then brand, name and size once each', () => {
         const identity: any = { ean: '5449000000439', brand: 'Acme', name: 'Acme Lemon 500ml', size: '500ml', packLanguage: 'de' };
-        expect(searchQueries(identity)).toEqual([{ query: '"5449000000439"', language: 'en' }, { query: 'Acme Lemon 500ml', language: 'de' }]);
+        expect(searchQueries(identity)).toEqual([{ query: '5449000000439', language: 'en' }, { query: 'Acme Lemon 500ml', language: 'de' }]);
     });
 });
 

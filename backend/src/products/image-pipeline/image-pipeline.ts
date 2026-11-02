@@ -10,7 +10,7 @@ import { buildIdentity, searchQueries } from './identity';
 import { blockedDomain, DEFAULT_POLICY, domainClass, licenceOf, mayPublish, type LicencePolicy } from './licensing';
 import { cleanName } from './name';
 import { fingerprint, hashDistance, isWhiteBackground, rawRgb, whiteRingShare, type Fingerprint } from './pixels';
-import { cutoutFits, cuttable, domainPoints, flawsOf, framingPoints, identityTextPoints, isStudio, MIN_LONG_SIDE, penaltyOf, resolutionPoints, total, visualPoints, WEIGHTS } from './scoring';
+import { cutoutFits, cuttable, domainPoints, flawsOf, framingPoints, identityTextPoints, isStudio, MIN_LONG_SIDE, namesProduct, penaltyOf, resolutionPoints, total, visualPoints, WEIGHTS } from './scoring';
 import type { LookupSource, SearchSource } from './sources';
 import type { Candidate, Identity, IdentityRecord, ImageStatus, PipelineResult, PipelineRow, RankedPhoto, RunPlan, Scored, SourceCall, Trace, VisionStage, VisionVerdict } from './types';
 import { VisionGate, VisionUnavailable, visionModel } from './vision';
@@ -156,7 +156,10 @@ export class ImagePipeline {
         if (person || down) return this.nothingAccepted(state, trace, end, down);
         for (const source of searches) {
             for (const q of searchQueries(identity)) {
-                await add(await source.search(q.query, identity.ean, q.language, trace.calls).catch(() => []));
+                const found = await source.search(q.query, identity.ean, q.language, trace.calls).catch(() => []);
+                const onTopic = found.filter((c) => namesProduct(c, identity.brand, gtin.searchCodes));
+                for (const c of found) if (!onTopic.includes(c)) trace.rejects.push({ url: c.url, source: c.source, reason: 'search_result_off_product' });
+                await add(onTopic);
                 if (state.lastUsable >= ENOUGH_FROM_A_SEARCH) break;
             }
         }

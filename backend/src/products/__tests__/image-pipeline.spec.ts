@@ -68,7 +68,7 @@ describe('a row through the pipeline', () => {
         ['Monster Aussie Lemonade 500ml', 'Monster', 'Monster Mango Loco'],
     ])('wrong variant for %s stops at vision', async (name, brand, read) => {
         const url = 'https://shop.tesco.com/v.jpg';
-        const { pipeline } = build({ [url]: await pack() }, { searches: [search([c(url)])] }, () => reply(answer({ same_variant: false, read_text: read, confidence: 0.95, reason: `this is ${read}` })));
+        const { pipeline } = build({ [url]: await pack() }, { searches: [search([c(url, { title: name })])] }, () => reply(answer({ same_variant: false, read_text: read, confidence: 0.95, reason: `this is ${read}` })));
         const r = await pipeline.run({ ...row, name, brand });
         expect(r.status).toBe('needs_review');
         expect(r.reason).toMatch(/same_variant/);
@@ -297,7 +297,7 @@ describe('free sources first', () => {
         const few = search([c('https://shop.tesco.com/1.jpg')]);
         const { pipeline } = build({ 'https://shop.tesco.com/1.jpg': await shelf() }, { searches: [few] }, () => reply(answer({ confidence: 0.2, edges_clean: false })));
         await pipeline.run(row);
-        expect((few.search as jest.Mock).mock.calls.map((x) => x[0])).toEqual([`"${ean}"`, 'Acme Lemon Drink 500 ml']);
+        expect((few.search as jest.Mock).mock.calls.map((x) => x[0])).toEqual([ean, 'Acme Lemon Drink 500 ml']);
     });
 
     it('three usable photos from the first search: no second search', async () => {
@@ -579,5 +579,14 @@ describe('one final picture per product', () => {
         const plain = await pipeline.run(row);
         const ro = await pipeline.run({ ...row, market: 'ro' });
         expect(ro.chosen?.url).not.toBe(plain.chosen?.url);
+    });
+
+    it('a search result that names neither the barcode nor the brand is dropped unseen', async () => {
+        const off = 'https://pisces.bbystatic.com/toy.jpg', on = 'https://shop.tesco.com/acme.jpg';
+        const download = jest.fn(async () => ({ ok: true as const, bytes: await pack() }));
+        const { pipeline } = build({}, { searches: [search([c(off, { title: 'Star Wars Vintage Collection', pageUrl: 'https://www.bestbuy.com/toy' }), c(on)])], download: download as any }, () => reply(answer()));
+        const r = await pipeline.run(row);
+        expect(download.mock.calls.map(([u]: any) => u)).not.toContain(off);
+        expect(r.trace.rejects.find((x) => x.url === off)?.reason).toBe('search_result_off_product');
     });
 });
