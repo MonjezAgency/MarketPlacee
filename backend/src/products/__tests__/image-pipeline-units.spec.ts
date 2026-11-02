@@ -4,7 +4,7 @@ import { join } from 'path';
 import { Logger } from '@nestjs/common';
 import { FileBudget, FREE_ALLOWANCE, MemoryBudget } from '../image-pipeline/budget';
 import { MemoryCache, SourceHttp } from '../image-pipeline/http';
-import { searchQueries } from '../image-pipeline/identity';
+import { buildIdentity, searchQueries } from '../image-pipeline/identity';
 import { barcodeSpider, eanDb, serper } from '../image-pipeline/sources';
 import type { SourceCall } from '../image-pipeline/types';
 import { decodeBarcode } from '../image-pipeline/barcode';
@@ -191,6 +191,15 @@ describe('the house layout', () => {
         };
         expect(await composeCutout(original, clean)).toMatchObject({ status: 'ok', engine: 'photoroom' });
     });
+});
+
+describe('brand disagreements', () => {
+    const says = (rowBrand: string, sourceBrand: string) => buildIdentity(parseGtin('3017620422003')!, cleanName(`${rowBrand} spread 350g`, rowBrand), [
+        { source: 'openfoodfacts', code: '3017620422003', name: null, brand: sourceBrand, quantity: null, imageUrls: [] },
+    ]).conflicts;
+    it('a company that owns the brand is no disagreement', () => expect(says('Nutella', 'Ferrero')).toEqual([]));
+    it('another brand of the same company still is', () => expect(says('Pampers', 'Fairy')).toHaveLength(1));
+    it('a stranger still is', () => expect(says('Nutella', 'Nocilla')).toHaveLength(1));
 });
 
 describe('spending limits', () => {

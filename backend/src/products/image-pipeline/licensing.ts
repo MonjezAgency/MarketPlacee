@@ -17,6 +17,8 @@ const OWNER_DOMAINS: Record<string, string[]> = {
     milka: ['mondelezinternational', 'milka'], oreo: ['mondelezinternational', 'oreo'], dove: ['unilever', 'dove'], lipton: ['unilever', 'lipton'], redbull: ['redbull'], monster: ['monsterenergy'], prime: ['drinkprime'],
     cocacola: ['coca-cola', 'cocacola', 'coca-colacompany'], pepsi: ['pepsico', 'pepsi'], lavazza: ['lavazza'], nescafe: ['nescafe', 'nestle'], persil: ['henkel', 'persil'], nivea: ['nivea', 'beiersdorf'],
 };
+/** True when one name is the company that owns the other: a database saying "Ferrero" for a Nutella row is no disagreement. */
+export const ownedBy = (brand: string, company: string) => (OWNER_DOMAINS[compact(brand)] || []).includes(compact(company));
 const RETAILERS = new Set([
     'carrefour', 'tesco', 'dm', 'rewe', 'kaufland', 'amazon', 'emag', 'noon', 'sainsburys', 'asda', 'morrisons', 'ocado', 'waitrose', 'lidl', 'aldi', 'auchan', 'walmart', 'target', 'ah', 'albertheijn', 'jumbo',
     'edeka', 'rossmann', 'mueller', 'bipa', 'migros', 'coop', 'lulu', 'luluhypermarket', 'spinneys', 'superdrug', 'boots', 'etos', 'kruidvat', 'douglas', 'costco', 'mega-image', 'freshful', 'sephora',

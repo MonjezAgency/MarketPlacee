@@ -1,4 +1,5 @@
 import type { Gtin } from './gtin';
+import { ownedBy } from './licensing';
 import type { CleanName } from './name';
 import type { Identity, IdentityRecord } from './types';
 
@@ -21,7 +22,7 @@ function mostSaid(values: (string | null)[]): string {
 export function buildIdentity(gtin: Gtin, name: CleanName, records: IdentityRecord[]): Identity {
     const brand = name.brand || mostSaid(records.map((r) => r.brand));
     const conflicts: string[] = [];
-    for (const r of records) if (r.brand && brand && !overlaps(r.brand, brand)) conflicts.push(`brand: ${r.source} says "${r.brand}", row says "${brand}"`);
+    for (const r of records) if (r.brand && brand && !overlaps(r.brand, brand) && !ownedBy(brand, r.brand) && !ownedBy(r.brand, brand)) conflicts.push(`brand: ${r.source} says "${r.brand}", row says "${brand}"`);
     const size = name.size || mostSaid(records.map((r) => r.quantity));
     const fromRecords = !name.clean ? mostSaid(records.map((r) => r.name)) : '';
     const matched = records[0]?.code;

@@ -90,6 +90,7 @@ function summary(items: Item[], searches: { used: number; cap: number }) {
     const models = [...new Set(live('vision').filter((c) => c.status === 200).map((c) => c.what))];
     const visionCost = live('vision').reduce((a, c) => a + (c.cost || 0), 0);
     const white = items.filter(({ r }) => r.output).length, cut_ = counts.needs_bg_removal || 0;
+    const skipped = (note: string) => all.filter((c) => c.source === 'serper' && c.status === 'skipped' && c.note === note).length;
     const free = ['openfoodfacts', 'upcitemdb', 'ean-db', 'go-upc', 'barcode-spider'];
     return [
         '# Smoke run', '', `Rows: ${n}, of which ${items.filter((x) => x.row.synthetic === 'yes').length} have synthetic names and ${n - real.length} have no barcode.`, '',
@@ -98,7 +99,7 @@ function summary(items: Item[], searches: { used: number; cap: number }) {
         `## Auto-approve rate (of ${real.length} rows with a barcode)\n- Policy A now: ${now('A')}, once backgrounds are removed: ${later('A')}\n- Policy B now: ${now('B')}, once backgrounds are removed: ${later('B')}`, '',
         '## Sources\n| Source | Candidates | Won (passed vision) |\n|---|---|---|', ...Object.entries(sources).map(([k, v]) => `| ${k} | ${v.candidates} | ${v.won} |`), '',
         '## Cost',
-        `- Serper: ${live('serper').length} real searches this run, ${searches.used}/${searches.cap} used this month, ${searches.cap - searches.used} left, ${all.filter((c) => c.source === 'serper' && c.status === 'skipped').length} skipped by the cap`,
+        `- Serper: ${live('serper').length} real searches this run, ${searches.used}/${searches.cap} used this month, ${searches.cap - searches.used} left, ${skipped('over its allowance')} skipped by the cap, ${skipped('key refused')} skipped because the key is refused`,
         `- OpenRouter: ${live('vision').filter((c) => c.status === 200).length} answered calls, ${live('vision').filter((c) => c.status !== 200).length} refused or limited, model(s) ${models.join(', ') || 'none'}, reported cost $${visionCost.toFixed(4)}`,
         `- Photoroom: ${live('photoroom').length} calls`,
         ...free.map((s) => `- ${s}: ${live(s).length} real calls, $0`), '',
