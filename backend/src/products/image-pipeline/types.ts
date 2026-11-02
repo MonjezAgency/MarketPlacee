@@ -2,10 +2,10 @@ import type { Gs1Country } from './gs1-prefixes';
 import type { Gtin } from './gtin';
 import type { CleanName } from './name';
 
-export type ImageStatus = 'pending' | 'searching' | 'approved' | 'needs_review' | 'not_found' | 'invalid_ean' | 'low_res' | 'failed';
+export type ImageStatus = 'pending' | 'searching' | 'approved' | 'needs_bg_removal' | 'needs_review' | 'not_found' | 'invalid_ean' | 'low_res' | 'failed';
 export type Licence = 'supplier' | 'manufacturer' | 'cc_by_sa' | 'unknown' | 'editorial' | 'stock_licensed';
 export type DomainClass = 'brand' | 'retailer' | 'ean_database' | 'unknown';
-export type SourceId = 'openfoodfacts' | 'ean-search' | 'ean-db' | 'upcitemdb' | 'go-upc' | 'barcode-spider' | 'serper' | 'brave' | 'shutterstock' | 'supplier';
+export type SourceId = 'openfoodfacts' | 'ean-db' | 'upcitemdb' | 'go-upc' | 'barcode-spider' | 'serper' | 'shutterstock' | 'supplier';
 
 export interface PipelineRow {
     ean: string;
@@ -118,5 +118,9 @@ export interface PipelineResult {
     chosen?: Scored;
     /** Would this be published under each licence setting. */
     publishable: { A: boolean; B: boolean };
+    /** Would it be, once the background is gone. Set on `needs_bg_removal`. */
+    wouldPublish?: { A: boolean; B: boolean };
     output?: { jpeg: Buffer; webp: Buffer };
+    /** A sandbox cut-out to look at. Watermarked: never saved, never published. */
+    preview?: { png: Buffer; label: 'SANDBOX PREVIEW' };
 }

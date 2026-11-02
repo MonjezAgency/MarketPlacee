@@ -26,13 +26,19 @@ export interface JsonRequest {
     method?: 'GET' | 'POST';
     headers?: Record<string, string>;
     body?: string;
-    /** Null means never store this answer (Brave's terms forbid it). */
+    /** Null means never store this answer. */
     cacheKey: string | null;
+    /** How long to keep it, when not the usual 30 days. */
+    cacheDays?: number;
     /** Minimum gap between calls to this source. */
     gapMs?: number;
     cost?: number;
+    /** Asked only when a real call is about to happen: a cached answer spends nothing. False skips the call. */
+    allow?: () => Promise<boolean>;
+    /** A call that costs is never repeated by itself. */
+    retries?: number;
 }
-export interface JsonReply { status: number | 'timeout' | 'error' | 'cached'; data: any }
+export interface JsonReply { status: number | 'timeout' | 'error' | 'cached' | 'skipped'; data: any }
 
 /** Timeout, retries, one call at a time per source, every failure logged at warn, every answer cached. */
 export class SourceHttp {
@@ -54,12 +60,16 @@ export class SourceHttp {
                 return { status: 'cached', data: hit };
             }
         }
+        if (req.allow && !(await req.allow())) {
+            calls.push({ source: req.source, ean: req.ean, what: req.what, status: 'skipped', ms: 0, cost: 0 });
+            return { status: 'skipped', data: null };
+        }
         const started = Date.now();
         const reply = await this.inTurn(req, () => this.attempts(req));
         const paid = reply.status === 200 ? req.cost ?? 0 : 0;
         calls.push({ source: req.source, ean: req.ean, what: req.what, status: reply.status as SourceCall['status'], ms: Date.now() - started, cost: paid });
         if (typeof reply.status === 'number' && reply.status < 500 && reply.status !== 429 && reply.status !== 401 && reply.status !== 403 && req.cacheKey) {
-            await this.cache.set(req.cacheKey, reply.data ?? null, CACHE_DAYS).catch((e) => this.logger.warn(`[cache] ${req.source} ${req.ean}: ${e?.message}`));
+            await this.cache.set(req.cacheKey, reply.data ?? null, req.cacheDays ?? CACHE_DAYS).catch((e) => this.logger.warn(`[cache] ${req.source} ${req.ean}: ${e?.message}`));
         }
         if (reply.status !== 200 && reply.status !== 404) this.logger.warn(`[${req.source}] ${req.ean} ${req.what}: ${reply.status}`);
         return reply;
@@ -67,7 +77,7 @@ export class SourceHttp {
 
     private async attempts(req: JsonRequest): Promise<JsonReply> {
         let last: JsonReply = { status: 'error', data: null };
-        for (let i = 0; i <= RETRIES; i++) {
+        for (let i = 0; i <= (req.retries ?? RETRIES); i++) {
             if (i) await this.pause(BACKOFF_MS * 2 ** (i - 1));
             last = await this.once(req);
             const again = last.status === 'timeout' || last.status === 'error' || last.status === 429 || (typeof last.status === 'number' && last.status >= 500);

@@ -35,6 +35,12 @@ export class PhotoroomService {
         return Buffer.from(await res.arrayBuffer());
     }
 
+    /** A look at what a cut-out would give, free with a sandbox key only. Watermarked: the pipeline keeps it apart from every saved photo. */
+    async sandboxPreview(image: Buffer): Promise<Buffer> {
+        if (!this.testMode) throw new ServiceUnavailableException({ code: 'NOT_SANDBOX', message: 'Previews need a sandbox key.' });
+        return this.whiteBackground(image, 'image/png');
+    }
+
     async whiteBackground(image: Buffer, type: string): Promise<Buffer> {
         if (!this.key) throw new ServiceUnavailableException({ code: 'NOT_CONFIGURED', message: 'White backgrounds aren’t set up yet.' });
         const form = new FormData();

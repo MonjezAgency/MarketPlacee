@@ -1,3 +1,12 @@
+import { unlinkSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { Logger } from '@nestjs/common';
+import { FileBudget, FREE_ALLOWANCE, MemoryBudget } from '../image-pipeline/budget';
+import { MemoryCache, SourceHttp } from '../image-pipeline/http';
+import { searchQueries } from '../image-pipeline/identity';
+import { barcodeSpider, eanDb, serper } from '../image-pipeline/sources';
+import type { SourceCall } from '../image-pipeline/types';
 import { decodeBarcode } from '../image-pipeline/barcode';
 import { composeCutout, composeWhite, postCheck } from '../image-pipeline/compose';
 import { gs1Country } from '../image-pipeline/gs1-prefixes';
@@ -119,9 +128,9 @@ describe('the vision answer', () => {
         expect(judgeAnswer({ ...good, same_variant: false }, 5, 'Monster').failed).toEqual(['same_variant']);
         expect(judgeAnswer({ ...good, watermark_or_overlay: true }, 5, 'Monster').passed).toBe(false);
     });
-    it('0.8 is the floor; 0.79 is a no', () => {
-        expect(judgeAnswer({ ...good, confidence: 0.8 }, 5, 'Monster').passed).toBe(true);
-        expect(judgeAnswer({ ...good, confidence: 0.79 }, 5, 'Monster').passed).toBe(false);
+    it('0.9 is the floor; 0.89 is a no', () => {
+        expect(judgeAnswer({ ...good, confidence: 0.9 }, 5, 'Monster').passed).toBe(true);
+        expect(judgeAnswer({ ...good, confidence: 0.89 }, 5, 'Monster').passed).toBe(false);
     });
     it('a brand it did not read, a bad index, or no answer are all failures', () => {
         expect(judgeAnswer({ ...good, read_text: 'energy drink' }, 5, 'Monster').failed).toContain('brand_not_read');
@@ -181,5 +190,84 @@ describe('the house layout', () => {
             return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
         };
         expect(await composeCutout(original, clean)).toMatchObject({ status: 'ok', engine: 'photoroom' });
+    });
+});
+
+describe('spending limits', () => {
+    const ok = (body: unknown) => ({ status: 200, text: async () => JSON.stringify(body) });
+    const noWait = async () => undefined;
+    const images = { images: [{ imageUrl: 'https://shop.tesco.com/a.jpg', title: 't', imageWidth: 1000, imageHeight: 1000 }], credits: 1 };
+    const fresh = () => { delete process.env.SERPER_MONTHLY_CAP; process.env.SERPER_API_KEY = 'test'; };
+    afterAll(() => { delete process.env.SERPER_API_KEY; delete process.env.SERPER_MONTHLY_CAP; });
+
+    it('Serper stops at the cap, without an error, and warns once', async () => {
+        fresh();
+        process.env.SERPER_MONTHLY_CAP = '2';
+        const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        const fetcher = jest.fn(async () => ok(images)) as any;
+        const source = serper(new SourceHttp(new MemoryCache(), fetcher, noWait), new MemoryBudget());
+        const calls: SourceCall[] = [];
+        for (const q of ['a', 'b', 'c', 'd']) await source.search(q, '1', 'en', calls);
+        expect(fetcher).toHaveBeenCalledTimes(2);
+        expect(calls.map((c) => c.status)).toEqual([200, 200, 'skipped', 'skipped']);
+        expect(warn.mock.calls.filter(([m]) => /cap of 2/.test(String(m)))).toHaveLength(1);
+        warn.mockRestore();
+    });
+    it('a cached search spends nothing, and is kept 90 days', async () => {
+        fresh();
+        const cache = new MemoryCache();
+        const set = jest.spyOn(cache, 'set');
+        const budget = new MemoryBudget();
+        const fetcher = jest.fn(async () => ok(images)) as any;
+        const source = serper(new SourceHttp(cache, fetcher, noWait), budget);
+        await source.search('a', '1', 'en', []);
+        const again = await source.search('a', '1', 'en', []);
+        expect(again).toHaveLength(1);
+        expect(fetcher).toHaveBeenCalledTimes(1);
+        expect(await budget.used('serper', 'month')).toBe(1);
+        expect((set.mock.calls[0] as unknown[])[2]).toBe(90);
+    });
+    it('a failed search is not repeated by itself', async () => {
+        fresh();
+        const fetcher = jest.fn(async () => ({ status: 500, text: async () => '' })) as any;
+        await serper(new SourceHttp(new MemoryCache(), fetcher, noWait), new MemoryBudget()).search('a', '1', 'en', []);
+        expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+    it('the count starts over on the 1st', async () => {
+        let now = Date.UTC(2026, 10, 30, 23, 59);
+        const budget = new MemoryBudget(() => now);
+        expect(await budget.reserve('serper', 1, 'month')).toBe(true);
+        expect(await budget.reserve('serper', 1, 'month')).toBe(false);
+        now = Date.UTC(2026, 11, 1, 0, 1);
+        expect(await budget.reserve('serper', 1, 'month')).toBe(true);
+    });
+    it('the file count survives a restart', async () => {
+        const file = join(tmpdir(), `budget-${process.pid}-${Date.now()}.json`);
+        await new FileBudget(file).reserve('serper', 200, 'month');
+        expect(await new FileBudget(file).used('serper', 'month')).toBe(1);
+        unlinkSync(file);
+    });
+    it('a barcode database past its free allowance is skipped, not called', async () => {
+        process.env.EANDB_API_KEY = 'test';
+        const budget = new MemoryBudget();
+        for (let i = 0; i < FREE_ALLOWANCE['ean-db'].limit; i++) await budget.reserve('ean-db', FREE_ALLOWANCE['ean-db'].limit, 'ever');
+        const fetcher = jest.fn() as any;
+        const calls: SourceCall[] = [];
+        await eanDb(new SourceHttp(new MemoryCache(), fetcher, noWait), budget).lookup('1', '1', calls, 'food');
+        delete process.env.EANDB_API_KEY;
+        expect(fetcher).not.toHaveBeenCalled();
+        expect(calls[0].status).toBe('skipped');
+    });
+    it('Barcode Spider stays off without a trial date in the future', () => {
+        process.env.BARCODESPIDER_API_KEY = 'test';
+        const source = barcodeSpider(new SourceHttp(new MemoryCache()), new MemoryBudget());
+        expect(source.enabled()).toBe(false);
+        process.env.BARCODESPIDER_TRIAL_UNTIL = '2999-01-01';
+        expect(source.enabled()).toBe(true);
+        delete process.env.BARCODESPIDER_API_KEY; delete process.env.BARCODESPIDER_TRIAL_UNTIL;
+    });
+    it('the search words are the barcode in quotes, then brand, name and size once each', () => {
+        const identity: any = { ean: '5449000000439', brand: 'Acme', name: 'Acme Lemon 500ml', size: '500ml', packLanguage: 'de' };
+        expect(searchQueries(identity)).toEqual([{ query: '"5449000000439"', language: 'en' }, { query: 'Acme Lemon 500ml', language: 'de' }]);
     });
 });

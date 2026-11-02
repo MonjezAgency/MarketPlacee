@@ -34,14 +34,13 @@ export function buildIdentity(gtin: Gtin, name: CleanName, records: IdentityReco
     };
 }
 
-/** The Tier B queries: the barcode alone, then the words with and without it, in the pack's language and in English. */
+/** At most two searches: the barcode in quotes, then the brand, name and size. */
 export function searchQueries(identity: Identity): { query: string; language: string }[] {
-    const withSize = (s: string) => (identity.size && !compact(s).includes(compact(identity.size)) ? `${s} ${identity.size}` : s);
-    const text = withSize(identity.name), english = withSize(identity.english);
-    const language = identity.packLanguage;
-    const list = [{ query: identity.ean, language: 'en' }];
-    if (text) list.push({ query: `${text} ${identity.ean}`, language }, { query: text, language }, { query: `${text} packshot`, language });
-    if (english && compact(english) !== compact(text)) list.push({ query: english, language: 'en' });
-    else if (text && language !== 'en') list.push({ query: text, language: 'en' });
+    const list = [{ query: `"${identity.ean}"`, language: 'en' }];
+    const has = (text: string, part: string) => compact(text).includes(compact(part));
+    let words = identity.name;
+    if (identity.brand && !has(words, identity.brand)) words = `${identity.brand} ${words}`.trim();
+    if (identity.size && !has(words, identity.size)) words = `${words} ${identity.size}`.trim();
+    if (words) list.push({ query: words, language: identity.packLanguage });
     return list;
 }

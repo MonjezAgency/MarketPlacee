@@ -4,7 +4,7 @@ import { kindOf, type ProductDataProvider } from '../product-data-providers';
 import { raiseVisionAlert } from './alerts';
 import { decodeBarcode } from './barcode';
 import { composeCutout, composeWhite, type ComposeOutcome } from './compose';
-import { downloadImage, type LookupCache } from './http';
+import { downloadImage, type Download, type LookupCache } from './http';
 import { parseGtin, sameCode, type Gtin } from './gtin';
 import { buildIdentity, searchQueries } from './identity';
 import { blockedDomain, DEFAULT_POLICY, domainClass, licenceOf, mayPublish, type LicencePolicy } from './licensing';
@@ -13,16 +13,18 @@ import { fingerprint, hashDistance, isWhiteBackground, rawRgb, whiteRingShare, t
 import { domainPoints, framingPoints, identityTextPoints, MIN_LONG_SIDE, resolutionPoints, total, visualPoints, WEIGHTS } from './scoring';
 import type { LookupSource, SearchSource } from './sources';
 import type { Candidate, Identity, IdentityRecord, ImageStatus, PipelineResult, PipelineRow, Scored, SourceCall, Trace, VisionVerdict } from './types';
-import { DEFAULT_VISION_MODEL, SHADOW_VISION_MODEL, VisionGate, VisionUnavailable } from './vision';
+import { VisionGate, VisionUnavailable, visionModel } from './vision';
 
-export const PIPELINE_VERSION = 'b1';
+export const PIPELINE_VERSION = 'b2';
 const TOP = 5;
 const MAX_DOWNLOADS = 40;
 const DOWNLOADS_AT_ONCE = 6;
-const MIN_USABLE_BEFORE_FALLBACK = 5;
+/** A first search that leaves this many usable photos gets no second one. */
+const ENOUGH_FROM_A_SEARCH = 3;
 /** Two photos this close are one photo. */
 const SAME_PICTURE = 6;
-const VISION_ROUNDS = 2;
+/** Free vision calls are few: this is the most one row may use. */
+const VISION_CALLS = 3;
 const PHOTOROOM_COST = 0.02;
 
 export interface PipelineDeps {
@@ -30,17 +32,32 @@ export interface PipelineDeps {
     searches: SearchSource[];
     vision: VisionGate;
     cache: LookupCache;
-    /** Basic background removal; absent when no key. */
+    /** Basic background removal, a paid call. */
     removeBackground?: (image: Buffer) => Promise<Buffer>;
-    /** Why no cut-out can be made, when that is the case. */
+    /** Why no cut-out can be made, when that is the case. Off until the owner decides on paying. */
     cutoutBlocked?: () => string | null;
+    /** Sandbox key only: a watermarked preview of the cut-out. */
+    previewBackground?: (image: Buffer) => Promise<Buffer>;
     download?: (url: string) => ReturnType<typeof downloadImage>;
     style?: () => Promise<Buffer[]>;
     alerts?: Parameters<typeof raiseVisionAlert>[0];
     /** Cut-outs are paid for once in a test run. Too big for the database, so production passes none. */
     cutoutCache?: LookupCache;
 }
-export interface RunOptions { upload?: string; policy?: LicencePolicy; shadow?: boolean; model?: string }
+export interface RunOptions { upload?: string; policy?: LicencePolicy; model?: string }
+type Done = (status: ImageStatus, reason: string, extra?: Partial<PipelineResult>) => PipelineResult;
+interface RunState {
+    /** Everything usable so far, best first. */
+    scored: Scored[];
+    prints: Fingerprint[];
+    seen: Set<string>;
+    tooSmall: number;
+    lastUsable: number;
+    visionCalls: number;
+    /** The nearest miss, what a person sees if nothing better comes. */
+    failed: { status: ImageStatus; reason: string; confidence: number; chosen?: Scored } | null;
+    downloads: Map<string, Promise<Download>>;
+}
 
 const longest = (c: Candidate) => Math.max(c.width || 0, c.height || 0);
 const digest = (b: Buffer) => createHash('sha1').update(b).digest('hex');
@@ -73,74 +90,95 @@ export class ImagePipeline {
         }
     }
 
-    private async steps(row: PipelineRow, opts: RunOptions, trace: Trace, done: (s: ImageStatus, r: string, x?: Partial<PipelineResult>) => PipelineResult): Promise<PipelineResult> {
+    /**
+     * Free sources first, one at a time, stopping at the first photo vision accepts:
+     * supplier pictures, Open Facts, UPCitemdb, the keyed free tiers, and only then
+     * the capped web search. A source's photos that vision turns down are no reason
+     * to stop; a day without vision is, because nothing could be judged.
+     */
+    private async steps(row: PipelineRow, opts: RunOptions, trace: Trace, done: Done): Promise<PipelineResult> {
         const gtin = parseGtin(row.ean);
         trace.gtin = { canonical: gtin.canonical, caseCode: gtin.caseCode, inner: gtin.inner, searchCodes: gtin.searchCodes, problem: gtin.problem };
         if (gtin.problem) return done('invalid_ean', gtin.digits ? gtin.problem : 'no barcode on this row');
         const name = cleanName(row.name ?? '', row.brand ?? '');
         trace.name = name;
 
-        const { records, candidates } = await this.lookups(gtin, row, trace.calls);
-        const identity = buildIdentity(gtin, name, records);
-        trace.identity = identity;
-        candidates.push(...await this.searches(identity, candidates, trace.calls));
-        candidates.push(...supplierCandidates(row));
-        trace.candidates.found = candidates.length;
-        for (const c of candidates) trace.candidates.bySource[c.source] = (trace.candidates.bySource[c.source] || 0) + 1;
-        if (!candidates.length) return done('not_found', `no_candidates: ${noCandidates(this.deps, trace.calls)}`);
+        const records: IdentityRecord[] = [];
+        const state: RunState = { scored: [], prints: [], seen: new Set(), tooSmall: 0, lastUsable: 0, visionCalls: 0, failed: null, downloads: new Map() };
+        const look = async (fresh: Candidate[]) => {
+            const unseen = fresh.filter((c) => !state.seen.has(c.url));
+            state.lastUsable = 0;
+            if (!unseen.length) return null;
+            const identity = buildIdentity(gtin, name, records);
+            trace.identity = identity;
+            trace.candidates.found += unseen.length;
+            for (const c of unseen) trace.candidates.bySource[c.source] = (trace.candidates.bySource[c.source] || 0) + 1;
+            const scored = await this.assess(unseen, identity, gtin, trace, state);
+            state.lastUsable = scored.length;
+            if (!scored.length) return null;
+            state.scored.push(...scored);
+            state.scored.sort((a, b) => b.score - a.score);
+            const down = await this.deps.vision.unavailable();
+            if (down) return done('needs_review', visionDown(down), { top: state.scored.slice(0, TOP) });
+            return this.judge(scored, identity, opts, trace, state, done);
+        };
 
-        const { scored, tooSmall } = await this.assess(candidates, identity, gtin, trace);
-        if (!scored.length) {
-            return tooSmall ? done('low_res', `every usable photo is under ${MIN_LONG_SIDE}px (${tooSmall} found)`) : done('not_found', `all_rejected: ${summarise(trace.rejects)}`);
+        const fromSupplier = await look(supplierCandidates(row));
+        if (fromSupplier) return fromSupplier;
+        for (const source of this.deps.lookups.filter((s) => s.enabled())) {
+            const found = await this.ask(source, gtin, row, trace.calls);
+            records.push(...found.records);
+            const result = await look(found.candidates);
+            if (result) return result;
         }
-        const top = scored.slice(0, TOP);
-        if (!this.deps.vision.enabled) return done('needs_review', 'vision_unavailable: no OPENROUTER_API_KEY, nothing approved automatically', { top });
-        return this.decide(scored, identity, opts, trace, done);
+        trace.identity = buildIdentity(gtin, name, records);
+
+        // Nothing could judge what a search finds, so nothing is spent on one.
+        const down = await this.deps.vision.unavailable();
+        if (down) return done('needs_review', visionDown(down), { top: state.scored.slice(0, TOP), chosen: state.failed?.chosen });
+        for (const source of this.deps.searches.filter((s) => s.enabled())) {
+            for (const q of searchQueries(trace.identity)) {
+                const result = await look(await source.search(q.query, trace.identity.ean, q.language, trace.calls).catch(() => []));
+                if (result) return result;
+                if (state.lastUsable >= ENOUGH_FROM_A_SEARCH) break;
+            }
+        }
+        return this.nothingAccepted(state, trace, done);
     }
 
-    private async lookups(gtin: Gtin, row: PipelineRow, calls: SourceCall[]) {
+    private nothingAccepted(state: RunState, trace: Trace, done: Done) {
+        const top = state.scored.slice(0, TOP);
+        if (state.failed) return done(state.failed.status, state.failed.reason, { top, chosen: state.failed.chosen });
+        if (state.scored.length) return done('needs_review', 'no candidate passed', { top });
+        if (state.tooSmall) return done('low_res', `every usable photo is under ${MIN_LONG_SIDE}px (${state.tooSmall} found)`);
+        return trace.candidates.found ? done('not_found', `all_rejected: ${summarise(trace.rejects)}`) : done('not_found', `no_candidates: ${noCandidates(this.deps, trace.calls)}`);
+    }
+
+    private async ask(source: LookupSource, gtin: Gtin, row: PipelineRow, calls: SourceCall[]) {
         const records: IdentityRecord[] = [];
         const candidates: Candidate[] = [];
-        const kind = kindOf(row.category);
-        await Promise.all(this.deps.lookups.filter((s) => s.enabled()).map(async (source) => {
-            for (const code of gtin.searchCodes) {
-                const a = await source.lookup(code, gtin.canonical, calls, kind).catch(() => ({ record: null, candidates: [] }));
-                if (a.record) records.push(a.record);
-                candidates.push(...a.candidates);
-            }
-        }));
+        for (const code of gtin.searchCodes) {
+            const a = await source.lookup(code, gtin.canonical, calls, kindOf(row.category)).catch(() => ({ record: null, candidates: [] }));
+            if (a.record) records.push(a.record);
+            candidates.push(...a.candidates);
+        }
         return { records, candidates };
     }
 
-    /** Serper first; Brave only when the barcode databases and Serper together leave too little. */
-    private async searches(identity: Identity, have: Candidate[], calls: SourceCall[]): Promise<Candidate[]> {
-        const usable = (list: Candidate[]) => list.filter((c) => !blockedDomain(c) && (!longest(c) || longest(c) >= MIN_LONG_SIDE)).length;
-        const queries = searchQueries(identity);
-        const found: Candidate[] = [];
-        const [first, ...rest] = this.deps.searches.filter((s) => s.enabled());
-        if (!first) return found;
-        for (const q of queries) found.push(...await first.search(q.query, identity.ean, q.language, calls).catch(() => []));
-        if (usable([...have, ...found]) >= MIN_USABLE_BEFORE_FALLBACK) return found;
-        for (const next of rest) for (const q of queries.slice(0, 3)) found.push(...await next.search(q.query, identity.ean, q.language, calls).catch(() => []));
-        return found;
-    }
-
     /** Hard rejects, then the points. What survives is ranked, best first. */
-    private async assess(all: Candidate[], identity: Identity, gtin: Gtin, trace: Trace): Promise<{ scored: Scored[]; tooSmall: number }> {
+    private async assess(all: Candidate[], identity: Identity, gtin: Gtin, trace: Trace, state: RunState): Promise<Scored[]> {
         const reject = (c: Candidate, reason: string) => trace.rejects.push({ url: c.url, source: c.source, reason });
-        let tooSmall = 0;
-        const seen = new Set<string>();
         const open: Candidate[] = [];
         for (const c of all) {
-            if (seen.has(c.url)) continue;
-            seen.add(c.url);
+            if (state.seen.has(c.url)) continue;
+            state.seen.add(c.url);
             const blocked = blockedDomain(c);
             if (blocked) { reject(c, `blocked_domain:${blocked}`); continue; }
-            if (longest(c) && longest(c) < MIN_LONG_SIDE && !c.bytes) { tooSmall++; reject(c, `under_${MIN_LONG_SIDE}px`); continue; }
+            if (longest(c) && longest(c) < MIN_LONG_SIDE && !c.bytes) { state.tooSmall++; reject(c, `under_${MIN_LONG_SIDE}px`); continue; }
             open.push(c);
         }
         open.sort((a, b) => Number(!!b.bytes) - Number(!!a.bytes) || identityTextPoints(b, identity, gtin.searchCodes) - identityTextPoints(a, identity, gtin.searchCodes) || longest(b) - longest(a));
-        const download = this.deps.download ?? downloadImage;
+        const download = this.downloader(state);
         const references = await this.referencePrints(identity, download);
         const opened = await inBatches(open.slice(0, MAX_DOWNLOADS), DOWNLOADS_AT_ONCE, async (c) => {
             const got = c.bytes ? { ok: true as const, bytes: c.bytes } : await download(c.url);
@@ -148,7 +186,7 @@ export class ImagePipeline {
             trace.candidates.downloaded++;
             try {
                 const raw = await rawRgb(got.bytes);
-                if (Math.max(raw.width, raw.height) < MIN_LONG_SIDE) { tooSmall++; reject(c, `under_${MIN_LONG_SIDE}px`); return null; }
+                if (Math.max(raw.width, raw.height) < MIN_LONG_SIDE) { state.tooSmall++; reject(c, `under_${MIN_LONG_SIDE}px`); return null; }
                 return { c, bytes: got.bytes, raw, print: await fingerprint(got.bytes) };
             } catch { reject(c, 'not_an_image'); return null; }
         });
@@ -156,8 +194,8 @@ export class ImagePipeline {
         // Largest first, so the copy that stays of any duplicate is the sharpest.
         const unique: typeof kept = [];
         for (const k of kept) {
-            if (unique.some((u) => hashDistance(u.print, k.print) <= SAME_PICTURE)) reject(k.c, 'duplicate');
-            else unique.push(k);
+            if (state.prints.some((p) => hashDistance(p, k.print) <= SAME_PICTURE)) reject(k.c, 'duplicate');
+            else { unique.push(k); state.prints.push(k.print); }
         }
         const scored = unique.map(({ c, bytes, raw, print }): Scored => {
             const cls = domainClass(c, identity.brand);
@@ -171,8 +209,17 @@ export class ImagePipeline {
             return { ...c, bytes, parts, score: total(parts), domainClass: cls, licence: licenceOf(c, cls), decodedBarcode: null, pixelWidth: raw.width, pixelHeight: raw.height, whiteBackground: white };
         }).sort((a, b) => b.score - a.score);
         const clean = await this.readBarcodes(scored, gtin, trace);
-        trace.scored = clean.map((s) => ({ url: s.url, source: s.source, score: s.score, parts: s.parts, licence: s.licence, decoded: s.decodedBarcode }));
-        return { scored: clean, tooSmall };
+        trace.scored.push(...clean.map((s) => ({ url: s.url, source: s.source, score: s.score, parts: s.parts, licence: s.licence, decoded: s.decodedBarcode })));
+        return clean;
+    }
+
+    /** One fetch per picture in a run, however many times it comes up. */
+    private downloader(state: RunState) {
+        const fetchOne = this.deps.download ?? downloadImage;
+        return (url: string) => {
+            if (!state.downloads.has(url)) state.downloads.set(url, fetchOne(url));
+            return state.downloads.get(url)!;
+        };
     }
 
     private async referencePrints(identity: Identity, download: NonNullable<PipelineDeps['download']>): Promise<Fingerprint[]> {
@@ -205,69 +252,76 @@ export class ImagePipeline {
         return keep.sort((a, b) => b.score - a.score);
     }
 
-    private async decide(scored: Scored[], identity: Identity, opts: RunOptions, trace: Trace, done: (s: ImageStatus, r: string, x?: Partial<PipelineResult>) => PipelineResult): Promise<PipelineResult> {
-        const model = opts.model || DEFAULT_VISION_MODEL;
+    /** A final result, or null when these photos won't do and the next source should be asked. */
+    private async judge(scored: Scored[], identity: Identity, opts: RunOptions, trace: Trace, state: RunState, done: Done): Promise<PipelineResult | null> {
+        const model = opts.model || visionModel();
         const policy = opts.policy || DEFAULT_POLICY;
+        const top = () => state.scored.slice(0, TOP);
+        const miss = (status: ImageStatus, reason: string, confidence: number, chosen?: Scored) => {
+            if (!state.failed || confidence >= state.failed.confidence) state.failed = { status, reason, confidence, chosen };
+        };
         const eligible = scored.filter((s) => !s.isEditorial && s.licence !== 'editorial');
-        const top = scored.slice(0, TOP);
-        if (!eligible.length) return done('needs_review', 'only editorial photos found: never published', { top });
-        const references = await this.identityPhotos(identity);
+        if (!eligible.length) { miss('needs_review', 'only editorial photos found: never published', -1); return null; }
+        const references = await this.identityPhotos(identity, state);
         const style = await this.deps.style?.().catch(() => []) ?? [];
         let queue = eligible;
-        let lastReason = '';
-        let lowRes = false;
-        for (let round = 0; round < VISION_ROUNDS && queue.length; round++) {
+        while (queue.length && state.visionCalls < VISION_CALLS) {
+            state.visionCalls++;
             const batch = queue.slice(0, TOP);
-            const verdict = await this.ask(model, identity, batch, references, style, trace, opts).catch((e) => e as VisionUnavailable);
+            const verdict = await this.deps.vision.check(model, identity, batch.map((b) => b.bytes), references, style, trace.calls).catch((e) => e as VisionUnavailable);
             if (!isVerdict(verdict)) {
                 const code = verdict instanceof VisionUnavailable ? verdict.code : 'error';
-                if (this.deps.alerts) await raiseVisionAlert(this.deps.alerts, this.logger, { code: 'vision_unavailable', status: verdict instanceof VisionUnavailable ? verdict.httpStatus : undefined, scope: opts.upload || new Date().toISOString().slice(0, 13) }).catch(() => undefined);
-                return done('needs_review', `vision_unavailable: ${code}, nothing approved automatically`, { top });
+                if (code !== 'vision_quota' && code !== 'rate_limited' && this.deps.alerts) await raiseVisionAlert(this.deps.alerts, this.logger, { code: 'vision_unavailable', status: verdict instanceof VisionUnavailable ? verdict.httpStatus : undefined, scope: opts.upload || new Date().toISOString().slice(0, 13) }).catch(() => undefined);
+                return done('needs_review', visionDown(code), { top: top() });
             }
-            if (!verdict.passed) return done('needs_review', `vision_failed: ${verdict.failed.join(', ')}${verdict.reason ? ` (${verdict.reason})` : ''}`, { top, chosen: batch[verdict.index] });
+            trace.vision.push(verdict);
             const chosen = batch[verdict.index];
+            if (!verdict.passed) { miss('needs_review', `vision_failed: ${verdict.failed.join(', ')}${verdict.reason ? ` (${verdict.reason})` : ''}`, verdict.confidence, chosen); return null; }
+
+            const conflict = identity.conflicts.some((c) => c.startsWith('brand'));
+            const allowed = (p: LicencePolicy) => !conflict && mayPublish({ licence: chosen.licence, confidence: verdict.confidence, domain: chosen.domainClass, isEditorial: chosen.isEditorial }, p);
+            const publishable = { A: allowed('A'), B: allowed('B') };
+            const cutoutOff = chosen.whiteBackground ? null : this.cutoutOff();
+            if (cutoutOff) {
+                if (conflict) return done('needs_review', `brand_conflict: ${identity.conflicts.join('; ')}`, { top: top(), chosen });
+                return done('needs_bg_removal', `vision ${verdict.confidence.toFixed(2)}, licence ${chosen.licence}, ${chosen.domainClass}: the right product, background not white (${cutoutOff})`, { top: top(), chosen, wouldPublish: publishable, ...await this.preview(chosen, trace) });
+            }
             const made = await this.compose(chosen, trace);
+            trace.compose = { engine: made.engine, checks: { ...made.checks } };
             if (made.status === 'ok') {
-                trace.compose = { engine: made.engine, checks: { ...made.checks } };
-                const conflict = identity.conflicts.some((c) => c.startsWith('brand'));
-                const allowed = (p: LicencePolicy) => !conflict && mayPublish({ licence: chosen.licence, confidence: verdict.confidence, domain: chosen.domainClass, isEditorial: chosen.isEditorial }, p);
-                const publishable = { A: allowed('A'), B: allowed('B') };
-                const extra = { top, chosen, publishable, output: { jpeg: made.jpeg, webp: made.webp } };
+                const extra = { top: top(), chosen, publishable, output: { jpeg: made.jpeg, webp: made.webp } };
                 if (publishable[policy]) return done('approved', `vision ${verdict.confidence.toFixed(2)}, licence ${chosen.licence}, ${chosen.domainClass}`, extra);
                 return done('needs_review', conflict ? `brand_conflict: ${identity.conflicts.join('; ')}` : `licence_${chosen.licence}: confirmed by vision, publishing needs a person under policy ${policy}`, extra);
             }
-            trace.compose = { engine: made.engine, checks: { ...made.checks } };
-            lastReason = made.reason;
-            lowRes = made.status === 'low_res';
-            if (made.status === 'needs_review' || made.status === 'failed') return done(made.status === 'failed' ? 'failed' : 'needs_review', `compose: ${made.reason}`, { top, chosen });
+            if (made.status !== 'low_res') return done(made.status === 'failed' ? 'failed' : 'needs_review', `compose: ${made.reason}`, { top: top(), chosen });
+            miss('low_res', `compose: ${made.reason}`, verdict.confidence, chosen);
             queue = queue.filter((s) => s !== chosen);
         }
-        return lowRes ? done('low_res', `compose: ${lastReason}`, { top }) : done('needs_review', `compose: ${lastReason || 'no candidate passed'}`, { top });
+        return null;
     }
 
-    private async identityPhotos(identity: Identity): Promise<Buffer[]> {
-        const download = this.deps.download ?? downloadImage;
-        const got = await Promise.all(identity.references.slice(0, 1).map((u) => download(u)));
+    private async identityPhotos(identity: Identity, state: RunState): Promise<Buffer[]> {
+        const got = await Promise.all(identity.references.slice(0, 1).map(this.downloader(state)));
         return got.flatMap((g) => (g.ok ? [g.bytes] : []));
     }
 
-    /** The gate that decides, and beside it, on the same pictures, the cheaper model being measured. Its answer changes nothing. */
-    private async ask(model: string, identity: Identity, batch: Scored[], references: Buffer[], style: Buffer[], trace: Trace, opts: RunOptions): Promise<VisionVerdict> {
-        const pictures = batch.map((b) => b.bytes);
-        const [main] = await Promise.all([
-            this.deps.vision.check(model, identity, pictures, references, style, trace.calls),
-            opts.shadow ? this.deps.vision.check(SHADOW_VISION_MODEL, identity, pictures, references, style, trace.calls).then((v) => { trace.vision.push(v); }).catch(() => undefined) : undefined,
-        ]);
-        trace.vision.unshift(main);
-        return main;
+    /** Why a background can't be removed here, or null when it can. */
+    private cutoutOff(): string | null {
+        return this.deps.cutoutBlocked?.() ?? (this.deps.removeBackground ? null : 'no_cutout_service');
+    }
+
+    /** A watermarked look at the cut-out, when a sandbox key allows one. It goes in `preview`, never `output`. */
+    private async preview(chosen: Scored, trace: Trace): Promise<Pick<PipelineResult, 'preview'>> {
+        if (!this.deps.previewBackground) return {};
+        const started = Date.now();
+        const png = await this.deps.previewBackground(chosen.bytes).catch(() => null);
+        trace.calls.push({ source: 'photoroom', what: 'sandbox preview', status: png ? 200 : 'error', ms: Date.now() - started, cost: 0 });
+        return png ? { preview: { png, label: 'SANDBOX PREVIEW' } } : {};
     }
 
     private async compose(chosen: Scored, trace: Trace): Promise<ComposeOutcome> {
         if (chosen.whiteBackground) return composeWhite(chosen.bytes);
-        const blocked = this.deps.cutoutBlocked?.();
-        if (blocked) return { status: 'needs_review', reason: blocked, engine: 'photoroom', checks: {} };
-        if (!this.deps.removeBackground) return { status: 'needs_review', reason: 'photoroom_not_configured', engine: 'photoroom', checks: {} };
-        const remove = this.deps.removeBackground;
+        const remove = this.deps.removeBackground!;
         return composeCutout(chosen.bytes, async (image) => {
             const key = `cutout:${digest(image)}`;
             const hit = await this.deps.cutoutCache?.get(key).catch(() => undefined) as string | undefined;
@@ -282,6 +336,10 @@ export class ImagePipeline {
 }
 
 const isVerdict = (v: VisionVerdict | Error): v is VisionVerdict => !(v instanceof Error);
+
+function visionDown(code: string) {
+    return code === 'vision_quota' ? 'vision_quota: today\'s free checks are used up, nothing approved automatically' : `vision_unavailable: ${code === 'no_key' ? 'no OPENROUTER_API_KEY' : code}, nothing approved automatically`;
+}
 
 function supplierCandidates(row: PipelineRow): Candidate[] {
     return (row.supplierImages || []).map((s, i): Candidate => ({ url: s.url || `supplier:${row.ean}:${i}`, source: 'supplier', title: row.name ?? undefined, licence: 'supplier', foundBy: row.ean, ...(s.bytes ? { bytes: s.bytes } : {}) }));

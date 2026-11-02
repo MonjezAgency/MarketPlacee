@@ -100,3 +100,4 @@ next-env.d.ts
 .vscode/
 .idea/
 qa/smoke/
+backend/.image-budget.json

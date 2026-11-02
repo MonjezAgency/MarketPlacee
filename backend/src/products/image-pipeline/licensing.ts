@@ -8,7 +8,7 @@ import type { Candidate, DomainClass, Licence } from './types';
  */
 export type LicencePolicy = 'A' | 'B';
 export const DEFAULT_POLICY: LicencePolicy = 'A';
-export const AUTO_APPROVE_CONFIDENCE = 0.8;
+export const AUTO_APPROVE_CONFIDENCE = 0.9;
 export const POLICY_B_CONFIDENCE = 0.9;
 
 /** Brands whose official sites use another name. A domain counts as the brand's only on an exact label. */
@@ -21,7 +21,7 @@ const RETAILERS = new Set([
     'carrefour', 'tesco', 'dm', 'rewe', 'kaufland', 'amazon', 'emag', 'noon', 'sainsburys', 'asda', 'morrisons', 'ocado', 'waitrose', 'lidl', 'aldi', 'auchan', 'walmart', 'target', 'ah', 'albertheijn', 'jumbo',
     'edeka', 'rossmann', 'mueller', 'bipa', 'migros', 'coop', 'lulu', 'luluhypermarket', 'spinneys', 'superdrug', 'boots', 'etos', 'kruidvat', 'douglas', 'costco', 'mega-image', 'freshful', 'sephora',
 ]);
-const EAN_DATABASES = new Set(['openfoodfacts', 'openbeautyfacts', 'openproductsfacts', 'ean-search', 'ean-db', 'upcitemdb', 'go-upc', 'barcodespider', 'barcodelookup']);
+const EAN_DATABASES = new Set(['openfoodfacts', 'openbeautyfacts', 'openproductsfacts', 'ean-db', 'upcitemdb', 'go-upc', 'barcodespider', 'barcodelookup']);
 /** Never used, whatever else the photo scores. */
 const BLOCKED = new Set([
     'aliexpress', 'alicdn', 'alibaba', 'temu', 'shein', 'wish', 'dhgate', 'pinterest', 'pinimg', 'facebook', 'fbcdn', 'instagram', 'cdninstagram', 'tiktok', 'tiktokcdn', 'twitter', 'twimg', 'reddit', 'redd', 'youtube', 'ytimg',

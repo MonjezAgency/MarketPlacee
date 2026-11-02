@@ -63,6 +63,8 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
   an unsure or failed check is a no. A yes goes on the product as `chosenBy: 'auto'` only when its licence allows it (`image-pipeline/licensing.ts` `mayPublish`, policy A by default); otherwise it waits as
   `needs_review`. The product's status never changes, and staff review in the `auto` bucket (accepting a product for sale counts as review). A removed automatic photo is never offered again.
   The daily sweep picks up what a broken check held back. 5,000 checks a month. A refused key is one admin alert per run of failures (`image-pipeline/alerts.ts`), and nothing is applied until it works.
+  Budget (`image-pipeline/budget.ts`, `sources/README.md`): vision uses free OpenRouter models only, anything not ending in `:free` is refused, `PHOTO_CHECK_MODEL` included. Free sources first, Serper last, `SERPER_MONTHLY_CAP` (200) a month, 2 per product.
+  ean-search.org is gone. No paid cut-outs: a right photo that isn't white is `needs_bg_removal`, unless `PHOTOROOM_LIVE=true` and a live key.
 - Product bulk actions: `POST /products/admin/bulk`, per-row rules in `backend/src/products/admin-bulk.ts`; every skip is reported.
 - Notifications: persisted per user; `data.kind` + `data.params` let the bell (`components/ui/NotificationBell.tsx`,
   `lib/notifications.ts`) render them in the reader's language (keys in `locales/sections/notificationsCenter.ts`);

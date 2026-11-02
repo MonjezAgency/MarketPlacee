@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { PrismaService } from '../common/prisma.service';
 import { clearVisionAlert, raiseVisionAlert } from './image-pipeline/alerts';
-import { DEFAULT_VISION_MODEL } from './image-pipeline/vision';
+import { reserveCount } from './image-pipeline/budget';
+import { isFreeModel, visionModel } from './image-pipeline/vision';
 
 /** Stops a mistake (or a very large import) from running up the AI bill: past this, photos wait for next month. */
 export const PHOTO_CHECK_MONTHLY_LIMIT = 5000;
@@ -26,20 +27,8 @@ export type PhotoCheckResult = { status: 'checked'; check: PhotoCheck } | { stat
 export type CheckItem = { ean?: string; name: string; brand?: string | null; weight?: string | null };
 
 /** Takes one from this month's allowance, with no two callers getting the same one. False when it's used up (fails closed). */
-export async function reserveMonthly(prisma: PrismaService, prefix: string, limit: number, now: number): Promise<boolean> {
-    const key = `${prefix}:${new Date(now).toISOString().slice(0, 7)}`;
-    for (let i = 0; i < 6; i++) {
-        const row = await prisma.appConfig.findUnique({ where: { key } });
-        const used = Number(row?.value) || 0;
-        if (used >= limit) return false;
-        if (!row) {
-            if (await prisma.appConfig.create({ data: { key, value: '1' } }).then(() => true, () => false)) return true;
-            continue;
-        }
-        const r = await prisma.appConfig.updateMany({ where: { key, value: row.value }, data: { value: String(used + 1) } });
-        if (r.count) return true;
-    }
-    return false;
+export function reserveMonthly(prisma: PrismaService, prefix: string, limit: number, now: number): Promise<boolean> {
+    return reserveCount(prisma, `${prefix}:${new Date(now).toISOString().slice(0, 7)}`, limit);
 }
 
 const compact = (s: unknown) => String(s ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
@@ -94,7 +83,7 @@ export class PhotoCheckService {
     constructor(private readonly prisma: PrismaService) {}
 
     get enabled() { return !!process.env.OPENROUTER_API_KEY; }
-    private get model() { return process.env.PHOTO_CHECK_MODEL || DEFAULT_VISION_MODEL; }
+    private get model() { return visionModel(); }
 
     /** Can the check answer right now? Asked before anything is spent on a search. Free, and remembered for a while. */
     async ready(): Promise<boolean> {
@@ -115,6 +104,10 @@ export class PhotoCheckService {
 
     async check(item: CheckItem, imageUrl: string): Promise<PhotoCheckResult> {
         if (!this.enabled) return { status: 'unavailable' };
+        if (!isFreeModel(this.model)) {
+            this.logger.error(`[photo-check] refused "${this.model}": only models ending in :free may be called`);
+            return { status: 'unavailable' };
+        }
         if (!(await reserveMonthly(this.prisma, 'photo_check_count', PHOTO_CHECK_MONTHLY_LIMIT, this.now()).catch(() => false))) return { status: 'limit_reached' };
         const model = this.model;
         const product = [`Product name: ${item.name}`, item.brand ? `Brand: ${item.brand}` : '', item.weight ? `Size: ${item.weight}` : ''].filter(Boolean).join('\n');

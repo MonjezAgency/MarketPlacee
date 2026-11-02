@@ -1,25 +1,31 @@
+import { Logger } from '@nestjs/common';
 import type { ProductDataProvider, ProductKind } from '../../product-data-providers';
+import { FREE_ALLOWANCE, serperCap, type Budget } from '../budget';
 import type { JsonRequest, SourceHttp } from '../http';
 import type { Candidate, IdentityRecord, SourceCall, SourceId } from '../types';
 
 /**
  * The official APIs the pipeline may use. A source switches itself on when its
- * key appears. Nothing here reads a web page: no search engine, retailer or
- * stock site is ever scraped. Unit costs are list prices (sources/README.md);
- * vision reports its own real cost.
+ * key appears, and a barcode database is only called inside its free allowance
+ * (budget.ts): if it would charge, it is skipped. Nothing here reads a web page:
+ * no search engine, retailer or stock site is ever scraped. Unit costs are list
+ * prices (sources/README.md); vision reports its own real cost.
  */
 export interface LookupAnswer { record: IdentityRecord | null; candidates: Candidate[] }
 export interface LookupSource { id: SourceId; keyEnv?: string; enabled(): boolean; lookup(code: string, ean: string, calls: SourceCall[], kind: ProductKind): Promise<LookupAnswer> }
 export interface SearchSource { id: SourceId; keyEnv: string; enabled(): boolean; search(query: string, ean: string, language: string, calls: SourceCall[]): Promise<Candidate[]> }
 
-export const UNIT_COST: Partial<Record<SourceId, number>> = { 'ean-search': 19 / 5000, 'ean-db': 9.8 / 5000, 'go-upc': 74.95 / 5000, 'barcode-spider': 39 / 10000, serper: 0.001, brave: 0.005 };
+export const UNIT_COST: Partial<Record<SourceId, number>> = { serper: 0.001 };
+export const SERPER_CACHE_DAYS = 90;
 
 const none: LookupAnswer = { record: null, candidates: [] };
 const key = (name: string) => (process.env[name] || '').trim();
 const urls = (list: unknown[]) => [...new Set(list.map((u) => String(u || '').trim()).filter((u) => /^https?:\/\//.test(u)))];
 
-function lookup(http: SourceHttp, calls: SourceCall[], req: Omit<JsonRequest, 'cost'>) {
-    return http.json({ ...req, cost: UNIT_COST[req.source] }, calls);
+/** Inside the free allowance only. */
+function lookup(http: SourceHttp, budget: Budget, calls: SourceCall[], req: Omit<JsonRequest, 'cost' | 'allow'>) {
+    const free = FREE_ALLOWANCE[req.source];
+    return http.json({ ...req, cost: 0, allow: () => (free ? budget.reserve(req.source, free.limit, free.period) : Promise.resolve(false)) }, calls);
 }
 
 /** Open Food, Beauty and Products Facts through the shared rate-limited providers. CC BY-SA, attribution kept. */
@@ -56,32 +62,12 @@ export function openFacts(providers: ProductDataProvider[]): LookupSource {
     };
 }
 
-export function eanSearch(http: SourceHttp): LookupSource {
-    return {
-        id: 'ean-search', keyEnv: 'EAN_SEARCH_TOKEN',
-        enabled: () => !!key('EAN_SEARCH_TOKEN'),
-        async lookup(code, ean, calls) {
-            const base = `https://api.ean-search.org/api?format=json&token=${encodeURIComponent(key('EAN_SEARCH_TOKEN'))}&ean=${code}`;
-            const info = await lookup(http, calls, { source: 'ean-search', ean, what: `barcode-lookup ${code}`, url: `${base}&op=barcode-lookup`, cacheKey: `ean-search:lookup:${code}`, gapMs: 300 });
-            const row = Array.isArray(info.data) ? info.data[0] : null;
-            if (!row?.name || row.error) return none;
-            const pic = await lookup(http, calls, { source: 'ean-search', ean, what: `product-image ${code}`, url: `${base}&op=product-image`, cacheKey: `ean-search:image:${code}`, gapMs: 300 });
-            const image = (Array.isArray(pic.data) ? pic.data[0]?.image : pic.data?.image) as string | undefined;
-            const list = image && /^https?:/.test(image) ? [image] : [];
-            return {
-                record: { source: 'ean-search', code, name: row.name, brand: null, quantity: null, imageUrls: list },
-                candidates: list.map((url) => ({ url, source: 'ean-search', title: row.name, foundBy: code })),
-            };
-        },
-    };
-}
-
-export function eanDb(http: SourceHttp): LookupSource {
+export function eanDb(http: SourceHttp, budget: Budget): LookupSource {
     return {
         id: 'ean-db', keyEnv: 'EANDB_API_KEY',
         enabled: () => !!key('EANDB_API_KEY'),
         async lookup(code, ean, calls) {
-            const r = await lookup(http, calls, { source: 'ean-db', ean, what: `product ${code}`, url: `https://ean-db.com/api/v2/product/${code}`, headers: { Authorization: `Bearer ${key('EANDB_API_KEY')}`, Accept: 'application/json' }, cacheKey: `ean-db:${code}`, gapMs: 200 });
+            const r = await lookup(http, budget, calls, { source: 'ean-db', ean, what: `product ${code}`, url: `https://ean-db.com/api/v2/product/${code}`, headers: { Authorization: `Bearer ${key('EANDB_API_KEY')}`, Accept: 'application/json' }, cacheKey: `ean-db:${code}`, gapMs: 200 });
             const p = r.data?.product;
             if (!p) return none;
             const titles = p.titles || {};
@@ -97,12 +83,12 @@ export function eanDb(http: SourceHttp): LookupSource {
 }
 
 /** Free trial endpoint: no key, about 100 calls a day, so it is spaced and a 429 just means no answer today. */
-export function upcItemDb(http: SourceHttp): LookupSource {
+export function upcItemDb(http: SourceHttp, budget: Budget): LookupSource {
     return {
         id: 'upcitemdb',
         enabled: () => true,
         async lookup(code, ean, calls) {
-            const r = await lookup(http, calls, { source: 'upcitemdb', ean, what: `trial lookup ${code}`, url: `https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`, cacheKey: `upcitemdb:${code}`, gapMs: 10_500 });
+            const r = await lookup(http, budget, calls, { source: 'upcitemdb', ean, what: `trial lookup ${code}`, url: `https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`, cacheKey: `upcitemdb:${code}`, gapMs: 10_500 });
             const it = r.data?.items?.[0];
             if (!it) return none;
             const list = urls(it.images || []);
@@ -114,12 +100,12 @@ export function upcItemDb(http: SourceHttp): LookupSource {
     };
 }
 
-export function goUpc(http: SourceHttp): LookupSource {
+export function goUpc(http: SourceHttp, budget: Budget): LookupSource {
     return {
         id: 'go-upc', keyEnv: 'GOUPC_API_KEY',
         enabled: () => !!key('GOUPC_API_KEY'),
         async lookup(code, ean, calls) {
-            const r = await lookup(http, calls, { source: 'go-upc', ean, what: `code ${code}`, url: `https://go-upc.com/api/v1/code/${code}`, headers: { Authorization: `Bearer ${key('GOUPC_API_KEY')}` }, cacheKey: `go-upc:${code}`, gapMs: 300 });
+            const r = await lookup(http, budget, calls, { source: 'go-upc', ean, what: `code ${code}`, url: `https://go-upc.com/api/v1/code/${code}`, headers: { Authorization: `Bearer ${key('GOUPC_API_KEY')}` }, cacheKey: `go-upc:${code}`, gapMs: 300 });
             const p = r.data?.product;
             if (!p?.name) return none;
             const list = urls([p.imageUrl]);
@@ -132,12 +118,13 @@ export function goUpc(http: SourceHttp): LookupSource {
     };
 }
 
-export function barcodeSpider(http: SourceHttp): LookupSource {
+export function barcodeSpider(http: SourceHttp, budget: Budget): LookupSource {
     return {
         id: 'barcode-spider', keyEnv: 'BARCODESPIDER_API_KEY',
-        enabled: () => !!key('BARCODESPIDER_API_KEY'),
+        // Its only free use is the 7-day trial: without the trial's end date it isn't called.
+        enabled: () => !!key('BARCODESPIDER_API_KEY') && key('BARCODESPIDER_TRIAL_UNTIL') >= new Date().toISOString().slice(0, 10),
         async lookup(code, ean, calls) {
-            const r = await lookup(http, calls, { source: 'barcode-spider', ean, what: `product ${code}`, url: `https://api.barcodespider.com/v2/products/${code}`, headers: { Authorization: `Bearer ${key('BARCODESPIDER_API_KEY')}` }, cacheKey: `barcode-spider:${code}`, gapMs: 5_200 });
+            const r = await lookup(http, budget, calls, { source: 'barcode-spider', ean, what: `product ${code}`, url: `https://api.barcodespider.com/v2/products/${code}`, headers: { Authorization: `Bearer ${key('BARCODESPIDER_API_KEY')}` }, cacheKey: `barcode-spider:${code}`, gapMs: 5_200 });
             const p = r.data?.product;
             if (!p?.name) return none;
             const list = urls(p.images || []);
@@ -149,8 +136,19 @@ export function barcodeSpider(http: SourceHttp): LookupSource {
     };
 }
 
-/** Google Images through Serper's API. Licence unknown: a search result is never proof of rights. */
-export function serper(http: SourceHttp): SearchSource {
+/** Google Images through Serper's API, capped per month. Licence unknown: a search result is never proof of rights. */
+export function serper(http: SourceHttp, budget: Budget): SearchSource {
+    const logger = new Logger('ImagePipeline');
+    let warned = '';
+    const allow = async () => {
+        const ok = await budget.reserve('serper', serperCap(), 'month');
+        const month = new Date().toISOString().slice(0, 7);
+        if (!ok && warned !== month) {
+            warned = month;
+            logger.warn(`[serper] the cap of ${serperCap()} searches for ${month} is reached: skipped until next month`);
+        }
+        return ok;
+    };
     return {
         id: 'serper', keyEnv: 'SERPER_API_KEY',
         enabled: () => !!key('SERPER_API_KEY'),
@@ -159,7 +157,7 @@ export function serper(http: SourceHttp): SearchSource {
             const r = await http.json({
                 source: 'serper', ean, what: `images "${query}"`, url: 'https://google.serper.dev/images', method: 'POST',
                 headers: { 'X-API-KEY': key('SERPER_API_KEY'), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ q: query, num: 20, hl }), cacheKey: `serper:${hl}:${query}`, gapMs: 120, cost: 0,
+                body: JSON.stringify({ q: query, num: 20, hl }), cacheKey: `serper:${hl}:${query}`, cacheDays: SERPER_CACHE_DAYS, gapMs: 120, cost: 0, allow, retries: 0,
             }, calls);
             const last = calls[calls.length - 1];
             // Serper states the credits each answer cost, so the trace records that and not an assumption.
@@ -167,21 +165,6 @@ export function serper(http: SourceHttp): SearchSource {
             return (r.data?.images || []).slice(0, 20).map((i: any): Candidate => ({
                 url: i.imageUrl, source: 'serper', pageUrl: i.link, title: i.title, width: i.imageWidth, height: i.imageHeight, query,
             })).filter((c: Candidate) => /^https:\/\//.test(c.url));
-        },
-    };
-}
-
-/** Fallback when Serper gives too little. Brave's terms forbid storing results, so nothing here is cached. */
-export function brave(http: SourceHttp): SearchSource {
-    return {
-        id: 'brave', keyEnv: 'BRAVE_SEARCH_API_KEY',
-        enabled: () => !!key('BRAVE_SEARCH_API_KEY'),
-        async search(query, ean, language, calls) {
-            const url = `https://api.search.brave.com/res/v1/images/search?q=${encodeURIComponent(query)}&count=20&search_lang=${/^[a-z]{2}$/.test(language) ? language : 'en'}`;
-            const r = await http.json({ source: 'brave', ean, what: `images "${query}"`, url, headers: { 'X-Subscription-Token': key('BRAVE_SEARCH_API_KEY'), Accept: 'application/json' }, cacheKey: null, gapMs: 1100, cost: UNIT_COST.brave }, calls);
-            return (r.data?.results || []).map((i: any): Candidate => ({
-                url: i.properties?.url, source: 'brave', pageUrl: i.url, title: i.title, width: i.properties?.width, height: i.properties?.height, query,
-            })).filter((c: Candidate) => /^https:\/\//.test(c.url || ''));
         },
     };
 }
