@@ -12,7 +12,7 @@ export type ImportTarget = 'supplier' | 'catalog';
 export interface UploadRow {
     id: string; sheet: string | null; row: number | null; name: string; ean: string | null;
     state: 'queued' | 'running' | 'waiting_vision' | 'done';
-    outcome: 'published' | 'published_image_pending' | 'needs_attention' | null;
+    outcome: 'published' | 'image_preparing' | 'awaiting_verification' | 'needs_attention' | null;
     imageState: 'verified' | 'bg_pending' | 'pending_vision' | 'placeholder' | 'kept' | null;
     reason: 'invalid_ean' | 'no_image' | 'photo_too_small' | 'not_verified' | 'missing_fields' | null;
     params: { missing?: string[] } | null; productId: string | null; productStatus: string | null; comment: string | null; image: string | null;

@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { ProductDataProvider, ProductKind } from '../../product-data-providers';
-import { FREE_ALLOWANCE, serperCap, type Budget } from '../budget';
+import { FREE_ALLOWANCE, serperCap, serperLive, type Budget } from '../budget';
 import type { JsonRequest, SourceHttp } from '../http';
 import type { Candidate, IdentityRecord, SourceCall, SourceId } from '../types';
 
@@ -158,7 +158,7 @@ export function serper(http: SourceHttp, budget: Budget): SearchSource {
     const hlOf = (language: string) => (/^[a-z]{2}$/.test(language) ? language : 'en');
     return {
         id: 'serper', keyEnv: 'SERPER_API_KEY',
-        enabled: () => !!key('SERPER_API_KEY'),
+        enabled: () => !!key('SERPER_API_KEY') && serperLive(),
         cacheKey: (query, language) => `serper:${hlOf(language)}:${query}`,
         async search(query, ean, language, calls) {
             const hl = hlOf(language);

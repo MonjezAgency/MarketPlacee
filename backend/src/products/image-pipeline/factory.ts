@@ -2,7 +2,7 @@ import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { buildProviders, HostQueue } from '../product-data-providers';
 import { PhotoroomService } from '../photoroom.service';
-import { photoroomCap, type Budget } from './budget';
+import { photoroomCap, PrismaBudget, type Budget } from './budget';
 import { SourceHttp, type LookupCache } from './http';
 import { ImagePipeline, type PipelineDeps } from './image-pipeline';
 import { barcodeSpider, eanDb, goUpc, openFacts, serper, shutterstock, upcItemDb } from './sources';
@@ -23,7 +23,8 @@ export function buildPipeline(cache: LookupCache, budget: Budget, extra: Partial
     const http = new SourceHttp(cache);
     const photoroom = new PhotoroomService();
     const lookups = [openFacts(buildProviders(new HostQueue(Number(process.env.PRODUCT_DATA_PER_MINUTE) || 12))), upcItemDb(http, budget), eanDb(http, budget), goUpc(http, budget), barcodeSpider(http, budget)];
-    const searches = [serper(http, budget), shutterstock(http)];
+    // Serper counts in the database or not at all, so a script with its own counter can't spend what the cap doesn't see.
+    const searches = [...(budget instanceof PrismaBudget ? [serper(http, budget)] : []), shutterstock(http)];
     const vision = new VisionGate(cache, fetch, { budget });
     const deps: PipelineDeps = {
         lookups, searches, vision, cache, style: styleImages,

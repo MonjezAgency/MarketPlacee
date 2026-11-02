@@ -3,7 +3,8 @@ import { unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Logger } from '@nestjs/common';
-import { FileBudget, FREE_ALLOWANCE, MemoryBudget } from '../image-pipeline/budget';
+import { FileBudget, FREE_ALLOWANCE, MemoryBudget, PrismaBudget } from '../image-pipeline/budget';
+import { buildPipeline } from '../image-pipeline/factory';
 import { MemoryCache, SourceHttp } from '../image-pipeline/http';
 import { buildIdentity, searchQueries } from '../image-pipeline/identity';
 import { barcodeSpider, eanDb, serper } from '../image-pipeline/sources';
@@ -268,6 +269,22 @@ describe('spending limits', () => {
     const images = { images: [{ imageUrl: 'https://shop.tesco.com/a.jpg', title: 't', imageWidth: 1000, imageHeight: 1000 }], credits: 1 };
     const fresh = () => { delete process.env.SERPER_MONTHLY_CAP; process.env.SERPER_API_KEY = 'test'; };
     afterAll(() => { delete process.env.SERPER_API_KEY; delete process.env.SERPER_MONTHLY_CAP; });
+
+    it('a key alone never spends a search, and neither does a script with its own counter', () => {
+        fresh();
+        const db = { appConfig: {} } as any;
+        const on = (budget: any) => buildPipeline(new MemoryCache(), budget).deps.searches.filter((s) => s.id === 'serper' && s.enabled()).length;
+        expect(on(new PrismaBudget(db))).toBe(0);
+        process.env.SERPER_LIVE = 'true';
+        // Under jest the flag does nothing either.
+        expect(on(new PrismaBudget(db))).toBe(0);
+        const worker = process.env.JEST_WORKER_ID;
+        delete process.env.JEST_WORKER_ID;
+        expect(on(new PrismaBudget(db))).toBe(1);
+        expect(buildPipeline(new MemoryCache(), new MemoryBudget()).deps.searches.some((s) => s.id === 'serper')).toBe(false);
+        process.env.JEST_WORKER_ID = worker;
+        delete process.env.SERPER_LIVE;
+    });
 
     it('Serper stops at the cap, without an error, and warns once', async () => {
         fresh();

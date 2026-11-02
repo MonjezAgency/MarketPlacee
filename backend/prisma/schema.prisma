@@ -742,7 +742,7 @@ model ImageRow {
   ean         String?
   /// queued | running | waiting_vision | done
   state       String       @default("queued")
-  /// published | published_image_pending | needs_attention. What the supplier reads.
+  /// published | image_preparing | awaiting_verification | needs_attention. What the supplier reads.
   outcome     String?
   /// verified | bg_pending | pending_vision | placeholder | kept
   imageState  String?

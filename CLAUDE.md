@@ -67,8 +67,12 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
   ean-search.org is gone. No paid cut-outs: a right photo that isn't white is `needs_bg_removal`, unless `PHOTOROOM_LIVE=true` and a live key.
 - Image pipeline (`backend/src/products/image-pipeline/`), behind `IMAGE_PIPELINE_ENABLED` (default off): a new import row is created at once and queued
   (`ImageRow`, `image-jobs.service.ts`, 4 at a time, a minute cron resumes). `image-outcome.ts decide()` says what a result means: a verified picture is attached and a complete row is
-  published with no staff queue, a row with no verified picture stays a draft (the image is a required field) and the supplier is told at `/supplier/products/import/status/[id]`, with one summary
-  notification per upload. Only a row waiting for the vision quota goes live on the placeholder (`pending_vision`) and returns to a draft if its photo then fails. A right product on a non-white
+  published with no staff queue, a row with no verified picture stays a draft (the image is a required field, nothing goes live on the placeholder) and the supplier is told at
+  `/supplier/products/import/status/[id]`, with one summary notification per upload. A row waiting for vision stays a draft (`image_preparing`) and publishes by itself after the reset, with a second
+  summary when the last waiting row is decided. Only a verified account (`kycStatus` VERIFIED, or a staff account for the catalog) auto-publishes: `ProductsService.mayAutoPublish`, also enforced in
+  `publishFromPipeline`. An unverified supplier's complete row stays a draft (`awaiting_verification`) and the minute cron publishes it once the account is verified; a draft saved by hand is never
+  touched. KYC is still not required to list by the normal flow (see `products.service.ts create`). Serper runs only with `SERPER_LIVE=true`, never under jest, and only with the database counter
+  (`PrismaBudget`), so a script can't spend it. A right product on a non-white
   background is cropped and kept as `bg_pending`; with `PHOTOROOM_LIVE=true`, `npm run images:backfill` replaces those. Staff control comes after publishing: pause, remove, re-publish
   (`POST /products/admin/:id/take-down|republish`, comment required, statuses `PAUSED`/`REMOVED`, supplier reads the comment). Staff see the trace on the review page and use in `/admin/products/photos`.
 - Product bulk actions: `POST /products/admin/bulk`, per-row rules in `backend/src/products/admin-bulk.ts`; every skip is reported.

@@ -6,7 +6,7 @@ import { composeCrop } from '../image-pipeline/compose';
 import { packBox, rawRgb } from '../image-pipeline/pixels';
 import { sharp } from '../image-pipeline/sharp';
 
-const none = { status: 'not_found' as const, hasPhoto: false, missing: [], wentLiveWaiting: false };
+const none = { status: 'not_found' as const, hasPhoto: false, missing: [], verified: true };
 
 describe('what a pipeline result means for the product', () => {
     it('a verified picture goes on and the product is published', () => {
@@ -16,19 +16,26 @@ describe('what a pipeline result means for the product', () => {
         expect(decide({ ...none, status: 'bg_pending' })).toMatchObject({ attach: true, publish: true, image: 'bg_pending', outcome: 'published' });
     });
     it.each([['not_found', 'no_image'], ['failed', 'no_image'], ['needs_review', 'not_verified'], ['needs_better_image', 'not_verified'], ['low_res', 'photo_too_small'], ['invalid_ean', 'invalid_ean']] as const)('%s: not published, the supplier is told %s', (status, reason) => {
-        expect(decide({ ...none, status })).toMatchObject({ attach: false, publish: false, withoutPhoto: false, outcome: 'needs_attention', reason });
+        expect(decide({ ...none, status })).toMatchObject({ attach: false, publish: false, outcome: 'needs_attention', reason });
     });
     it('a verified picture on a row with a field missing: attached, not published, supplier told', () => {
         expect(decide({ ...none, status: 'approved', missing: ['Price'] })).toMatchObject({ attach: true, publish: false, outcome: 'needs_attention', reason: 'missing_fields' });
     });
-    it('quota gone: live on the placeholder, waits for the reset, nothing attached', () => {
-        expect(decide({ ...none, status: 'pending_vision' })).toMatchObject({ attach: false, publish: true, withoutPhoto: true, waiting: true, image: 'pending_vision', outcome: 'published_image_pending' });
+    it('quota gone: stays a draft, waits for the reset, nothing attached', () => {
+        expect(decide({ ...none, status: 'pending_vision' })).toMatchObject({ attach: false, publish: false, waiting: true, image: 'pending_vision', outcome: 'image_preparing', reason: null });
     });
     it('quota gone with a field missing: stays a draft and still resumes', () => {
         expect(decide({ ...none, status: 'pending_vision', missing: ['Price'] })).toMatchObject({ waiting: true, outcome: 'needs_attention', reason: 'missing_fields' });
     });
-    it('the photo that was waiting then fails: back to a draft, supplier told', () => {
-        expect(decide({ ...none, status: 'needs_review', wentLiveWaiting: true })).toMatchObject({ withdraw: true, attach: false, outcome: 'needs_attention' });
+    it('an unverified supplier: picture attached, still a draft, told why', () => {
+        expect(decide({ ...none, status: 'approved', verified: false })).toMatchObject({ attach: true, publish: false, outcome: 'awaiting_verification', reason: null });
+        expect(decide({ ...none, status: 'bg_pending', verified: false })).toMatchObject({ attach: true, publish: false, outcome: 'awaiting_verification' });
+        expect(decide({ ...none, status: 'approved', hasPhoto: true, verified: false })).toMatchObject({ publish: false, outcome: 'awaiting_verification' });
+    });
+    it('an unverified supplier with a problem: the problem comes first', () => {
+        expect(decide({ ...none, status: 'approved', missing: ['Price'], verified: false })).toMatchObject({ publish: false, outcome: 'needs_attention', reason: 'missing_fields' });
+        expect(decide({ ...none, verified: false })).toMatchObject({ publish: false, outcome: 'needs_attention', reason: 'no_image' });
+        expect(decide({ ...none, status: 'pending_vision', verified: false })).toMatchObject({ publish: false, waiting: true, outcome: 'image_preparing' });
     });
     it('a real photo is never replaced', () => {
         for (const status of ['approved', 'bg_pending'] as const) expect(decide({ ...none, status, hasPhoto: true })).toMatchObject({ attach: false, image: 'kept' });
@@ -140,7 +147,7 @@ describe('uploads and rows', () => {
         expect(notify).not.toHaveBeenCalled();
         await (service as any).sendSummary('u');
         expect(notify).toHaveBeenCalledTimes(1);
-        expect(notify.mock.calls[0][4]).toMatchObject({ kind: 'IMAGE_UPLOAD_DONE', dedupeKey: 'image-upload:u', params: { total: 3, published: 2, attention: 1, pending: 0 } });
+        expect(notify.mock.calls[0][4]).toMatchObject({ kind: 'IMAGE_UPLOAD_DONE', dedupeKey: 'image-upload:u', params: { total: 3, published: 2, attention: 1, preparing: 0, unverified: 0 } });
     });
 });
 
@@ -150,6 +157,43 @@ describe('a blank cell from the file', () => {
         const { service, prisma } = jobs(rows);
         await service.recheck('r1', 's1');
         expect(prisma.imageRow.update.mock.calls[0][0].data.params).toBe(Prisma.DbNull);
+    });
+});
+
+describe('an account verified later', () => {
+    it('publishes its complete drafts and says so once, per account', async () => {
+        const rows = [{ id: 'r1', ownerId: 's1', productId: 'p1', outcome: 'awaiting_verification', state: 'done', photos: [] }, { id: 'r2', ownerId: 's1', productId: 'p2', outcome: 'awaiting_verification', state: 'done', photos: [] }];
+        const { service, prisma } = jobs(rows);
+        prisma.imageRow.updateMany = jest.fn(async () => ({ count: 1 }));
+        (service as any).process = jest.fn(async (id: string) => { rows.find((r) => r.id === id)!.outcome = 'published'; });
+        await (service as any).releaseVerified();
+        expect((service as any).process).toHaveBeenCalledTimes(2);
+        expect(prisma.imageRow.findMany.mock.calls[0][0].where).toMatchObject({ outcome: 'awaiting_verification', product: { supplier: { kycStatus: 'VERIFIED' } } });
+        const notify = (service as any).notifications.notifyUser;
+        expect(notify).toHaveBeenCalledTimes(1);
+        expect(notify.mock.calls[0][4]).toMatchObject({ kind: 'IMAGE_VERIFIED_LIVE', params: { count: 2 } });
+    });
+    it('two instances: only the one that wins the row runs it', async () => {
+        const { service, prisma } = jobs([{ id: 'r1', ownerId: 's1', outcome: 'awaiting_verification', state: 'done', photos: [] }]);
+        prisma.imageRow.updateMany = jest.fn(async () => ({ count: 0 }));
+        (service as any).process = jest.fn();
+        await (service as any).releaseVerified();
+        expect((service as any).process).not.toHaveBeenCalled();
+    });
+});
+
+describe('the second summary', () => {
+    const upload = { id: 'u1', ownerId: 's1', catalog: false, fileName: 'a.xlsx', summarySentAt: new Date() };
+    it('goes once the last waiting row is decided, under its own key', async () => {
+        const { service } = jobs([], [upload]);
+        await (service as any).sendAfterWait('u1');
+        expect((service as any).notifications.notifyUser.mock.calls[0][4].dedupeKey).toBe('image-upload:u1:after-wait');
+    });
+    it('waits while a row is still waiting', async () => {
+        const { service, prisma } = jobs([], [upload]);
+        prisma.imageRow.count = jest.fn(async () => 1);
+        await (service as any).sendAfterWait('u1');
+        expect((service as any).notifications.notifyUser).not.toHaveBeenCalled();
     });
 });
 
@@ -206,9 +250,9 @@ describe('backfill of crops, with a mocked Photoroom', () => {
 describe('staff control after publishing', () => {
     const { ProductsService } = require('../products.service');
     const actor = { id: 'staff', role: 'ADMIN', name: 'Staff' };
-    const svc = (product: any) => {
+    const svc = (product: any, owner: any = { role: 'SUPPLIER', kycStatus: 'VERIFIED' }) => {
         const s = Object.create(ProductsService.prototype);
-        s.prisma = { product: { findUnique: jest.fn(async () => product), update: jest.fn(async ({ data }: any) => ({ ...product, ...data })) } };
+        s.prisma = { product: { findUnique: jest.fn(async () => product), update: jest.fn(async ({ data }: any) => ({ ...product, ...data })) }, user: { findUnique: jest.fn(async () => owner) } };
         s.review = { record: jest.fn(async () => undefined) };
         s.notificationsService = { notifyUser: jest.fn(async () => undefined) };
         s.priceHistory = { record: jest.fn(async () => undefined) };
@@ -230,11 +274,6 @@ describe('staff control after publishing', () => {
         expect(s.review.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'PAUSED', actor }));
         expect(s.notificationsService.notifyUser.mock.calls[0][4]).toMatchObject({ kind: 'PRODUCT_PAUSED', params: { reason: 'Pack shown is the old design' } });
     });
-    it('a paused product still waiting for vision can go back on the placeholder, one with no photo for any other reason cannot', async () => {
-        const full = { name: 'Acme Lemon', brand: 'Acme', category: 'Beverages', ean: '5449000000439', origin: 'Spain', exwLocation: 'Madrid', weight: '500 ml', price: 10, stock: 5, unitsPerCase: 12, casesPerPallet: 80, unit: 'piece', moq: 1, moqUnit: 'CASE', images: [] };
-        await expect(svc({ ...live, ...full, status: 'PAUSED', imageStatus: 'pending_vision' }).republish('p', actor)).resolves.toMatchObject({ status: 'APPROVED' });
-        await expect(svc({ ...live, ...full, status: 'PAUSED', imageStatus: 'not_found' }).republish('p', actor)).rejects.toMatchObject({ status: 400 });
-    });
     it('remove keeps the record', async () => {
         const s = svc(live);
         await s.takeDown('p', 'remove', 'Discontinued', actor);
@@ -254,9 +293,22 @@ describe('staff control after publishing', () => {
             expect(s.prisma.product.update).not.toHaveBeenCalled();
         }
     });
-    it('a placeholder alone is never enough to publish, unless the photo is only waiting for vision', async () => {
-        const full = { ...live, status: 'DRAFT', brand: 'Acme', category: 'Drinks', description: 'd', basePrice: 10, price: 12, moq: 1, unitsPerCase: 12, weight: '500ml', countryOfOrigin: 'DE', ean: '5449000000439', images: ['data:image/svg+xml;base64,AAAA'] };
-        const a = svc(full);
-        expect(await a.publishFromPipeline('p')).toBe(false);
+    describe('auto-publish', () => {
+        const full = { ...live, ...{ name: 'Acme Lemon', brand: 'Acme', category: 'Beverages', ean: '5449000000439', origin: 'Spain', exwLocation: 'Madrid', weight: '500 ml', price: 10, stock: 5, unitsPerCase: 12, casesPerPallet: 80, unit: 'piece', moq: 1, moqUnit: 'CASE', images: [] }, status: 'DRAFT', supplierId: 's', images: ['https://s/a.jpg'] };
+        it('a placeholder alone is never enough, and neither is a paused one to re-publish', async () => {
+            expect(await svc({ ...full, images: [] }).publishFromPipeline('p')).toBe(false);
+            await expect(svc({ ...full, status: 'PAUSED', images: [], imageStatus: 'pending_vision' }).republish('p', actor)).rejects.toMatchObject({ status: 400 });
+        });
+        it('a verified supplier publishes', async () => {
+            expect(await svc(full).publishFromPipeline('p')).toBe(true);
+        });
+        it.each(['UNVERIFIED', 'PENDING', 'REJECTED'])('a %s supplier stays a draft', async (kycStatus) => {
+            const s = svc(full, { role: 'SUPPLIER', kycStatus });
+            expect(await s.publishFromPipeline('p')).toBe(false);
+            expect(s.prisma.product.update).not.toHaveBeenCalled();
+        });
+        it('the catalog account has no KYC and publishes', async () => {
+            expect(await svc(full, { role: 'OWNER', kycStatus: 'UNVERIFIED' }).publishFromPipeline('p')).toBe(true);
+        });
     });
 });

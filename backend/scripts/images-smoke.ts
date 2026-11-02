@@ -181,9 +181,7 @@ async function main() {
     const left = serperCap() - await budget.used('serper', 'month');
     const plan = flag('--plan');
     if (flag('--search')) {
-        const known = existsSync(PLAN_FILE) ? JSON.parse(readFileSync(PLAN_FILE, 'utf8')) : null;
-        if (!known) throw new Error('run --plan first: the number of searches must be known before any is spent');
-        if (known.serperTotal > left) throw new Error(`the plan needs ${known.serperTotal} searches and ${left} are left this month`);
+        throw new Error('this script counts in a file: Serper runs only through the upload jobs, which count in the database');
     }
     const { pipeline } = buildPipeline(new FileCache(join(OUT, 'cache.json')), budget, { cutoutCache: new CutoutCache(), ...(plan || flag('--search') ? {} : { searches: [] }) });
     const items: Item[] = new Array(rows.length);

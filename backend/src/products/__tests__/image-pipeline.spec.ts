@@ -143,6 +143,15 @@ describe('a row through the pipeline', () => {
         expect(r.output).toBeUndefined();
     });
 
+    it('nobody names the product and vision is down: nothing to wait for and no search spent', async () => {
+        const url = 'https://images.openfoodfacts.org/c.jpg';
+        const looked = jest.fn(async () => []);
+        const { pipeline } = build({ [url]: await pack() }, { searches: [{ ...search([]), search: looked }], vision: { unavailable: async () => 'daily_quota_exhausted', check: async () => 'daily_quota_exhausted' } as any }, () => { throw new Error('no vision call'); });
+        const r = await pipeline.run({ ...row, name: '', brand: '' }, { policy: 'open' });
+        expect(r.status).not.toBe('pending_vision');
+        expect(looked).not.toHaveBeenCalled();
+    });
+
     it('an editorial Shutterstock photo is never published or even sent to vision', async () => {
         const url = 'https://image.shutterstock.com/e.jpg';
         const { pipeline, fetcher } = build({ [url]: await pack() }, { searches: [search([c(url, { source: 'shutterstock', pageUrl: undefined, isEditorial: true, licence: 'editorial' })])] }, () => reply(answer()));

@@ -1,3 +1,4 @@
+import { isStaffRole } from './catalog-scope';
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductStatus } from '@prisma/client';
@@ -897,8 +898,7 @@ export class ProductsService {
         const product = await this.findOne(id);
         if (!product) throw new NotFoundException('Product not found');
         if (product.status !== ProductStatus.PAUSED && product.status !== ProductStatus.REMOVED) throw new BadRequestException({ code: 'NOT_TAKEN_DOWN', message: 'Only a paused or removed product can be re-published.' });
-        // A product that went live on the placeholder may go back the same way: its photo is still waiting for vision.
-        const errors = missingForPublish(product).filter((m) => !(m.field === 'images' && (product as any).imageStatus === 'pending_vision')).map((m) => m.label);
+        const errors = missingForPublish(product).map((m) => m.label);
         if (errors.length) throw new BadRequestException({ code: 'INCOMPLETE', message: `Incomplete product cannot be published. Missing: ${errors.join(', ')}.`, errors });
         const updated = await this.prisma.product.update({ where: { id }, data: { status: ProductStatus.APPROVED, adminNotes: null } });
         this.priceHistory.record(id, 'APPROVED').catch(() => {});
@@ -909,27 +909,24 @@ export class ProductsService {
 
     /**
      * The image pipeline's decision to publish: no review queue. Only a draft moves, so a
-     * product Ali FMCG took down or rejected stays down. `withoutPhoto` is for a product
-     * waiting on the vision quota, which shows the placeholder until its photo is judged.
+     * product Ali FMCG took down or rejected stays down, and only a verified account publishes.
      */
-    async publishFromPipeline(id: string, opts: { withoutPhoto?: boolean } = {}) {
+    async publishFromPipeline(id: string) {
         const product = await this.prisma.product.findUnique({ where: { id } });
         // A supplier who completed the row on the edit form sent it for review: that review is what this replaces.
         if (!product || (product.status !== ProductStatus.DRAFT && product.status !== ProductStatus.PENDING)) return false;
-        const missing = missingForPublish(product).filter((m) => !(opts.withoutPhoto && m.field === 'images'));
-        if (missing.length) return false;
+        if (missingForPublish(product).length || !(await this.mayAutoPublish(product.supplierId))) return false;
         await this.prisma.product.update({ where: { id }, data: { status: ProductStatus.APPROVED, adminNotes: null } });
         this.priceHistory.record(id, 'APPROVED').catch(() => {});
         await this.review?.record({ productId: id, action: 'AUTO_PUBLISHED', statusAfter: ProductStatus.APPROVED, actor: null });
         return true;
     }
 
-    /** A product put live on the placeholder whose photo then failed: a photo is required, so it goes back to a draft. */
-    async withdrawFromPipeline(id: string) {
-        const product = await this.prisma.product.findUnique({ where: { id }, select: { status: true } });
-        if (product?.status !== ProductStatus.APPROVED) return;
-        await this.prisma.product.update({ where: { id }, data: { status: ProductStatus.DRAFT } });
-        await this.review?.record({ productId: id, action: 'STATUS_CHANGED', statusAfter: ProductStatus.DRAFT, actor: null });
+    /** Auto-publishing is for verified suppliers. Staff accounts own the Ali FMCG catalog and have no KYC. */
+    async mayAutoPublish(supplierId: string | null) {
+        if (!supplierId) return false;
+        const owner = await this.prisma.user.findUnique({ where: { id: supplierId }, select: { role: true, kycStatus: true } });
+        return !!owner && (isStaffRole(owner.role) || owner.kycStatus === 'VERIFIED');
     }
 
     /**

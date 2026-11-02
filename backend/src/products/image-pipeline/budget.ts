@@ -11,6 +11,8 @@ export interface Budget {
 
 export const SERPER_DEFAULT_CAP = 200;
 export const serperCap = () => Number(process.env.SERPER_MONTHLY_CAP) || SERPER_DEFAULT_CAP;
+/** A key alone spends nothing: `backend/.env` holds one, so a live search must be asked for, and a test can never ask. */
+export const serperLive = () => (process.env.SERPER_LIVE || '').trim() === 'true' && !process.env.JEST_WORKER_ID;
 /** Paid cut-outs allowed for this test, counted across runs. */
 export const PHOTOROOM_DEFAULT_CAP = 60;
 export const photoroomCap = () => Number(process.env.PHOTOROOM_CAP) || PHOTOROOM_DEFAULT_CAP;

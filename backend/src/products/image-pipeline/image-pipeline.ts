@@ -151,9 +151,11 @@ export class ImagePipeline {
         if (free) return free;
         // Only a row with no good photo gets a search, and nothing could judge what one finds without vision.
         const down = await this.deps.vision.unavailable();
+        // No source names the product, so nothing could prove a picture shows it: no search, and nothing to wait for.
+        const usable = identity.brand || identity.name ? searches : [];
         // With no photo and no search left there is nothing to wait for: the row goes on to "not found".
-        if (down && (state.scored.length || searches.length)) return end('pending_vision', visionDown(down), { top: state.scored.slice(0, TOP) });
-        for (const source of searches) {
+        if (down && (identity.brand || identity.name) && (state.scored.length || usable.length)) return end('pending_vision', visionDown(down), { top: state.scored.slice(0, TOP) });
+        for (const source of usable) {
             for (const q of searchQueries(identity)) {
                 const found = await source.search(q.query, identity.ean, q.language, trace.calls).catch(() => []);
                 const onTopic = found.filter((c) => namesProduct(c, identity.brand, gtin.searchCodes));

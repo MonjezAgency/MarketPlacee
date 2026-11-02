@@ -36,6 +36,12 @@ export const ownStorageDownload = (url: string) => {
     return fetch(url, { signal: AbortSignal.timeout(45_000) }).then(async (res) => (res.ok ? { ok: true as const, bytes: Buffer.from(await res.arrayBuffer()) } : { ok: false as const, reason: `download_http_${res.status}` }), () => ({ ok: false as const, reason: 'download_failed' }));
 };
 
+/** A picture the pipeline put on the product earlier is still its own, not the supplier's, when the row runs again. */
+function pipelinePicture(product: { images: unknown; imageCredits: unknown }): 'verified' | 'bg_pending' | null {
+    const credit = (product.imageCredits as Record<string, any> | null)?.[realImages(product.images as string[])[0]];
+    return credit?.origin === 'pipeline' ? (credit.bgPending ? 'bg_pending' : 'verified') : null;
+}
+
 /**
  * The job around ImagePipeline: rows wait in ImageRow, four run at a time, and a run
  * is safe to repeat. Nothing here runs on an existing product unless someone re-runs
@@ -110,6 +116,7 @@ export class ImageJobsService {
             const ready = await this.prisma.imageRow.findMany({ where: { state: 'waiting_vision' }, orderBy: { updatedAt: 'asc' }, take: RESUME_PER_TICK, select: { id: true } });
             if (ready.length) await this.prisma.imageRow.updateMany({ where: { id: { in: ready.map((r) => r.id) } }, data: { state: 'queued' } });
         }
+        await this.releaseVerified();
         const idle = await this.prisma.imageUpload.findMany({ where: { summarySentAt: null, OR: [{ closedAt: { not: null } }, { createdAt: { lt: new Date(Date.now() - IDLE_UPLOAD_MS) } }] }, select: { id: true }, take: 50 });
         for (const u of idle) await this.closeUpload(u.id);
         this.kick();
@@ -124,25 +131,43 @@ export class ImageJobsService {
         const result = hasPhoto ? null : await this.engine.pipeline.run({ ean: row.ean ?? '', name: product.name, brand: product.brand, weight: product.weight, category: product.category, supplierImages: row.photos.map((url) => ({ url })) }, { policy: 'open', upload: row.uploadId ?? row.id });
         const blank: string[] = (row.params as any)?.blank ?? [];
         const missing = [...new Set([...missingForPublish(product).filter((m) => m.field !== 'images').map((m) => m.label), ...blank])];
-        const d = decide({ status: result?.status ?? 'approved', hasPhoto, missing, wentLiveWaiting: product.imageStatus === 'pending_vision' });
-        const attached = d.attach && result ? await this.attach(product.id, result) : false;
-        if (d.publish) await this.products.publishFromPipeline(product.id, { withoutPhoto: d.withoutPhoto && !attached });
-        if (d.withdraw) await this.products.withdrawFromPipeline(product.id);
+        const verified = await this.products.mayAutoPublish(product.supplierId);
+        const d = decide({ status: result?.status ?? 'approved', hasPhoto, missing, verified });
+        if (d.attach && result) await this.attach(product.id, result);
+        if (d.publish) await this.products.publishFromPipeline(product.id);
         if (result) await this.prisma.product.update({ where: { id: product.id }, data: { imageStatus: result.status, imageStatusReason: result.reason.slice(0, 500) } });
         const live = await this.prisma.product.findUnique({ where: { id: product.id }, select: { status: true } });
         // A product staff took down stays down: the row says so instead of "published".
-        const outcome: RowOutcome = d.outcome !== 'needs_attention' && live?.status !== 'APPROVED' ? 'needs_attention' : d.outcome;
+        const outcome: RowOutcome = d.outcome === 'published' && live?.status !== 'APPROVED' ? 'needs_attention' : d.outcome;
         const calls = result?.trace.calls ?? [];
         await this.prisma.imageRow.update({
             where: { id },
             data: {
-                state: d.waiting ? 'waiting_vision' : 'done', outcome, imageState: d.image, reason: d.reason ?? (outcome === 'needs_attention' ? 'missing_fields' : null),
+                state: d.waiting ? 'waiting_vision' : 'done', outcome, imageState: pipelinePicture(product) ?? d.image, reason: d.reason ?? (outcome === 'needs_attention' ? 'missing_fields' : null),
                 params: { ean: row.ean, missing, ...(blank.length ? { blank } : {}) }, detail: result?.reason.slice(0, 500) ?? 'photo_kept', ...(result ? { trace: JSON.parse(JSON.stringify(result.trace)) } : {}), finishedAt: new Date(),
                 visionCalls: { increment: calls.filter((c) => c.source === 'vision' && c.status !== 'cached').length },
                 searches: { increment: calls.filter((c) => c.source === 'serper' && c.status === 200).length },
             },
         });
         if (row.uploadId) await this.sendSummary(row.uploadId);
+        if (row.uploadId && row.outcome === 'image_preparing') await this.sendAfterWait(row.uploadId);
+    }
+
+    /**
+     * Rows that passed everything and only waited for the account. Reads the account rather
+     * than hooking the KYC code, so every way of verifying one counts (KYC review, owner tools).
+     */
+    private async releaseVerified() {
+        const rows = await this.prisma.imageRow.findMany({ where: { state: 'done', outcome: 'awaiting_verification', product: { supplier: { kycStatus: 'VERIFIED' } } }, take: RESUME_PER_TICK, select: { id: true, ownerId: true } });
+        const live = new Map<string, number>();
+        for (const r of rows) {
+            const won = await this.prisma.imageRow.updateMany({ where: { id: r.id, state: 'done', outcome: 'awaiting_verification' }, data: { state: 'running', startedAt: new Date() } });
+            if (!won.count) continue;
+            await this.process(r.id).catch((e) => this.fail(r.id, e));
+            const after = await this.prisma.imageRow.findUnique({ where: { id: r.id }, select: { outcome: true } });
+            if (after?.outcome === 'published') live.set(r.ownerId, (live.get(r.ownerId) ?? 0) + 1);
+        }
+        for (const [owner, count] of live) await this.notifications.notifyUser(owner, 'Your account is verified', `${count} of your products are now live.`, 'SUCCESS', { link: '/supplier/products', kind: 'IMAGE_VERIFIED_LIVE', params: { count } }).catch((e) => this.logger.warn(`[verified] ${owner}: ${e?.message}`));
     }
 
     /** Stored with its origin, so every picture can be audited and replaced. A real photo that appeared meanwhile stays. */
@@ -168,11 +193,23 @@ export class ImageJobsService {
         if (open) return;
         const taken = await this.prisma.imageUpload.updateMany({ where: { id: uploadId, summarySentAt: null }, data: { summarySentAt: new Date() } });
         if (!taken.count) return;
-        const rows = await this.prisma.imageRow.groupBy({ by: ['outcome'], where: { uploadId }, _count: { _all: true } });
+        await this.notifySummary(upload, `image-upload:${uploadId}`);
+    }
+
+    /** The first summary said some images were still being prepared: a second one, once, when the last of them is decided. */
+    private async sendAfterWait(uploadId: string) {
+        const upload = await this.prisma.imageUpload.findUnique({ where: { id: uploadId } });
+        if (!upload?.summarySentAt) return;
+        if (await this.prisma.imageRow.count({ where: { uploadId, state: { in: ['queued', 'running', 'waiting_vision'] } } })) return;
+        await this.notifySummary(upload, `image-upload:${uploadId}:after-wait`);
+    }
+
+    private async notifySummary(upload: { id: string; ownerId: string; catalog: boolean; fileName: string | null }, dedupeKey: string) {
+        const rows = await this.prisma.imageRow.groupBy({ by: ['outcome'], where: { uploadId: upload.id }, _count: { _all: true } });
         const n = (o: RowOutcome) => rows.find((r) => r.outcome === o)?._count._all ?? 0;
-        const params = { file: upload.fileName ?? '', total: rows.reduce((s, r) => s + r._count._all, 0), published: n('published'), pending: n('published_image_pending'), attention: n('needs_attention') };
-        const link = upload.catalog ? `/admin/products/catalog/import/status/${uploadId}` : `/supplier/products/import/status/${uploadId}`;
-        await this.notifications.notifyUser(upload.ownerId, 'Your product upload is finished', `${params.total} rows: ${params.published} published, ${params.pending} published with the image pending, ${params.attention} need your attention.`, params.attention ? 'WARNING' : 'SUCCESS', { link, kind: 'IMAGE_UPLOAD_DONE', params, dedupeKey: `image-upload:${uploadId}` }).catch((e) => this.logger.warn(`[summary] ${uploadId}: ${e?.message}`));
+        const params = { file: upload.fileName ?? '', total: rows.reduce((s, r) => s + r._count._all, 0), published: n('published'), preparing: n('image_preparing'), unverified: n('awaiting_verification'), attention: n('needs_attention') };
+        const link = upload.catalog ? `/admin/products/catalog/import/status/${upload.id}` : `/supplier/products/import/status/${upload.id}`;
+        await this.notifications.notifyUser(upload.ownerId, 'Your product upload is finished', `${params.total} rows: ${params.published} published, ${params.preparing} with the image being prepared, ${params.unverified} waiting for your account to be verified, ${params.attention} need your attention.`, params.attention ? 'WARNING' : 'SUCCESS', { link, kind: 'IMAGE_UPLOAD_DONE', params, dedupeKey }).catch((e) => this.logger.warn(`[summary] ${upload.id}: ${e?.message}`));
     }
 
     private async ownUpload(id: string, ownerId: string | null) {

@@ -64,18 +64,20 @@ export default function UploadStatus({ target, id }: { target: ImportTarget; id:
     const rows = data.rows;
     const count = (o: string) => rows.filter((r) => r.outcome === o).length;
     const done = rows.filter((r) => !running(r)).length;
-    const tiles: [string, number, string][] = [[tu('tilePublished'), count('published'), 'text-emerald-700'], [tu('tilePending'), count('published_image_pending'), 'text-amber-800'], [tu('tileAttention'), count('needs_attention'), 'text-red-700']];
+    const tiles: [string, number, string][] = [[tu('tilePublished'), count('published'), 'text-emerald-700'], [tu('tilePending'), count('image_preparing'), 'text-amber-800'], [tu('tileVerification'), count('awaiting_verification'), 'text-amber-800'], [tu('tileAttention'), count('needs_attention'), 'text-red-700']];
 
     const badge = (r: UploadRow): [Tone, string] => running(r) ? ['info', 'statusChecking']
         : takenDown(r) ? ['danger', 'statusTakenDown']
             : r.outcome === 'published' ? ['success', 'statusPublished']
-                : r.outcome === 'published_image_pending' ? ['warning', 'statusPending'] : ['danger', 'statusAttention'];
+                : r.outcome === 'image_preparing' ? ['warning', 'statusPending']
+                    : r.outcome === 'awaiting_verification' ? ['warning', 'statusVerification'] : ['danger', 'statusAttention'];
     const detail = (r: UploadRow) => {
         if (running(r)) return '';
         if (takenDown(r)) return r.comment ? tu('msgStaff', { comment: r.comment }) : '';
         const code = r.ean ?? '';
         if (r.outcome === 'published') return r.imageState === 'bg_pending' ? tu('imageBg') : r.imageState === 'kept' ? tu('imageFromSeller') : '';
-        if (r.outcome === 'published_image_pending') return tu('imageWaiting');
+        if (r.outcome === 'image_preparing') return tu('imageWaiting');
+        if (r.outcome === 'awaiting_verification') return tu('msgVerification');
         switch (r.reason) {
             case 'invalid_ean': return tu('msgInvalidEan');
             case 'not_verified': return tu('msgNotVerified', { ean: code });
@@ -87,7 +89,7 @@ export default function UploadStatus({ target, id }: { target: ImportTarget; id:
 
     return (
         <div className="space-y-4">
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                 {tiles.map(([label, value, tone]) => (
                     <div key={label} className="rounded-xl ring-1 ring-line p-3">
                         <p className="text-[12.5px] text-ink-3">{label}</p>
