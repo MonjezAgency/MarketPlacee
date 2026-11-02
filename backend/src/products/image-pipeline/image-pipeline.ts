@@ -76,7 +76,7 @@ export class ImagePipeline {
     private async steps(row: PipelineRow, opts: RunOptions, trace: Trace, done: (s: ImageStatus, r: string, x?: Partial<PipelineResult>) => PipelineResult): Promise<PipelineResult> {
         const gtin = parseGtin(row.ean);
         trace.gtin = { canonical: gtin.canonical, caseCode: gtin.caseCode, inner: gtin.inner, searchCodes: gtin.searchCodes, problem: gtin.problem };
-        if (gtin.problem) return done('invalid_ean', gtin.problem);
+        if (gtin.problem) return done('invalid_ean', gtin.digits ? gtin.problem : 'no barcode on this row');
         const name = cleanName(row.name ?? '', row.brand ?? '');
         trace.name = name;
 

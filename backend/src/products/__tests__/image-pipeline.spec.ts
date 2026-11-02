@@ -171,6 +171,7 @@ describe('barcodes and sources', () => {
         const source = db([]);
         const { pipeline } = build({}, { lookups: [source] }, () => reply(answer()));
         expect(await pipeline.run({ ...row, ean: '123' })).toMatchObject({ status: 'invalid_ean', reason: 'invalid_ean' });
+        expect(await pipeline.run({ ...row, ean: '' })).toMatchObject({ status: 'invalid_ean', reason: 'no barcode on this row' });
         expect(source.lookup).not.toHaveBeenCalled();
     });
     it('a case code asks both codes and records which answered', async () => {

@@ -101,7 +101,7 @@ Under $1 needs Haiku plus Photoroom on 15% of products or fewer. I have not test
 
 ## 6. Keys
 
-Add them yourself, and don't paste any in chat. For the local smoke run they go in `~/.cache/atlantis-scratch/inst/backend/.env`, which is outside the repo. Production keys are a separate step at §6.
+Add them yourself, and don't paste any in chat. For the local smoke run they go in `~/atlantis-image-pipeline/backend/.env`, which is outside the repo. Production keys are a separate step at §6.
 
 **Required**
 

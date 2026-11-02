@@ -99,3 +99,4 @@ next-env.d.ts
 # IDEs
 .vscode/
 .idea/
+qa/smoke/
