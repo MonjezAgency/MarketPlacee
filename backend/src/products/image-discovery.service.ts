@@ -112,7 +112,7 @@ const SWEEP_LIMIT = 300;
 /** Buckets of the staff "Product photos" list. */
 export const PHOTO_BUCKETS = ['auto', 'review', 'searching', 'not_searched', 'no_barcode', 'invalid_barcode', 'not_in_database', 'mismatch', 'no_photo', 'no_clean_background', 'unavailable', 'dismissed'] as const;
 export type PhotoBucket = (typeof PHOTO_BUCKETS)[number];
-const SELECT = { id: true, supplierId: true, ean: true, images: true, name: true, brand: true, weight: true, category: true, status: true, imageDiscovery: true, imageCredits: true, updatedAt: true } as const;
+const SELECT = { imageStatus: true, id: true, supplierId: true, ean: true, images: true, name: true, brand: true, weight: true, category: true, status: true, imageDiscovery: true, imageCredits: true, updatedAt: true } as const;
 type Row = { id: string; supplierId: string; ean: string | null; images: string[]; name: string; brand: string | null; weight: string | null; category: string; status?: string; imageDiscovery: unknown; imageCredits?: unknown; updatedAt: Date };
 
 @Injectable()
@@ -167,7 +167,7 @@ export class ImageDiscoveryService implements OnModuleInit {
     async sweep(limit = SWEEP_LIMIT) {
         if (!(await this.photoCheck.ready())) return 0;
         const rows = await this.prisma.product.findMany({
-            where: { status: { not: 'REJECTED' }, ean: { not: null }, images: { isEmpty: true } } as any,
+            where: { status: { not: 'REJECTED' }, ean: { not: null }, images: { isEmpty: true }, imageStatus: null } as any,
             orderBy: { createdAt: 'asc' }, take: 5000, select: { id: true, imageDiscovery: true },
         }) as unknown as { id: string; imageDiscovery: unknown }[];
         const due = rows.filter((r) => {
@@ -197,6 +197,8 @@ export class ImageDiscoveryService implements OnModuleInit {
     async enqueue(productId: string, opts: { force?: boolean; add?: boolean; restore?: boolean; again?: boolean; by?: DiscoveryActor } = {}): Promise<DiscoveryState | null> {
         const p = await this.load(productId);
         if (!p) return null;
+        // The image pipeline answers for this product; only a person's own search runs beside it.
+        if ((p as any).imageStatus && !opts.force && !opts.add) return null;
         const state = asState(p.imageDiscovery);
         const hasPhoto = realImages(p.images).length > 0;
         // A product with a photo is only searched when someone asks for more; a stale "fill" suggestion is cleared.

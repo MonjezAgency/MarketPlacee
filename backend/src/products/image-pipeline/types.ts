@@ -2,7 +2,7 @@ import type { Gs1Country } from './gs1-prefixes';
 import type { Gtin } from './gtin';
 import type { CleanName } from './name';
 
-export type ImageStatus = 'pending' | 'searching' | 'approved' | 'needs_bg_removal' | 'needs_better_image' | 'needs_review' | 'not_found' | 'invalid_ean' | 'low_res' | 'failed';
+export type ImageStatus = 'pending' | 'searching' | 'approved' | 'bg_pending' | 'pending_vision' | 'needs_bg_removal' | 'needs_better_image' | 'needs_review' | 'not_found' | 'invalid_ean' | 'low_res' | 'failed';
 export type Licence = 'supplier' | 'manufacturer' | 'cc_by_sa' | 'unknown' | 'editorial' | 'stock_licensed';
 export type DomainClass = 'brand' | 'retailer' | 'ean_database' | 'unknown';
 export type SourceId = 'openfoodfacts' | 'ean-db' | 'upcitemdb' | 'go-upc' | 'barcode-spider' | 'serper' | 'shutterstock' | 'supplier';
@@ -94,10 +94,12 @@ export interface VisionAnswer {
     watermark_or_overlay: boolean; confidence: number; reason: string; read_text?: string;
     /** On the raw photo, before a cut-out is paid for. */
     whole_pack_visible?: boolean; hand_over_pack?: boolean; sharp?: boolean; fills_frame?: boolean; straight_on?: boolean; stands_out_from_background?: boolean; pack_language?: string;
+    /** Where the pack sits on the raw photo: left, top, right, bottom as shares of the picture. */
+    pack_box?: number[];
     /** On the final composed picture. */
     edges_clean?: boolean; no_leftover_background?: boolean; hand_fragments?: boolean; pack_not_cut?: boolean; text_readable?: boolean;
 }
-export type VisionStage = 'screen' | 'final';
+export type VisionStage = 'screen' | 'final' | 'crop';
 export interface VisionVerdict {
     model: string;
     stage: VisionStage;
@@ -144,10 +146,6 @@ export interface PipelineResult {
     plan?: RunPlan;
     chosen?: Scored;
     /** Would this be published under each licence setting. */
-    publishable: { A: boolean; B: boolean };
-    /** Would it be, once the background is gone. Set on `needs_bg_removal`. */
-    wouldPublish?: { A: boolean; B: boolean };
+    publishable: { A: boolean; B: boolean; open: boolean };
     output?: { jpeg: Buffer; webp: Buffer };
-    /** A sandbox cut-out to look at. Watermarked: never saved, never published. */
-    preview?: { png: Buffer; label: 'SANDBOX PREVIEW' };
 }

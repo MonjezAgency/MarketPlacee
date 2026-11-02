@@ -1,14 +1,15 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { ALL_FIELDS, IMPORT_FIELDS, buildFromValues, labelOf, weightAmounts, weightFromName, type BuiltRow, type FieldKey } from './product-import';
-import { missingForPublish, realImages } from './catalog-rules';
+import { barcodeProblem, missingForPublish, realImages } from './catalog-rules';
 import { ImportEnrichmentService } from './import-enrichment.service';
 import { ImageLookupService } from './image-lookup.service';
 import { applyImportBrands } from './catalog-fields';
 import { ImageDiscoveryService } from './image-discovery.service';
 import type { ReviewActor } from './product-review.service';
+import type { ImageJobsService } from './image-pipeline/image-jobs.service';
 
 /**
  * The same import, run by Ali FMCG staff into the Ali FMCG Catalog (admin-catalog
@@ -54,6 +55,8 @@ export interface ImportRequest {
     /** Commit only: when the whole import started, and whether this is its last batch. */
     startedAt?: string;
     last?: boolean;
+    /** Names one file across its batches, for the image pipeline. */
+    uploadId?: string;
 }
 
 /** Keeps the review response well under the ~4.5 MB proxy limit (≈1.2 KB per row). */
@@ -91,10 +94,13 @@ export function brandFromName(name: string, known: string[]): string | null {
 
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
+/** A token: the job service reads this file's sniffImage, so the import can't load its class. */
+export const IMAGE_JOBS = 'IMAGE_JOBS';
+
 @Injectable()
 export class SupplierImportService {
     private readonly logger = new Logger(SupplierImportService.name);
-    constructor(private readonly products: ProductsService, private readonly notifications: NotificationsService, private readonly storage: SupabaseStorageService, private readonly enrichment: ImportEnrichmentService, private readonly imageLookup: ImageLookupService, private readonly discovery?: ImageDiscoveryService) {}
+    constructor(private readonly products: ProductsService, private readonly notifications: NotificationsService, private readonly storage: SupabaseStorageService, private readonly enrichment: ImportEnrichmentService, private readonly imageLookup: ImageLookupService, private readonly discovery?: ImageDiscoveryService, @Optional() @Inject(IMAGE_JOBS) private readonly jobs?: ImageJobsService) {}
 
     /** Reject malformed requests; return the mapping problems the supplier must fix first. */
     private checkRequest(req: ImportRequest, maxRows = MAX_IMPORT_ROWS_TOTAL) {
@@ -326,18 +332,22 @@ export class SupplierImportService {
         const base = (p: string) => String(p || '').split('/').pop() || '';
         const photos = new Map(files.map((f) => [base(f.originalname), f]));
         const results: any[] = [];
+        // The image pipeline decides the picture and the publishing of every new row.
+        const upload = this.jobs?.enabled ? await this.jobs.openUpload(actorId, req.uploadId, { fileName: req.fileName, catalog: !!catalog }) : null;
         for (let i = 0; i < v.rows.length; i++) {
             const r = v.rows[i];
             const it = v.built[i];
             const head = { key: r.key, sheet: r.sheet, row: r.row, name: r.name, ean: r.ean, ...(r.page ? { page: r.page } : {}) };
-            if (r.state === 'error') { results.push({ ...head, outcome: 'failed', reasons: r.errors.map((e: any) => e.reason) }); continue; }
+            // A wrong barcode alone doesn't stop the row: it is saved as a draft and the supplier fixes the barcode on the upload screen.
+            const fixable = !!upload && r.state === 'error' && r.errors.every((e: any) => e.field === 'ean') && !!r.ean && !!barcodeProblem(r.ean);
+            if (r.state === 'error' && !fixable) { results.push({ ...head, outcome: 'failed', reasons: r.errors.map((e: any) => e.reason) }); continue; }
             if (r.state === 'skip') { results.push({ ...head, outcome: 'skipped', productId: r.existing?.id, reasons: [catalog ? 'Already in the Ali FMCG Catalog (you chose to skip these).' : 'Already in your catalog (you chose to skip these).'] }); continue; }
             if (r.state === 'unchanged') { results.push({ ...head, outcome: 'unchanged', productId: r.existing?.id }); continue; }
             const notes: string[] = [];
             try {
                 // Pictures from the file: stored first so a complete product goes straight to review.
                 let images: string[] = it.built.product.images?.length ? it.built.product.images : [];
-                const wantsPhotos = !images.length && r.images.length && (r.action === 'create' || r.action === 'update');
+                const wantsPhotos = !images.length && r.images.length && (r.action === 'create' || r.action === 'update' || fixable);
                 if (wantsPhotos) {
                     if (r.action === 'update') {
                         const ex = await this.products.findOneRaw(r.existing!.id);
@@ -346,6 +356,17 @@ export class SupplierImportService {
                     } else images = await this.storePhotos(r.images, photos, notes);
                 }
                 let credits: Record<string, any> | null = null;
+                if (upload && (r.action === 'create' || fixable)) {
+                    // Nothing goes on the product unchecked: a photo from the row is the first candidate for the pipeline.
+                    const candidates = [...images, ...(it.external ? [it.external.url] : [])];
+                    const { ean: _ean, ...row } = it.built.product;
+                    const saved = await this.products.create({ ...row, ...(fixable ? {} : { ean: r.ean }), images: [], supplierId } as any, false, true, { submit: false, actorId, actorRole: catalog?.actor.role ?? 'SUPPLIER', noInference: true });
+                    await this.jobs!.enqueue({ uploadId: upload.id, productId: saved.id, ownerId: actorId, sheet: r.sheet, rowNumber: r.row, name: r.name, ean: r.ean, photos: candidates });
+                    await this.products.recordImportSource(saved.id, actorId, { file: req.fileName, sheet: r.sheet, row: r.row, columns: it.original, ...(it.page ? { page: it.page, extracted: it.source } : {}), ...(it.edited && Object.keys(it.edited).length ? { editedBySupplier: it.edited } : {}) })
+                        .catch((e) => this.logger.warn(`[import] source record for ${saved.id}: ${e?.message}`));
+                    results.push({ ...head, outcome: 'created', productId: saved.id, status: saved.status, missing: [], imageMissing: false, photoFromLookup: false, notes });
+                    continue;
+                }
                 if (!images.length && it.external && (r.action === 'create' || r.action === 'update')) {
                     const ex = r.action === 'update' ? await this.products.findOneRaw(r.existing!.id) : null;
                     if (ex && realImages(ex.images).length) notes.push('Kept your current photos; the photo from the barcode search was not used.');
@@ -387,8 +408,13 @@ export class SupplierImportService {
             }
         }
         if (req.last && !catalog) await this.notifyReviewers(supplierId, req.startedAt);
+        if (upload) {
+            if (req.last) await this.jobs!.closeUpload(upload.id);
+            this.jobs!.kick();
+        }
         const count = (o: string) => results.filter((x) => x.outcome === o).length;
         return {
+            uploadId: upload?.id ?? null,
             summary: {
                 total: results.length, created: count('created'), updated: count('updated'), unchanged: count('unchanged'), skipped: count('skipped'), failed: count('failed'),
                 pendingReview: results.filter((x) => x.status === 'PENDING').length, drafts: results.filter((x) => x.status === 'DRAFT').length,

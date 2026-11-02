@@ -25,13 +25,17 @@ const SAFE_DAILY_LIMIT = 50;
 const LIMIT_CHECK_MS = 10 * 60 * 1000;
 /** A verdict on one photo of one barcode is never asked twice. */
 const VERDICT_DAYS = 365;
+/** Raised when a question changes: an answer to an older one says nothing. */
+const QUESTIONS = 'b5';
 
 const IDENTITY = ['same_product', 'same_variant', 'same_size_or_count', 'front_face', 'single_product'] as const;
 const RULES: Record<VisionStage, { yes: readonly (keyof VisionAnswer)[]; no: readonly (keyof VisionAnswer)[] }> = {
-    /** The raw photo: is it worth a paid cut-out? */
-    screen: { yes: [...IDENTITY, 'whole_pack_visible', 'sharp', 'fills_frame', 'straight_on', 'stands_out_from_background'], no: ['hand_over_pack', 'watermark_or_overlay'] },
+    /** The raw photo: is it this product, and where is the pack? */
+    screen: { yes: [...IDENTITY, 'whole_pack_visible', 'sharp'], no: ['hand_over_pack', 'watermark_or_overlay'] },
     /** The finished picture, exactly as a buyer would see it. */
     final: { yes: [...IDENTITY, 'edges_clean', 'no_leftover_background', 'pack_not_cut', 'text_readable', 'straight_on'], no: ['hand_fragments', 'watermark_or_overlay'] },
+    /** The finished crop, background left as it was. */
+    crop: { yes: [...IDENTITY, 'pack_not_cut'], no: ['hand_over_pack', 'watermark_or_overlay'] },
 };
 
 export const isFreeModel = (model: string) => model.trim().endsWith(':free');
@@ -88,15 +92,20 @@ single_product: one pack only, unless the product is itself a multipack.
 watermark_or_overlay: any watermark, badge, price, sticker or text laid over the photo that is not printed on the pack.
 confidence: how sure you are this photo shows exactly this product.`;
     if (stage === 'screen') return `${head}
-{"images": [{"index": 0, "read_text": "brand and words legible on that pack", "same_product": true, "same_variant": true, "same_size_or_count": true, "front_face": true, "single_product": true, "whole_pack_visible": true, "hand_over_pack": false, "sharp": true, "fills_frame": true, "straight_on": true, "stands_out_from_background": true, "watermark_or_overlay": false, "pack_language": "en", "confidence": 0.0, "reason": ""}]}
-These are ordinary photos, phone photos included. The background will be removed, so a room or a table doesn't matter. Say whether this one can make a clean picture.
+{"images": [{"index": 0, "read_text": "brand and words legible on that pack", "same_product": true, "same_variant": true, "same_size_or_count": true, "front_face": true, "single_product": true, "whole_pack_visible": true, "hand_over_pack": false, "sharp": true, "watermark_or_overlay": false, "pack_box": [0.1, 0.1, 0.9, 0.9], "pack_language": "en", "confidence": 0.0, "reason": ""}]}
+These are ordinary photos, phone photos included. A room or a table behind the pack doesn't matter. Say whether this one shows the product, and where.
 ${identityRules}
 whole_pack_visible: the entire pack is in frame, nothing cut off by the edge of the picture.
 hand_over_pack: a hand or finger covers any part of the pack. A hand behind or below it that overlaps nothing is false.
 sharp: the print on the pack is in focus.
-fills_frame: the pack takes up at least 40% of the picture's height or width.
-straight_on: facing the camera, not heavily tilted or seen from an angle.
-stands_out_from_background: the pack's edges are easy to tell from what is behind it.
+pack_box: the smallest box round the whole pack as [left, top, right, bottom], each a share of the picture from 0 to 1.
+pack_language: main language printed on the front, as a two-letter code.`;
+    if (stage === 'crop') return `${head}
+{"images": [{"index": 0, "read_text": "brand and words legible on that pack", "same_product": true, "same_variant": true, "same_size_or_count": true, "front_face": true, "single_product": true, "pack_not_cut": true, "hand_over_pack": false, "watermark_or_overlay": false, "pack_language": "en", "confidence": 0.0, "reason": ""}]}
+Each candidate is the finished picture: a photo cropped to the pack, centred on a white canvas, with the photo's own background still behind the pack. That background is fine and is not a fault.
+${identityRules}
+pack_not_cut: the whole pack is there, cap, corners and transparent parts included.
+hand_over_pack: a hand or finger covers any part of the pack. A hand behind or below it that overlaps nothing is false.
 pack_language: main language printed on the front, as a two-letter code.`;
     return `${head}
 {"images": [{"index": 0, "read_text": "brand and words legible on that pack", "same_product": true, "same_variant": true, "same_size_or_count": true, "front_face": true, "single_product": true, "edges_clean": true, "no_leftover_background": true, "hand_fragments": false, "pack_not_cut": true, "text_readable": true, "straight_on": true, "watermark_or_overlay": false, "confidence": 0.0, "reason": ""}]}
@@ -188,7 +197,7 @@ export class VisionGate {
         return (await this.budget.used('vision', 'day')) >= (await this.dayLimit()) ? 'vision_quota' : null;
     }
 
-    private verdictKey(ean: string, photo: Buffer, stage: VisionStage) { return `vision:${stage}:${ean}:${sha1(photo)}`; }
+    private verdictKey(ean: string, photo: Buffer, stage: VisionStage) { return `vision:${QUESTIONS}:${stage}:${ean}:${sha1(photo)}`; }
 
     /** Has this photo of this barcode been judged already? */
     async judged(ean: string, photo: Buffer, stage: VisionStage) { return (await this.cache.get(this.verdictKey(ean, photo, stage)).catch(() => undefined)) !== undefined; }

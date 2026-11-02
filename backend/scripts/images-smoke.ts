@@ -61,13 +61,13 @@ async function tile(input: Buffer | null, label: string) {
 /** Right tile: our output; else the raw best candidate, labelled, so selection can be judged whatever became of the photo. */
 async function pairTile(row: Record<string, string>, r: PipelineResult) {
     const raw = r.chosen?.bytes ?? r.top[0]?.bytes ?? null;
-    const shown = r.output?.jpeg ?? r.preview?.png ?? raw;
-    const kind = r.output ? 'OUR OUTPUT' : r.preview ? r.preview.label : raw ? 'RAW CANDIDATE, NOT PUBLISHED' : '';
+    const shown = r.output?.jpeg ?? raw;
+    const kind = r.output ? 'OUR OUTPUT' : raw ? 'RAW CANDIDATE, NOT PUBLISHED' : '';
     const refFile = row.reference ? join(QA, 'reference', row.reference) : '';
     const v = r.trace.vision[r.trace.vision.length - 1];
     const lines = [
         `#${row.n} ${row.ean || 'no barcode'} ${row.synthetic === 'yes' ? '[SYNTHETIC] ' : ''}${row.brand} ${row.name} ${row.size} · ${r.status}`.replace(/\s+/g, ' '),
-        `${kind} · source ${r.chosen?.source ?? '-'} · score ${r.chosen?.score ?? '-'} · licence ${r.chosen?.licence ?? '-'} · A ${r.publishable.A || r.wouldPublish?.A ? 'yes' : 'no'} / B ${r.publishable.B || r.wouldPublish?.B ? 'yes' : 'no'}`,
+        `${kind} · source ${r.chosen?.source ?? '-'} · score ${r.chosen?.score ?? '-'} · licence ${r.chosen?.licence ?? '-'} · A ${r.publishable.A ? 'yes' : 'no'} / B ${r.publishable.B ? 'yes' : 'no'}`,
         `vision: ${v ? `${v.passed ? 'pass' : 'fail'} ${v.confidence.toFixed(2)} ${v.reason}` : r.reason}`,
     ].map((l) => cut(l, 88));
     return { left: await tile(refFile && existsSync(refFile) ? readFileSync(refFile) : null, 'no reference'), right: await tile(shown, r.status), lines };
@@ -143,23 +143,23 @@ function summary(items: Item[], searches: { used: number; cap: number }, cutouts
     const counts: Record<string, number> = {};
     for (const { r } of items) counts[r.status] = (counts[r.status] || 0) + 1;
     const now = (p: 'A' | 'B') => real.filter((x) => x.r.publishable[p]).length;
-    const later = (p: 'A' | 'B') => real.filter((x) => x.r.publishable[p] || x.r.wouldPublish?.[p]).length;
+    const later = (p: 'A' | 'B') => real.filter((x) => x.r.publishable[p]).length;
     const sources: Record<string, { candidates: number; won: number }> = {};
     for (const { r } of items) {
         for (const [s, c] of Object.entries(r.trace.candidates.bySource)) (sources[s] ??= { candidates: 0, won: 0 }).candidates += c;
-        if (r.publishable.A || r.publishable.B || r.wouldPublish?.A || r.wouldPublish?.B) (sources[r.chosen!.source] ??= { candidates: 0, won: 0 }).won++;
+        if (r.publishable.A || r.publishable.B) (sources[r.chosen!.source] ??= { candidates: 0, won: 0 }).won++;
     }
     const all = items.flatMap(({ r }) => r.trace.calls);
     const live = (s: string) => all.filter((c) => c.source === s && typeof c.status === 'number');
     const models = [...new Set(live('vision').filter((c) => c.status === 200).map((c) => c.what))];
     const visionCost = live('vision').reduce((a, c) => a + (c.cost || 0), 0);
-    const white = items.filter(({ r }) => r.output).length, cut_ = counts.needs_bg_removal || 0;
+    const white = items.filter(({ r }) => r.output).length, cut_ = counts.bg_pending || 0;
     const skipped = (note: string) => all.filter((c) => c.source === 'serper' && c.status === 'skipped' && c.note === note).length;
     const free = ['openfoodfacts', 'upcitemdb', 'ean-db', 'go-upc', 'barcode-spider'];
     return [
         '# Smoke run', '', `Rows: ${n}, of which ${items.filter((x) => x.row.synthetic === 'yes').length} have synthetic names and ${n - real.length} have no barcode.`, '',
         '## Status', ...Object.entries(counts).map(([k, v]) => `- ${k}: ${v}`), '',
-        `## Winners\n- Already white, composed locally: ${white}\n- needs_bg_removal: ${cut_}`, '',
+        `## Winners\n- Already white, composed locally: ${white}\n- bg_pending: ${cut_}`, '',
         `## Auto-approve rate (of ${real.length} rows with a barcode)\n- Policy A now: ${now('A')}, once backgrounds are removed: ${later('A')}\n- Policy B now: ${now('B')}, once backgrounds are removed: ${later('B')}`, '',
         '## Sources\n| Source | Candidates | Won (passed vision) |\n|---|---|---|', ...Object.entries(sources).map(([k, v]) => `| ${k} | ${v.candidates} | ${v.won} |`), '',
         '## Cost',

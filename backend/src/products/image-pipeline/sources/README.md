@@ -23,7 +23,7 @@ Not used: ean-search.org (paid), Brave (paid after a monthly credit), Barcode Lo
 Vision: OpenRouter `OPENROUTER_API_KEY`, free models only. Any model not ending in `:free` is refused and logged as an error, `PHOTO_CHECK_MODEL` included.
 Calls are spaced to stay under 20 a minute, and when the day's allowance is gone the remaining rows are `needs_review: vision_quota` and no search is spent.
 
-Photoroom: nothing is paid for. A winner that is not already white is marked `needs_bg_removal` with its raw photo kept. Paid cut-outs need `PHOTOROOM_LIVE=true` as well as a live key; a `sandbox_` key gives a labelled preview on those items only, never saved.
+Photoroom: nothing is paid for. A winner that is not already white is cropped to the pack, published as it is and marked `bg_pending`. Paid cut-outs need `PHOTOROOM_LIVE=true` as well as a live key; `npm run images:backfill` then replaces every `bg_pending` picture.
 
 SerpApi is removed and stays removed; a `SERPAPI_API_KEY` is logged as an error and ignored.
 The older Bing and DuckDuckGo code in `ean.service.ts` goes after Checkpoint C.

@@ -15,6 +15,7 @@ import { SupplierUpdatesService, type UpdateRequest } from './supplier-updates.s
 import { ProductsService } from './products.service';
 import { MOQ_UNITS, TO_EUR, UNIT_TYPES } from './catalog-rules';
 import { STAFF_ROLES, isStaffRole } from './catalog-scope';
+import { ImageJobsService } from './image-pipeline/image-jobs.service';
 
 /**
  * Ali FMCG Catalog import (admin). The same analysis, mapping, review, photo
@@ -27,7 +28,7 @@ import { STAFF_ROLES, isStaffRole } from './catalog-scope';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN, Role.OWNER)
 export class AdminCatalogController {
-    constructor(private readonly importer: SupplierImportService, private readonly enrich: ImportEnrichmentService, private readonly prisma: PrismaService, private readonly updates: SupplierUpdatesService, private readonly products: ProductsService) {}
+    constructor(private readonly importer: SupplierImportService, private readonly enrich: ImportEnrichmentService, private readonly prisma: PrismaService, private readonly updates: SupplierUpdatesService, private readonly products: ProductsService, private readonly jobs: ImageJobsService) {}
 
     /** The account that owns Ali FMCG Catalog products (same lookup as single-product create), and every staff account. */
     private async mode(req: any): Promise<{ owner: string; mode: ImportMode }> {
@@ -38,6 +39,19 @@ export class AdminCatalogController {
         const owner = platform?.id || req.user.sub;
         return { owner, mode: { catalog: { ownerIds: staff.map((u) => u.id), actor: { id: req.user.sub, role: req.user.role } } } };
     }
+
+    @Get('image-uploads/:id')
+    imageUpload(@Param('id') id: string) { return this.jobs.uploadDetail(id, null); }
+
+    @Post('image-rows/:id/ean')
+    fixEan(@Param('id') id: string, @Body() body: { ean?: string }) { return this.jobs.fixEan(id, null, String(body?.ean ?? '')); }
+
+    @Post('image-rows/:id/recheck')
+    recheck(@Param('id') id: string) { return this.jobs.recheck(id, null); }
+
+    @Post('image-rows/:id/photo')
+    @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 10 * 1024 * 1024 } }))
+    ownPhoto(@Param('id') id: string, @UploadedFile() file: any) { return this.jobs.ownPhoto(id, null, file); }
 
     @Get('import/schema')
     schema() {

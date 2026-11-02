@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ImageDiscoveryService } from './image-discovery.service';
+import { ImageJobsService } from './image-pipeline/image-jobs.service';
 
 /**
  * Admin → Products → Product photos: products that need a photo or have
@@ -18,7 +19,21 @@ import { ImageDiscoveryService } from './image-discovery.service';
 @Controller('admin-product-photos')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminProductPhotosController {
-    constructor(private readonly discovery: ImageDiscoveryService) {}
+    constructor(private readonly discovery: ImageDiscoveryService, private readonly jobs: ImageJobsService) {}
+
+    /** This month's web searches and today's vision calls, against their limits. */
+    @Get('pipeline/costs')
+    @Roles(Role.ADMIN, Role.OWNER, Role.MODERATOR)
+    costs() {
+        return this.jobs.costs();
+    }
+
+    /** How the image pipeline decided this product's picture. For debugging: nothing here is shown to suppliers. */
+    @Get('pipeline/:id/trace')
+    @Roles(Role.ADMIN, Role.OWNER, Role.MODERATOR)
+    trace(@Param('id') id: string) {
+        return this.jobs.traceOf(id);
+    }
 
     @Get()
     @Roles(Role.ADMIN, Role.OWNER, Role.MODERATOR)

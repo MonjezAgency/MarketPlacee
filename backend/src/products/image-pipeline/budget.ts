@@ -77,6 +77,22 @@ export async function reserveCount(prisma: PrismaService, key: string, limit: nu
     return false;
 }
 
+/** Lookups and vision verdicts kept between runs, in the same table as the counters. */
+export class PrismaCache {
+    constructor(private readonly prisma: PrismaService, private readonly now: () => number = Date.now) {}
+    private key(key: string) { return `imagePipeline:cache:${key}`; }
+    async get(key: string): Promise<unknown | undefined> {
+        const row = await this.prisma.appConfig.findUnique({ where: { key: this.key(key) } });
+        if (!row) return undefined;
+        const stored = JSON.parse(row.value);
+        return stored.until > this.now() ? stored.value : undefined;
+    }
+    async set(key: string, value: unknown, days: number) {
+        const stored = JSON.stringify({ until: this.now() + days * 86_400_000, value });
+        await this.prisma.appConfig.upsert({ where: { key: this.key(key) }, create: { key: this.key(key), value: stored }, update: { value: stored } });
+    }
+}
+
 export class PrismaBudget implements Budget {
     constructor(private readonly prisma: PrismaService, private readonly now: () => number = Date.now) {}
     private key(name: string, period: Period) { return `imagePipeline:budget:${periodKey(name, period, this.now())}`; }

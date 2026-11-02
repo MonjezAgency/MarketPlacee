@@ -74,6 +74,31 @@ async function finish(placed: { canvas: Sharp; upscale: number }, engine: 'sharp
     return { status: 'ok', jpeg, webp, engine, checks };
 }
 
+const CROP_MARGIN = 0.03;
+
+/**
+ * Right product, no white behind it: cropped to the pack and centred on the
+ * canvas with its own background, which stays until a cut-out replaces it.
+ * `box` is left, top, right, bottom as shares of the picture.
+ */
+export async function composeCrop(input: Buffer, box: number[]): Promise<ComposeOutcome> {
+    const r = await rawRgb(input);
+    const margin = CROP_MARGIN * Math.max((box[2] - box[0]) * r.width, (box[3] - box[1]) * r.height);
+    const left = Math.max(0, Math.floor(box[0] * r.width - margin)), top = Math.max(0, Math.floor(box[1] * r.height - margin));
+    const right = Math.min(r.width, Math.ceil(box[2] * r.width + margin)), bottom = Math.min(r.height, Math.ceil(box[3] * r.height + margin));
+    const w = right - left, h = bottom - top;
+    if (w <= 0 || h <= 0) return { status: 'failed', reason: 'no_subject', engine: 'sharp', checks: {} };
+    const upscale = SUBJECT / Math.max(w, h);
+    if (upscale > MAX_UPSCALE) return { status: 'low_res', reason: `would need ${upscale.toFixed(2)}x enlargement`, engine: 'sharp', checks: { upscale } };
+    const cut = await sharp(r.data, { raw: { width: r.width, height: r.height, channels: r.channels as 3 } })
+        .extract({ left, top, width: w, height: h })
+        .resize(Math.round(w * upscale), Math.round(h * upscale), { kernel: 'lanczos3' }).png().toBuffer();
+    const meta = await sharp(cut).metadata();
+    const canvas = sharp({ create: { width: CANVAS, height: CANVAS, channels: 3, background: '#ffffff' } }).composite([{ input: cut, left: Math.round((CANVAS - meta.width!) / 2), top: Math.round((CANVAS - meta.height!) / 2) }]);
+    const { jpeg, webp } = await exportBoth(canvas);
+    return { status: 'ok', jpeg, webp, engine: 'sharp', checks: { corners: true, centred: true, longestSide: Math.max(meta.width!, meta.height!), areaLoss: null, upscale } };
+}
+
 /** Already on white: no paid call. */
 export async function composeWhite(input: Buffer): Promise<ComposeOutcome> {
     const rgb = await rawRgb(input);

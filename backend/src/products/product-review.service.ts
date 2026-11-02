@@ -12,7 +12,7 @@ import { PrismaService } from '../common/prisma.service';
  * PENDING again). Failures here are logged and swallowed so an audit-trail
  * hiccup never blocks a decision that already happened.
  */
-export const REVIEW_ACTIONS = ['SUBMITTED', 'RESUBMITTED', 'CHANGES_REQUESTED', 'APPROVED', 'REJECTED', 'STATUS_CHANGED'] as const;
+export const REVIEW_ACTIONS = ['SUBMITTED', 'RESUBMITTED', 'CHANGES_REQUESTED', 'APPROVED', 'REJECTED', 'STATUS_CHANGED', 'PAUSED', 'REMOVED', 'REPUBLISHED', 'AUTO_PUBLISHED'] as const;
 export type ReviewAction = (typeof REVIEW_ACTIONS)[number];
 
 export interface ReviewActor { id?: string | null; role?: string | null }

@@ -171,6 +171,8 @@ export function statusExplanation(status: string, missing: Missing[], adminNotes
         case 'PENDING': return 'Waiting for Ali FMCG review. Buyers can’t see it yet.';
         case 'NEEDS_CHANGES': return `Ali FMCG asked for changes${adminNotes ? `: ${adminNotes}` : '.'} Fix them and resubmit.`;
         case 'REJECTED': return `Rejected${adminNotes ? `: ${adminNotes}` : '.'} Create a new listing that addresses the reason.`;
+        case 'PAUSED': return `Taken off the storefront by Ali FMCG${adminNotes ? `: ${adminNotes}` : '.'}`;
+        case 'REMOVED': return `Removed from display by Ali FMCG${adminNotes ? `: ${adminNotes}` : '.'}`;
         case 'APPROVED': return missing.length ? 'Live, but some required details are missing — update them to keep the listing complete.' : 'Live — buyers can find and order it.';
         default: return status;
     }

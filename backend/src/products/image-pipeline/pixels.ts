@@ -145,6 +145,13 @@ function maskFrom(r: Raw, colour: number[]): Uint8Array {
     return mask;
 }
 
+/** Where the pack sits on a plain backdrop, as shares of the picture. Null on a scene: only eyes can find it there. */
+export function packBox(r: Raw): number[] | null {
+    const { colour } = backdropOf(r);
+    const box = colour ? boxOf(maskFrom(r, colour), r.width, r.height) : null;
+    return box && [box.left / r.width, box.top / r.height, box.right / r.width, box.bottom / r.height];
+}
+
 /** Laplacian variance over the product, on the sampled picture: low means soft. */
 function sharpnessOf(r: Raw, box: Box): number {
     const grey = (x: number, y: number) => { const i = (y * r.width + x) * r.channels; return 0.299 * r.data[i] + 0.587 * r.data[i + 1] + 0.114 * r.data[i + 2]; };

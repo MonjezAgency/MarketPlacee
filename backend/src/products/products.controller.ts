@@ -808,6 +808,22 @@ export class ProductsController {
         }
     }
 
+    /** Off the storefront, or deleted from display (the record stays). The comment is required and the supplier reads it. */
+    @Post('admin/:id/take-down')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+    takeDown(@Param('id') id: string, @Body() body: { kind?: string; comment?: string }, @Request() req: any) {
+        if (body?.kind !== 'pause' && body?.kind !== 'remove') throw new BadRequestException({ code: 'KIND', message: 'Choose pause or remove.' });
+        return this.productsService.takeDown(id, body.kind, String(body?.comment ?? ''), actorOf(req));
+    }
+
+    @Post('admin/:id/republish')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+    republish(@Param('id') id: string, @Request() req: any) {
+        return this.productsService.republish(id, actorOf(req));
+    }
+
     @Patch(':id/status')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.ADMIN)

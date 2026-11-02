@@ -13,7 +13,7 @@ import { ReviewsService } from './reviews.service';
 import { ReviewsController, AdminReviewsController } from './reviews.controller';
 import { SupplierCatalogController } from './supplier-catalog.controller';
 import { CatalogFieldsController } from './catalog-fields.controller';
-import { SupplierImportService } from './supplier-import.service';
+import { IMAGE_JOBS, SupplierImportService } from './supplier-import.service';
 import { ImageLookupService } from './image-lookup.service';
 import { ImportEnrichmentService } from './import-enrichment.service';
 import { ImageDiscoveryService } from './image-discovery.service';
@@ -29,6 +29,7 @@ import { ProductReviewService } from './product-review.service';
 import { AdminProductsService } from './admin-products.service';
 import { AdminCatalogController } from './admin-catalog.controller';
 import { AdminProductPhotosController } from './admin-product-photos.controller';
+import { ImageJobsService } from './image-pipeline/image-jobs.service';
 
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -36,7 +37,7 @@ import { EmailModule } from '../email/email.module';
 
 @Module({
     imports: [PricingModule, AiAgentModule, StorageModule, NotificationsModule, EmailModule],
-    providers: [PhotoroomService, ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService, SupplierImportService, ImageLookupService, ImportEnrichmentService, ImageDiscoveryService, PhotoCheckService, SupplierOverviewService, PriceHistoryService, TargetPricesService, SupplierUpdatesService, OfferCompareService, ProductReviewService, AdminProductsService],
+    providers: [PhotoroomService, ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService, SupplierImportService, ImageLookupService, ImportEnrichmentService, ImageDiscoveryService, PhotoCheckService, SupplierOverviewService, PriceHistoryService, TargetPricesService, SupplierUpdatesService, OfferCompareService, ProductReviewService, AdminProductsService, ImageJobsService, { provide: IMAGE_JOBS, useExisting: ImageJobsService }],
     controllers: [AdminCatalogController, AdminProductPhotosController, SupplierCatalogController, CatalogFieldsController, PriceHistoryController, TargetPricesController, ProductsController, PlacementController, ReviewsController, AdminReviewsController],
     exports: [ProductsService, PlacementService, PriceHistoryService, ProductReviewService],
 })

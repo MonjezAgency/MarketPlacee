@@ -6,7 +6,8 @@ import type { Candidate, DomainClass, Licence } from './types';
  *   B: `unknown` may publish only with confidence 0.9+, from the brand's own
  *      domain or a major retailer, and never an editorial image.
  */
-export type LicencePolicy = 'A' | 'B';
+/** A: stated licences only. B: also brand and retailer pages. open: anything vision passed, on the owner's decision of 2 Nov 2026; the source stays on record. */
+export type LicencePolicy = 'A' | 'B' | 'open';
 export const DEFAULT_POLICY: LicencePolicy = 'A';
 export const AUTO_APPROVE_CONFIDENCE = 0.9;
 export const POLICY_B_CONFIDENCE = 0.9;
@@ -66,6 +67,6 @@ export function mayPublish(input: { licence: Licence; confidence: number; domain
     const { licence, confidence, domain, isEditorial } = input;
     if (isEditorial || licence === 'editorial' || licence === 'stock_licensed') return false;
     if (confidence < AUTO_APPROVE_CONFIDENCE) return false;
-    if (licence !== 'unknown') return true;
+    if (licence !== 'unknown' || policy === 'open') return true;
     return policy === 'B' && confidence >= POLICY_B_CONFIDENCE && (domain === 'brand' || domain === 'retailer');
 }

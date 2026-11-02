@@ -12,6 +12,7 @@ import { MAX_PDF_BYTES, MAX_PDF_PAGES, analysePdf } from './pdf-import';
 import { ImportEnrichmentService, MAX_ENRICH_ITEMS, type EnrichItem } from './import-enrichment.service';
 import { ImageLookupService } from './image-lookup.service';
 import { ImageDiscoveryService } from './image-discovery.service';
+import { ImageJobsService } from './image-pipeline/image-jobs.service';
 import { SupplierUpdatesService, type UpdateRequest } from './supplier-updates.service';
 import { SupplierOverviewService } from './supplier-overview.service';
 import { ALL_FIELDS, IMPORT_FIELDS, MAX_IMPORT_BYTES, buildTemplate, matchHeaders, parseSpreadsheet } from './product-import';
@@ -35,6 +36,7 @@ export class SupplierCatalogController {
         private readonly updates: SupplierUpdatesService,
         private readonly enrich: ImportEnrichmentService,
         private readonly discovery: ImageDiscoveryService,
+        private readonly jobs: ImageJobsService,
     ) {}
 
     /** ?range=3d|7d|30d|12m|custom&from=YYYY-MM-DD&to=YYYY-MM-DD&tz=<IANA> — boundaries are resolved on the server (report-range.ts). */
@@ -202,6 +204,27 @@ export class SupplierCatalogController {
         const photos = (files || []).filter((f) => f.fieldname === 'photos').map((f) => ({ originalname: String(f.originalname || ''), buffer: f.buffer, mimetype: f.mimetype, size: f.size }));
         return this.importer.commit(req.user.sub, payload, photos);
     }
+
+    // ─── Image pipeline: what happened to each row of an upload ──────
+
+    @Get('image-uploads')
+    imageUploads(@Request() req) { return this.jobs.uploads(req.user.sub); }
+
+    @Get('image-uploads/:id')
+    imageUpload(@Request() req, @Param('id') id: string) { return this.jobs.uploadDetail(id, req.user.sub); }
+
+    @Post('image-rows/:id/ean')
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    fixEan(@Request() req, @Param('id') id: string, @Body() body: { ean?: string }) { return this.jobs.fixEan(id, req.user.sub, String(body?.ean ?? '')); }
+
+    @Post('image-rows/:id/recheck')
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    recheck(@Request() req, @Param('id') id: string) { return this.jobs.recheck(id, req.user.sub); }
+
+    @Post('image-rows/:id/photo')
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @UseInterceptors(FileInterceptor('photo', { limits: { fileSize: 10 * 1024 * 1024 } }))
+    ownPhoto(@Request() req, @Param('id') id: string, @UploadedFile() file: any) { return this.jobs.ownPhoto(id, req.user.sub, file); }
 
     // ─── Bulk price & stock updates (existing products only) ─────────
 

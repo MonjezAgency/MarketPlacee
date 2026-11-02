@@ -36,7 +36,7 @@ describe('PATCH /admin-catalog/products/:id/price', () => {
             product: { findUnique: jest.fn(async ({ select }: any) => (select.price ? { price: 54.45 } : { id: 'c-1', supplierId: 'owner-1', unitsPerCase, supplierCurrency: 'EUR', supplier: { role: ownerRole } })) },
         };
         const products: any = { supplierUpdate: jest.fn(async (id: string, _o: string, patch: any) => ({ id, status: 'APPROVED', basePrice: patch.supplierPrice, ...patch })) };
-        const ctrl = new AdminCatalogController({} as any, { providers: [] } as any, prisma, {} as any, products);
+        const ctrl = new AdminCatalogController({} as any, { providers: [] } as any, prisma, {} as any, products, {} as any);
         return { ctrl, products };
     }
     const req = { user: { sub: 'admin-1', role: 'ADMIN' } };

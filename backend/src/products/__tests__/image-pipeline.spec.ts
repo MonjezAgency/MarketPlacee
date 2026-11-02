@@ -7,7 +7,7 @@ import { DEFAULT_VISION_MODEL, FALLBACK_VISION_MODEL, VisionGate } from '../imag
 import { ean13Png, pack, shelf } from './image-pipeline-fixtures';
 
 /** Recorded-shape answers; no network anywhere in this file. */
-const answer = (o: Record<string, unknown> = {}) => ({ best_index: 0, read_text: 'Acme Lemon 500ml', same_product: true, same_variant: true, same_size_or_count: true, front_face: true, single_product: true, watermark_or_overlay: false, whole_pack_visible: true, hand_over_pack: false, sharp: true, fills_frame: true, straight_on: true, stands_out_from_background: true, edges_clean: true, no_leftover_background: true, hand_fragments: false, pack_not_cut: true, text_readable: true, confidence: 0.93, reason: 'clear front', ...o });
+const answer = (o: Record<string, unknown> = {}) => ({ best_index: 0, read_text: 'Acme Lemon 500ml', same_product: true, same_variant: true, same_size_or_count: true, front_face: true, single_product: true, watermark_or_overlay: false, whole_pack_visible: true, hand_over_pack: false, sharp: true, fills_frame: true, straight_on: true, stands_out_from_background: true, edges_clean: true, no_leftover_background: true, hand_fragments: false, pack_not_cut: true, text_readable: true, pack_box: [0.1, 0.1, 0.9, 0.9], confidence: 0.93, reason: 'clear front', ...o });
 const reply = (a: unknown, cost = 0) => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(a) } }], usage: { cost } }) });
 
 const ean = '5449000000439';
@@ -43,7 +43,7 @@ describe('a row through the pipeline', () => {
         const { pipeline } = build({ [url]: await pack() }, { lookups: [db([c(url, { source: 'openfoodfacts', pageUrl: 'https://world.openfoodfacts.org/p', licence: 'cc_by_sa' })])] }, () => reply(answer()));
         const r = await pipeline.run(row);
         expect(r.status).toBe('approved');
-        expect(r.publishable).toEqual({ A: true, B: true });
+        expect(r.publishable).toMatchObject({ A: true, B: true });
         expect(r.output?.jpeg.length).toBeGreaterThan(0);
         expect(r.trace.compose?.engine).toBe('sharp');
         expect(r.trace.calls.filter((x) => x.source === 'photoroom')).toEqual([]);
@@ -57,7 +57,7 @@ describe('a row through the pipeline', () => {
         expect(r.status).toBe('needs_better_image');
         expect(r.reason).toMatch(/busy_background/);
         expect(r.chosen?.url).toBe(url);
-        expect(r.publishable).toEqual({ A: false, B: false });
+        expect(r.publishable).toMatchObject({ A: false, B: false });
         expect(r.output).toBeUndefined();
         expect(fetcher).not.toHaveBeenCalled();
     });
@@ -72,7 +72,7 @@ describe('a row through the pipeline', () => {
         const r = await pipeline.run({ ...row, name, brand });
         expect(r.status).toBe('needs_review');
         expect(r.reason).toMatch(/same_variant/);
-        expect(r.publishable).toEqual({ A: false, B: false });
+        expect(r.publishable).toMatchObject({ A: false, B: false });
     });
 
     it('a printed barcode that differs throws the photo out before anyone pays to look', async () => {
@@ -108,17 +108,15 @@ describe('a row through the pipeline', () => {
         expect(r.trace.cost.bySource.photoroom).toBeCloseTo(0.02);
     });
 
-    it('right product on a coloured background: marked needs_bg_removal, raw photo kept, nothing published, run goes on', async () => {
+    it('right product on a coloured background: cropped, published as it is, marked bg_pending, nothing paid', async () => {
         const url = 'https://images.openfoodfacts.org/c.jpg';
         const remove = jest.fn(async (b: Buffer) => b);
         const { pipeline } = build({ [url]: await pack({ background: '#88aacc' }) }, { lookups: [db([c(url, { licence: 'cc_by_sa' })])], removeBackground: remove, cutoutBlocked: () => 'paid_cutouts_off' }, () => reply(answer()));
-        const r = await pipeline.run(row);
-        expect(r.status).toBe('needs_bg_removal');
-        expect(r.reason).toMatch(/paid_cutouts_off/);
+        const r = await pipeline.run(row, { policy: 'open' });
+        expect(r.status).toBe('bg_pending');
         expect(r.chosen?.bytes.length).toBeGreaterThan(0);
-        expect(r.output).toBeUndefined();
-        expect(r.publishable).toEqual({ A: false, B: false });
-        expect(r.wouldPublish).toEqual({ A: true, B: true });
+        expect(r.output?.jpeg.length).toBeGreaterThan(0);
+        expect(r.publishable.open).toBe(true);
         expect(remove).not.toHaveBeenCalled();
         expect(r.trace.calls.filter((x) => x.source === 'photoroom')).toEqual([]);
     });
@@ -126,26 +124,23 @@ describe('a row through the pipeline', () => {
     it('no Photoroom at all is no problem', async () => {
         const url = 'https://images.openfoodfacts.org/c.jpg';
         const { pipeline } = build({ [url]: await pack({ background: '#88aacc' }) }, { lookups: [db([c(url, { licence: 'cc_by_sa' })])] }, () => reply(answer()));
-        expect((await pipeline.run(row)).status).toBe('needs_bg_removal');
+        expect((await pipeline.run(row, { policy: 'open' })).status).toBe('bg_pending');
     });
 
-    it('a sandbox preview is labelled, kept apart from the output, and can never publish', async () => {
+    it('a crop the final check refuses is not published', async () => {
         const url = 'https://images.openfoodfacts.org/c.jpg';
-        const marked = Buffer.from('watermarked');
-        const { pipeline } = build({ [url]: await pack({ background: '#88aacc' }) }, { lookups: [db([c(url, { licence: 'cc_by_sa' })])], cutoutBlocked: () => 'photoroom_sandbox_key', previewBackground: async () => marked }, () => reply(answer()));
-        const r = await pipeline.run(row);
-        expect(r.status).toBe('needs_bg_removal');
-        expect(r.preview).toEqual({ png: marked, label: 'SANDBOX PREVIEW' });
+        const { pipeline } = build({ [url]: await pack({ background: '#88aacc' }) }, { lookups: [db([c(url, { licence: 'cc_by_sa' })])] }, () => reply(answer({ pack_not_cut: false })));
+        const r = await pipeline.run(row, { policy: 'open' });
+        expect(r.status).not.toBe('bg_pending');
         expect(r.output).toBeUndefined();
-        expect(r.publishable).toEqual({ A: false, B: false });
     });
 
-    it('a white photo gets no sandbox preview', async () => {
+    it('the vision quota gone: nothing is published and the row can wait', async () => {
         const url = 'https://images.openfoodfacts.org/c.jpg';
-        const preview = jest.fn();
-        const { pipeline } = build({ [url]: await pack() }, { lookups: [db([c(url, { licence: 'cc_by_sa' })])], cutoutBlocked: () => 'photoroom_sandbox_key', previewBackground: preview as any }, () => reply(answer()));
-        expect((await pipeline.run(row)).status).toBe('approved');
-        expect(preview).not.toHaveBeenCalled();
+        const { pipeline } = build({ [url]: await pack() }, { lookups: [db([c(url, { licence: 'cc_by_sa' })])] }, () => ({ ok: false, status: 429, json: async () => ({}), headers: { get: () => null } }));
+        const r = await pipeline.run(row, { policy: 'open' });
+        expect(r.status).toBe('pending_vision');
+        expect(r.output).toBeUndefined();
     });
 
     it('an editorial Shutterstock photo is never published or even sent to vision', async () => {
@@ -154,7 +149,7 @@ describe('a row through the pipeline', () => {
         const r = await pipeline.run(row);
         expect(r.status).toBe('needs_review');
         expect(r.reason).toMatch(/editorial/);
-        expect(r.publishable).toEqual({ A: false, B: false });
+        expect(r.publishable).toMatchObject({ A: false, B: false });
         expect(fetcher).not.toHaveBeenCalled();
     });
 });
@@ -166,7 +161,7 @@ describe('licence settings', () => {
         const r = await pipeline.run(row);
         expect(r.status).toBe('needs_review');
         expect(r.reason).toMatch(/licence_unknown/);
-        expect(r.publishable).toEqual({ A: false, B: true });
+        expect(r.publishable).toMatchObject({ A: false, B: true });
         expect(r.output).toBeDefined();
         expect((await pipeline.run(row, { policy: 'B' })).status).toBe('approved');
     });
@@ -185,7 +180,7 @@ describe('the vision service failing', () => {
         const url = 'https://images.openfoodfacts.org/a.jpg';
         const { pipeline } = build({ [url]: await pack() }, { lookups: [db([c(url, { licence: 'cc_by_sa' })])] }, () => reply(answer()));
         const r = await pipeline.run(row);
-        expect(r.status).toBe('needs_review');
+        expect(r.status).toBe('pending_vision');
         expect(r.reason).toMatch(/^vision_unavailable/);
         expect(r.top).toHaveLength(1);
     });
@@ -200,7 +195,7 @@ describe('the vision service failing', () => {
         const { pipeline } = build({ [url]: await pack() }, { lookups: [db([c(url, { licence: 'cc_by_sa' })])], alerts }, () => ({ ok: false, status: 401, json: async () => ({}) }));
         const out = [];
         for (let i = 0; i < 16; i++) out.push(await pipeline.run({ ...row, ean }, { upload: 'u1' }));
-        expect(out.every((r) => r.status === 'needs_review' && /vision_unavailable: http_401/.test(r.reason))).toBe(true);
+        expect(out.every((r) => r.status === 'pending_vision' && /vision_unavailable: http_401/.test(r.reason))).toBe(true);
         expect(alerts.appConfig.upsert).toHaveBeenCalledTimes(1);
     });
 });
@@ -314,8 +309,8 @@ describe('free sources first', () => {
         const web = search([c('https://shop.tesco.com/1.jpg')]);
         const { pipeline, fetcher } = build({}, { searches: [web] }, () => reply(answer()), 0);
         const r = await pipeline.run(row);
-        expect(r.status).toBe('not_found');
-        expect(r.reason).toMatch(/search waits for vision \(vision_quota\)/);
+        expect(r.status).toBe('pending_vision');
+        expect(r.reason).toMatch(/vision_quota/);
         expect(web.search).not.toHaveBeenCalled();
         expect(fetcher).not.toHaveBeenCalled();
     });
@@ -330,7 +325,7 @@ describe('free vision only', () => {
         const { pipeline, fetcher } = build({ [url]: await pack() }, { lookups: source() }, () => reply(answer()));
         const r = await pipeline.run(row, { model: 'anthropic/claude-sonnet-5.5' });
         expect(fetcher).not.toHaveBeenCalled();
-        expect(r.status).toBe('needs_review');
+        expect(r.status).toBe('pending_vision');
         expect(r.reason).toMatch(/paid_model_refused/);
     });
     it('PHOTO_CHECK_MODEL set to a paid model is refused too', async () => {
@@ -377,7 +372,7 @@ describe('free vision only', () => {
         const pipeline = new ImagePipeline({ lookups: source(), searches: [], cache, vision: new VisionGate(cache, fetcher, { pause: noop, dailyLimit: async () => 50 }), download: async () => ({ ok: true, bytes: images }) });
         const one = await pipeline.run(row);
         const two = await pipeline.run({ ...row, ean: '5449000000996' });
-        expect(one.status).toBe('needs_review');
+        expect(one.status).toBe('pending_vision');
         expect(one.reason).toMatch(/^vision_quota/);
         expect(two.reason).toMatch(/^vision_quota/);
         expect(fetcher).toHaveBeenCalledTimes(1);
@@ -444,7 +439,7 @@ describe('free vision only', () => {
         const r = await pipeline.run(row);
         expect(r.status).toBe('needs_review');
         expect(r.reason).toMatch(/unreadable_answer/);
-        expect(r.publishable).toEqual({ A: false, B: false });
+        expect(r.publishable).toMatchObject({ A: false, B: false });
         expect(fetcher).toHaveBeenCalledTimes(2);
     });
     it('confidence 0.89 from a free model is a no', async () => {
@@ -495,7 +490,7 @@ describe('one final picture per product', () => {
         const { pipeline, fetcher } = build({ [url]: await pack({ background: '#88aacc' }) }, { lookups: open([c(url, { licence: 'cc_by_sa' })]), removeBackground: remove, cutoutBlocked: () => null }, () => reply(answer({ hand_over_pack: true, reason: 'fingers over the logo' })));
         const r = await pipeline.run(row);
         expect(r.status).toBe('needs_better_image');
-        expect(r.reason).toMatch(/not_cutout_ready: hand_over_pack/);
+        expect(r.reason).toMatch(/hand_over_pack/);
         expect(remove).not.toHaveBeenCalled();
         expect(fetcher).toHaveBeenCalledTimes(1);
     });
@@ -545,7 +540,7 @@ describe('one final picture per product', () => {
         expect(r.status).toBe('needs_review');
         expect(r.reason).toMatch(/brand_not_read/);
         expect(r.output).toBeUndefined();
-        expect(r.publishable).toEqual({ A: false, B: false });
+        expect(r.publishable).toMatchObject({ A: false, B: false });
     });
 
     it('another product of the same brand: refused', async () => {
@@ -562,7 +557,7 @@ describe('one final picture per product', () => {
         const r = await pipeline.run({ ean });
         expect(r.status).toBe('needs_review');
         expect(r.reason).toMatch(/identity_unknown/);
-        expect(r.publishable).toEqual({ A: false, B: false });
+        expect(r.publishable).toMatchObject({ A: false, B: false });
     });
 
     it('a carton code keeps the single unit and says so in the trace', async () => {

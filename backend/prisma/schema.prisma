@@ -45,6 +45,8 @@ enum ProductStatus {
   APPROVED       // admin approved, live on the catalog
   REJECTED       // admin rejected — supplier blocked from re-submitting
   NEEDS_CHANGES  // admin sent a comment; supplier must fix and resend
+  PAUSED         // live product taken off the storefront by Ali FMCG, comment in adminNotes; can be re-published
+  REMOVED        // deleted from display by Ali FMCG, comment in adminNotes; the record and order history stay
 }
 
 enum PlacementType {
@@ -208,7 +210,7 @@ model Product {
   ///                      "origin"?: "discovery", "originalUrl"?: "…", "chosenBy"?: "supplier" | "staff", "approvedBy"?: userId, "approvedByRole"?: role, "approvedAt"?: ISO, "tier"?: 1 | 2 | 3 | null, "imgid"?: "…" } }
   /// Null / missing key = the supplier's (or staff's) own uploaded photo.
   imageCredits Json?
-  /// Where the image pipeline stands for this product: pending, searching, approved, needs_review, not_found, invalid_ean, low_res, failed.
+  /// Where the image pipeline stands for this product: pending, searching, approved, bg_pending, pending_vision, needs_review, needs_better_image, not_found, invalid_ean, low_res, failed.
   /// Null = never been through it; such products keep showing the photos they have.
   imageStatus       String?
   /// The exact reason, shown to admins. Never just "no image".
@@ -307,6 +309,7 @@ model Product {
   priceObservations PriceObservation[]
   promotions   Promotion[]
   reviewEvents ProductReviewEvent[]
+  imageRows    ImageRow[]
   // What the supplier typed: price per case in their own currency. basePrice
   // (EUR) is derived from it; kept so the entered figure is never reinterpreted.
   supplierCurrency String?
@@ -706,6 +709,64 @@ model CouponRedemption {
   createdAt  DateTime @default(now())
 
   @@index([couponId, customerId])
+}
+
+/// One Excel upload that went through the image pipeline (IMAGE_PIPELINE_ENABLED). Its summary is sent once, at `summarySentAt`.
+model ImageUpload {
+  id            String    @id @default(uuid())
+  /// Who is told: the supplier, or the staff member who ran a catalog import.
+  ownerId       String
+  catalog       Boolean   @default(false)
+  fileName      String?
+  /// The last batch of the file has arrived.
+  closedAt      DateTime?
+  summarySentAt DateTime?
+  createdAt     DateTime  @default(now())
+  rows          ImageRow[]
+
+  @@index([ownerId, createdAt])
+  @@index([summarySentAt])
+}
+
+/// One product's place in the image pipeline. The worker claims rows by `state`; a re-run puts the same row back in the queue.
+model ImageRow {
+  id          String       @id @default(uuid())
+  uploadId    String?
+  upload      ImageUpload? @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product?     @relation(fields: [productId], references: [id], onDelete: SetNull)
+  ownerId     String
+  sheet       String?
+  rowNumber   Int?
+  name        String
+  ean         String?
+  /// queued | running | waiting_vision | done
+  state       String       @default("queued")
+  /// published | published_image_pending | needs_attention. What the supplier reads.
+  outcome     String?
+  /// verified | bg_pending | pending_vision | placeholder | kept
+  imageState  String?
+  /// invalid_ean | no_image | not_verified | missing_fields
+  reason      String?
+  /// Facts for the supplier's message, read in their language: ean, missing fields.
+  params      Json?
+  /// Staff only: the pipeline's exact reason and trace.
+  detail      String?
+  trace       Json?
+  /// The supplier's own pictures for this row, stored but not yet checked.
+  photos      String[]     @default([])
+  attempts    Int          @default(0)
+  visionCalls Int          @default(0)
+  searches    Int          @default(0)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([state])
+  @@index([uploadId])
+  @@index([productId])
+  @@index([ownerId, createdAt])
 }
 
 model AppConfig {

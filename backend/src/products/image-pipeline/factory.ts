@@ -16,7 +16,7 @@ async function styleImages(): Promise<Buffer[]> {
 }
 
 /** Paid cut-outs stay off until the owner decides on them. A live key alone turns nothing on. */
-const liveCutouts = () => (process.env.PHOTOROOM_LIVE || '').trim() === 'true';
+export const liveCutouts = () => (process.env.PHOTOROOM_LIVE || '').trim() === 'true';
 
 /** Every source, in the order they are asked; each one decides from its own key whether it is on. */
 export function buildPipeline(cache: LookupCache, budget: Budget, extra: Partial<PipelineDeps> = {}) {
@@ -30,7 +30,6 @@ export function buildPipeline(cache: LookupCache, budget: Budget, extra: Partial
         removeBackground: (image) => photoroom.segment(image),
         reserveCutout: () => budget.reserve('photoroom', photoroomCap(), 'ever'),
         cutoutBlocked: () => (!liveCutouts() ? 'paid_cutouts_off' : !photoroom.configured ? 'photoroom_not_configured' : photoroom.testMode ? 'photoroom_sandbox_key' : null),
-        ...(photoroom.testMode ? { previewBackground: (image: Buffer) => photoroom.sandboxPreview(image) } : {}),
         ...extra,
     };
     return { pipeline: new ImagePipeline(deps), deps, photoroom };

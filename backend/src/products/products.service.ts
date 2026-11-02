@@ -874,6 +874,64 @@ export class ProductsService {
     }
 
     /**
+     * Staff control after publishing: off the storefront with the reason the supplier
+     * reads. Every public query asks for APPROVED, so nothing else has to change. The
+     * record, its order history and its photos stay.
+     */
+    async takeDown(id: string, kind: 'pause' | 'remove', comment: string, actor: ReviewActor) {
+        const text = String(comment || '').trim();
+        if (!text) throw new BadRequestException({ code: 'COMMENT_REQUIRED', message: 'Say why: the supplier reads this comment.' });
+        const product = await this.prisma.product.findUnique({ where: { id }, select: { id: true, name: true, status: true, supplierId: true } });
+        if (!product) throw new NotFoundException('Product not found');
+        const status = kind === 'pause' ? ProductStatus.PAUSED : ProductStatus.REMOVED;
+        if (product.status === ProductStatus.REJECTED) throw new BadRequestException({ code: 'CLOSED', message: 'A rejected listing is already off the storefront.' });
+        if (kind === 'pause' && product.status !== ProductStatus.APPROVED) throw new BadRequestException({ code: 'NOT_LIVE', message: 'Only a live product can be paused.' });
+        const updated = await this.prisma.product.update({ where: { id }, data: { status, adminNotes: text.slice(0, 2000) } });
+        await this.review?.record({ productId: id, action: kind === 'pause' ? 'PAUSED' : 'REMOVED', message: text, statusAfter: status, actor });
+        if (product.supplierId) await this.notificationsService.notifyUser(product.supplierId, kind === 'pause' ? 'Product taken off the storefront' : 'Product removed from display', `"${product.name}": ${text.slice(0, 300)}`, 'WARNING', { productId: id, link: ProductsService.supplierFeedbackLink(id), kind: kind === 'pause' ? 'PRODUCT_PAUSED' : 'PRODUCT_REMOVED', params: { product: product.name, reason: text.slice(0, 300) } }).catch((e) => this.logger.warn(`take-down notice for ${id}: ${e?.message}`));
+        return updated;
+    }
+
+    /** Back on the storefront, under the same completeness rule as any publish. */
+    async republish(id: string, actor: ReviewActor) {
+        const product = await this.findOne(id);
+        if (!product) throw new NotFoundException('Product not found');
+        if (product.status !== ProductStatus.PAUSED && product.status !== ProductStatus.REMOVED) throw new BadRequestException({ code: 'NOT_TAKEN_DOWN', message: 'Only a paused or removed product can be re-published.' });
+        const errors = missingForPublish(product).map((m) => m.label);
+        if (errors.length) throw new BadRequestException({ code: 'INCOMPLETE', message: `Incomplete product cannot be published. Missing: ${errors.join(', ')}.`, errors });
+        const updated = await this.prisma.product.update({ where: { id }, data: { status: ProductStatus.APPROVED, adminNotes: null } });
+        this.priceHistory.record(id, 'APPROVED').catch(() => {});
+        await this.review?.record({ productId: id, action: 'REPUBLISHED', statusAfter: ProductStatus.APPROVED, actor });
+        if (updated.supplierId) await this.notificationsService.notifyUser(updated.supplierId, 'Product back on the storefront', `"${updated.name}" is live again.`, 'SUCCESS', { productId: id, link: ProductsService.supplierFeedbackLink(id), kind: 'PRODUCT_REPUBLISHED', params: { product: updated.name } }).catch((e) => this.logger.warn(`re-publish notice for ${id}: ${e?.message}`));
+        return updated;
+    }
+
+    /**
+     * The image pipeline's decision to publish: no review queue. Only a draft moves, so a
+     * product Ali FMCG took down or rejected stays down. `withoutPhoto` is for a product
+     * waiting on the vision quota, which shows the placeholder until its photo is judged.
+     */
+    async publishFromPipeline(id: string, opts: { withoutPhoto?: boolean } = {}) {
+        const product = await this.prisma.product.findUnique({ where: { id } });
+        // A supplier who completed the row on the edit form sent it for review: that review is what this replaces.
+        if (!product || (product.status !== ProductStatus.DRAFT && product.status !== ProductStatus.PENDING)) return false;
+        const missing = missingForPublish(product).filter((m) => !(opts.withoutPhoto && m.field === 'images'));
+        if (missing.length) return false;
+        await this.prisma.product.update({ where: { id }, data: { status: ProductStatus.APPROVED, adminNotes: null } });
+        this.priceHistory.record(id, 'APPROVED').catch(() => {});
+        await this.review?.record({ productId: id, action: 'AUTO_PUBLISHED', statusAfter: ProductStatus.APPROVED, actor: null });
+        return true;
+    }
+
+    /** A product put live on the placeholder whose photo then failed: a photo is required, so it goes back to a draft. */
+    async withdrawFromPipeline(id: string) {
+        const product = await this.prisma.product.findUnique({ where: { id }, select: { status: true } });
+        if (product?.status !== ProductStatus.APPROVED) return;
+        await this.prisma.product.update({ where: { id }, data: { status: ProductStatus.DRAFT } });
+        await this.review?.record({ productId: id, action: 'STATUS_CHANGED', statusAfter: ProductStatus.DRAFT, actor: null });
+    }
+
+    /**
      * Hard-delete a single product. The OrderItem.product FK is now SET NULL
      * on cascade (migration 20260509_orderitem_product_setnull), so existing
      * orders preserve their quantity + price + productNameSnapshot — only
@@ -1725,6 +1783,7 @@ export class ProductsService {
 
         const merged = { ...existing, ...patch, basePrice: patch.price !== undefined ? patch.price : existing.basePrice };
         const missing = missingForPublish(merged);
+        const heldByStaff = existing.status === ProductStatus.PAUSED || existing.status === ProductStatus.REMOVED;
         const sameSet = (a: any, b: any) => JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
         // Filling a field that was empty is not a change of identity; replacing a value is.
         const wasSet = (f: string) => (f === 'images' ? realImages(existing.images).length > 0 : String(existing[f] ?? '').trim() !== '');
@@ -1741,6 +1800,8 @@ export class ProductsService {
                 throw new BadRequestException({ code: 'LIVE_PRODUCT_INCOMPLETE', message: `A live product must stay complete. You removed: ${newlyMissing.map((m) => m.label).join(', ')}.`, missing: newlyMissing });
             }
             if (identityChanged) { nextStatus = ProductStatus.PENDING; note = 'Supplier changed product details — re-review before it goes live again.'; }
+        } else if (heldByStaff) {
+            // Only Ali FMCG brings it back: an edit changes the details, never the status or the comment.
         } else if (missing.length) {
             nextStatus = ProductStatus.DRAFT;
         } else if (opts.submit) {

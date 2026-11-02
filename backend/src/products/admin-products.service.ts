@@ -15,7 +15,7 @@ import { planBulk, type BulkAction, type BulkCandidate, type BulkPlan } from './
  *    the same rule approval enforces — no separate percentage.
  *  • Decisions themselves stay in ProductsService (approve / reject / comment).
  */
-const STATUSES = ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'NEEDS_CHANGES'] as const;
+const STATUSES = ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'NEEDS_CHANGES', 'PAUSED', 'REMOVED'] as const;
 const SORTS: Record<string, any> = {
     newest: { createdAt: 'desc' }, oldest: { createdAt: 'asc' }, updated: { updatedAt: 'desc' }, name: { name: 'asc' },
     price_asc: { basePrice: 'asc' }, price_desc: { basePrice: 'desc' }, stock_asc: { stock: 'asc' }, stock_desc: { stock: 'desc' },

@@ -50,7 +50,7 @@ export function planBulk(action: BulkAction, ids: string[], found: BulkCandidate
         const s = String(c.status).toUpperCase();
         if (action === 'approve') {
             if (s === 'APPROVED') { skip(c, 'ALREADY_APPROVED'); continue; }
-            if (s === 'REJECTED') { skip(c, 'CLOSED'); continue; }
+            if (s === 'REJECTED' || s === 'PAUSED' || s === 'REMOVED') { skip(c, 'CLOSED'); continue; }
             // A supplier draft was never submitted; an Ali FMCG draft is ours to publish.
             if (s === 'DRAFT' && c.scope === 'submissions') { skip(c, 'NOT_SUBMITTED'); continue; }
             if (s === 'NEEDS_CHANGES' && c.scope === 'submissions') { skip(c, 'ALREADY_CHANGES'); continue; }
