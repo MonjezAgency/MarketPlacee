@@ -12,6 +12,8 @@ import { Badge, Button, Card, ConfirmProvider, Dialog, ErrorState, Field, Notice
 import { categoryLabel, statusLabel } from '@/components/supplier/import/types';
 import { ReviewTrail } from '@/components/products/ReviewTrail';
 import UpdatePriceDialog from '@/components/admin/UpdatePriceDialog';
+import ProductTakeDown from '@/components/admin/ProductTakeDown';
+import ImagePipelineTrace from '@/components/admin/ImagePipelineTrace';
 
 /**
  * Admin → product review (/admin/products/[id]). One record, read from
@@ -93,7 +95,7 @@ function ReviewView({ params }: { params: { id: string } }) {
         { field: 'moq', label: tp('ckMoq') }, { field: 'moqUnit', label: tp('ckMoqUnit') }, { field: 'images', label: tp('ckImages') },
     ];
     const value = (v: unknown, fmtFn?: (x: any) => React.ReactNode) => (v === null || v === undefined || v === '' ? <span className="text-ink-4">{tp('notProvided')}</span> : fmtFn ? fmtFn(v) : String(v));
-    const canPublish = status !== 'APPROVED' && status !== 'REJECTED';
+    const canPublish = !['APPROVED', 'REJECTED', 'PAUSED', 'REMOVED'].includes(status);
     // Photo checks from stored facts only (count, generated placeholder, borrowed database photo); nothing is inferred from pixels.
     const credits = (p.imageCredits || {}) as Record<string, { source?: string; chosenBy?: string; reviewedAt?: string }>;
     const imageWarnings = [
@@ -210,14 +212,17 @@ function ReviewView({ params }: { params: { id: string } }) {
                 </div>
 
                 <aside className="lg:sticky lg:top-4 space-y-3">
+                    {(status === 'PAUSED' || status === 'REMOVED') && p.adminNotes && <Notice tone="warning">{t('imageUpload', 'takenDownNotice', { comment: p.adminNotes })}</Notice>}
+                    <ImagePipelineTrace productId={p.id} />
                     {/* Actions */}
                     <Card title={tp('actionsTitle')}>
                         <div className="flex flex-col gap-2">
                             {canPublish && <Button variant="primary" icon={<CheckCircle2 size={15} />} loading={busy === 'approve'} disabled={!!busy || !data.canApprove} title={!data.canApprove ? tp('approveBlocked') : undefined} onClick={() => act('approve')}>{tp(isCatalog ? 'publish' : 'approve')}</Button>}
-                            {!isCatalog && status !== 'REJECTED' && <Button icon={<MessageSquare size={15} />} disabled={!!busy} onClick={() => { setText(''); setDialog('changes'); }}>{tp('requestChanges')}</Button>}
-                            {!isCatalog && status !== 'REJECTED' && <Button variant="danger" icon={<XCircle size={15} />} disabled={!!busy} onClick={() => { setText(''); setDialog('reject'); }}>{tp('reject')}</Button>}
+                            {!isCatalog && !['REJECTED', 'PAUSED', 'REMOVED'].includes(status) && <Button icon={<MessageSquare size={15} />} disabled={!!busy} onClick={() => { setText(''); setDialog('changes'); }}>{tp('requestChanges')}</Button>}
+                            {!isCatalog && !['REJECTED', 'PAUSED', 'REMOVED'].includes(status) && <Button variant="danger" icon={<XCircle size={15} />} disabled={!!busy} onClick={() => { setText(''); setDialog('reject'); }}>{tp('reject')}</Button>}
                             {isCatalog && status === 'APPROVED' && <Button icon={<EyeOff size={15} />} loading={busy === 'offline'} disabled={!!busy} onClick={() => act('offline')}>{tp('takeOffline')}</Button>}
                             {isCatalog && status !== 'REJECTED' && <Button icon={<Euro size={15} />} onClick={() => setPriceOpen(true)}>{tp('updatePrice')}</Button>}
+                            <ProductTakeDown product={{ id: p.id, name: p.name, status }} onDone={load} />
                             {isCatalog && <Link href={editHref}><Button className="w-full" icon={<Pencil size={15} />}>{tp('editDetails')}</Button></Link>}
                             {!data.canApprove && canPublish && <p className="text-[12.5px] text-amber-800">{tp('approveBlocked')}</p>}
                             {status === 'REJECTED' && <p className="text-[12.5px] text-ink-3">{tp('rejectedFinal')}</p>}

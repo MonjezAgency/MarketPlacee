@@ -7,6 +7,7 @@ import buyerAccount from './buyerAccount';
 import support from './support';
 import legacySupplier from './legacySupplier';
 import catalogImport from './catalogImport';
+import imageUpload from './imageUpload';
 import targetsPage from './targetsPage';
 import productTour from './productTour';
 import catalogFields from './catalogFields';
@@ -39,5 +40,5 @@ import adminEmailTools from './adminEmailTools';
 import adminOwnerPanel from './adminOwnerPanel';
 
 /** Every area dictionary (see define.ts). Order doesn't matter; names must be unique. */
-export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier, catalogImport, targetsPage, productTour, catalogFields, supplierOverview, imageDiscovery, productPhotos, targetPrice, promotions, adminOverview, adminProducts, productReview, notificationsCenter, adminUsers, adminOrders, adminNav, adminOffers, adminSupport, adminSettings, adminFinance, adminDisputes, adminKyc, adminCoupons, adminTeam, adminTargets, adminNewsletter, cookieBanner, catalogPage, productPage, adminEmailTools, adminOwnerPanel] as const;
+export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier, catalogImport, targetsPage, productTour, catalogFields, supplierOverview, imageDiscovery, productPhotos, targetPrice, promotions, adminOverview, adminProducts, productReview, notificationsCenter, adminUsers, adminOrders, adminNav, adminOffers, adminSupport, adminSettings, adminFinance, adminDisputes, adminKyc, adminCoupons, adminTeam, adminTargets, adminNewsletter, cookieBanner, catalogPage, productPage, adminEmailTools, adminOwnerPanel, imageUpload] as const;
 export type SectionName = (typeof SECTIONS)[number]['name'];

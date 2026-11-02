@@ -56,6 +56,8 @@ export const PRODUCT_STATUS: Record<string, { labelKey: string; tone: Tone }> = 
     NEEDS_CHANGES: { labelKey: 'statusChangesRequested', tone: 'warning' },
     APPROVED: { labelKey: 'statusLive', tone: 'success' },
     REJECTED: { labelKey: 'statusRejected', tone: 'danger' },
+    PAUSED: { labelKey: 'statusPaused', tone: 'warning' },
+    REMOVED: { labelKey: 'statusRemoved', tone: 'danger' },
 };
 
 export const ORDER_STATUS: Record<string, { labelKey: string; tone: Tone }> = {

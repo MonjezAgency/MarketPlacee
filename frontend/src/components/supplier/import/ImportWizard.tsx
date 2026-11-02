@@ -66,6 +66,7 @@ export default function ImportWizard({ target = 'supplier' }: { target?: ImportT
     const [confirmed, setConfirmed] = React.useState(false);
     const [progress, setProgress] = React.useState<Progress | null>(null);
     const [results, setResults] = React.useState<CommitResult[] | null>(null);
+    const [uploadId, setUploadId] = React.useState<string | null>(null);
     const [busy, setBusy] = React.useState<string | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const urls = React.useRef(new Map<string, string>());
@@ -189,6 +190,7 @@ export default function ImportWizard({ target = 'supplier' }: { target?: ImportT
         const todo = review.rows.filter((r) => r.action !== 'none');
         const batches = batchRows(todo, prepared.photos);
         const startedAt = new Date().toISOString();
+        const uploadKey = crypto.randomUUID();
         const all: CommitResult[] = [];
         setBusy('commit'); setError(null); setProgress({ done: 0, total: todo.length, batch: 0, batches: batches.length });
         try {
@@ -198,7 +200,8 @@ export default function ImportWizard({ target = 'supplier' }: { target?: ImportT
                 const bySheet = new Map<string, Set<number>>();
                 for (const r of b) (bySheet.get(r.sheet) || bySheet.set(r.sheet, new Set()).get(r.sheet)!).add(r.row);
                 const photos = b.flatMap((r: ReviewRow) => r.images.map((p) => ({ path: p, blob: prepared.photos.get(p) }))).filter((p): p is { path: string; blob: Blob } => !!p.blob && p.blob.size <= MAX_PHOTO_IN_REQUEST);
-                const out = await api.commit({ ...request(map, bySheet), startedAt, last: i === batches.length - 1 }, photos);
+                const out = await api.commit({ ...request(map, bySheet), startedAt, last: i === batches.length - 1, uploadId: uploadKey }, photos);
+                if (out.uploadId) setUploadId(out.uploadId);
                 all.push(...out.results);
             }
             setResults(all);
@@ -297,7 +300,7 @@ export default function ImportWizard({ target = 'supplier' }: { target?: ImportT
             )}
 
             {step === 'import' && review && (
-                <ImportStep target={target} review={review} onExisting={onExisting} confirmed={confirmed} setConfirmed={setConfirmed} progress={progress} results={results} error={error} multi={multi} fileName={analysis?.fileName ?? 'import'} />
+                <ImportStep target={target} uploadId={uploadId} review={review} onExisting={onExisting} confirmed={confirmed} setConfirmed={setConfirmed} progress={progress} results={results} error={error} multi={multi} fileName={analysis?.fileName ?? 'import'} />
             )}
 
             {step !== 'upload' && <div className="h-6 shrink-0" aria-hidden />}

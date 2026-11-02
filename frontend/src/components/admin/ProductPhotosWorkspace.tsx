@@ -9,6 +9,7 @@ import { canDo } from '@/lib/admin-access';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { adminPhotosApi, PHOTO_BUCKETS, type DiscoveryCandidate, type PhotoBucket, type PhotoList, type PhotoRow, type PhotoScope } from '@/lib/admin-photos-api';
+import ImagePipelineCosts from '@/components/admin/ImagePipelineCosts';
 import { Badge, Button, Card, Dialog, EmptyState, ErrorState, Notice, PageHeader, Skeleton, Thumb, inputCls } from '@/components/supplier/ui';
 import PhotoCandidateCard from '@/components/supplier/PhotoCandidateCard';
 import { useDiscoveryReason } from '@/components/supplier/ImageDiscoveryPanel';
@@ -115,6 +116,7 @@ export default function ProductPhotosWorkspace() {
             <PageHeader eyebrow={t('adminProducts', 'title')} title={tp('title')} description={tp('description')}
                 actions={<Link href={scope === 'catalog' ? '/admin/products/catalog' : '/admin/products/submissions'}><Button>{tp(scope === 'catalog' ? 'backCatalog' : 'backSubmissions')}</Button></Link>} />
 
+            <ImagePipelineCosts />
             <Card bodyClassName="p-0">
                 <div className="flex flex-col gap-3 p-3 sm:p-4 border-b border-line">
                     <div role="tablist" aria-label={tp('scopeAria')} className="flex gap-1">

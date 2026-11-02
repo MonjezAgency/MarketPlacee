@@ -125,6 +125,7 @@ export const ADMIN_ACTION_ROLES = {
     changeOrderStatus: ['OWNER', 'ADMIN', 'LOGISTICS'] as StaffRole[],
     exportOrders: OA,
     reviewProducts: CATALOG,
+    takeDownProducts: CATALOG,   // pause / remove from display / re-publish, with a comment
     applyCatalogPhotos: OA,      // use / dismiss photos found by barcode on Ali FMCG Catalog products
     reviewOffers: CATALOG,
     manageSpecialOffers: OA,

@@ -1,6 +1,9 @@
 import { apiFetch } from '@/lib/api';
 import { ApiError } from '@/lib/supplier-api';
 
+export interface PipelineCosts { enabled: boolean; serper: { used: number; cap: number }; vision: { used: number; cap: number } }
+export interface PipelineRun { id: string; state: string; outcome: string | null; imageState: string | null; reason: string | null; detail: string | null; visionCalls: number; searches: number; attempts: number; finishedAt: string | null; trace: unknown }
+
 /** Typed calls for the founder/admin workspace (`/dashboard/admin/*`, `/products/admin/*`). */
 
 export type CatalogScope = 'catalog' | 'submissions';
@@ -72,6 +75,10 @@ export const adminApi = {
     reject: (id: string, reason: string) => post(`/products/${id}/reject`, { reason }, 'PATCH').then((r) => json<any>(r)),
     requestChanges: (id: string, message: string) => post(`/products/${id}/comment`, { message }, 'PATCH').then((r) => json<any>(r)),
     setStatus: (id: string, status: string, adminNotes?: string) => post(`/products/${id}/status`, { status, adminNotes }, 'PATCH').then((r) => json<any>(r)),
+    takeDown: (id: string, kind: 'pause' | 'remove', comment: string) => post(`/products/admin/${id}/take-down`, { kind, comment }).then((r) => json<any>(r)),
+    republish: (id: string) => post(`/products/admin/${id}/republish`, {}).then((r) => json<any>(r)),
+    pipelineCosts: () => apiFetch('/admin-product-photos/pipeline/costs', { cache: 'no-store' }).then((r) => json<PipelineCosts>(r)),
+    pipelineTrace: (id: string) => apiFetch(`/admin-product-photos/pipeline/${id}/trace`, { cache: 'no-store' }).then((r) => json<PipelineRun[]>(r)),
     bulkApprove: (ids: string[]) => post('/products/bulk-approve', { ids }).then((r) => json<{ count: number; skipped: { id: string; name: string; missing: string[] }[]; message: string }>(r)),
     bulkReject: (ids: string[], reason: string) => post('/products/bulk-reject', { ids, reason }).then((r) => json<any>(r)),
     /** One bulk action; the server decides per product and reports every skip (backend/src/products/admin-bulk.ts). */

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle2, MessageSquare, RefreshCw, Send, Shuffle, XCircle } from 'lucide-react';
+import { CheckCircle2, EyeOff, MessageSquare, RefreshCw, RotateCcw, Send, Shuffle, Trash2, XCircle, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { ReviewEvent } from '@/lib/admin-api';
@@ -18,6 +18,10 @@ const ICON: Record<string, { icon: React.ElementType; cls: string }> = {
     APPROVED: { icon: CheckCircle2, cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
     REJECTED: { icon: XCircle, cls: 'bg-red-50 text-red-700 ring-red-200' },
     STATUS_CHANGED: { icon: Shuffle, cls: 'bg-slate-100 text-slate-700 ring-slate-200' },
+    PAUSED: { icon: EyeOff, cls: 'bg-amber-50 text-amber-800 ring-amber-200' },
+    REMOVED: { icon: Trash2, cls: 'bg-red-50 text-red-700 ring-red-200' },
+    REPUBLISHED: { icon: RotateCcw, cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+    AUTO_PUBLISHED: { icon: Zap, cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
 };
 
 export function ReviewTrail({ events, viewer, compact }: { events: ReviewEvent[]; viewer: 'staff' | 'supplier'; compact?: boolean }) {

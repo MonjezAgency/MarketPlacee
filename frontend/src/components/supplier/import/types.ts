@@ -167,7 +167,7 @@ const CATEGORY_SLUGS = new Set(CATEGORIES_LIST.map(slug));
 /** Catalog category name for display; categories outside the standard list are shown as stored. */
 export const categoryLabel = (c: string | null | undefined, t: TFn) => (c && CATEGORY_SLUGS.has(slug(c)) && CATEGORIES_LIST.includes(c) ? t('supplierCatalog', `cat_${slug(c)}`) : c || '');
 /** Product review status (DRAFT, PENDING, NEEDS_CHANGES, APPROVED, REJECTED). */
-export const statusLabel = (s: string, t: TFn) => (['DRAFT', 'PENDING', 'NEEDS_CHANGES', 'APPROVED', 'REJECTED'].includes(s) ? t('supplierCatalog', `status_${s}`) : s);
+export const statusLabel = (s: string, t: TFn) => (['DRAFT', 'PENDING', 'NEEDS_CHANGES', 'APPROVED', 'REJECTED', 'PAUSED', 'REMOVED'].includes(s) ? t('supplierCatalog', `status_${s}`) : s);
 /** What one piece is (piece, bottle, can…). */
 export const unitLabel = (u: string, t: TFn) => ((UNIT_TYPES as readonly string[]).includes(u) ? t('supplierCatalog', `unit_${u}`) : u);
 /** MOQ unit (PIECE, CASE, PALLET, TRUCK) as a plural noun for selects ("cases"). */

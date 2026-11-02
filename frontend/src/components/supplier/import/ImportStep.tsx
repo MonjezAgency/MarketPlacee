@@ -9,6 +9,7 @@ import { Trans } from '@/components/i18n/Trans';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { listJoin, where, type CommitResult, type Review } from './types';
 import type { ImportTarget } from './api';
+import UploadStatus from './UploadStatus';
 
 /** Wording that differs for the Ali FMCG Catalog import (adminProducts dictionary): rows are published, not sent to review. */
 const CATALOG_TEXT: Record<string, string> = { sumUpdates: 'impSumUpdates', sumReady: 'impSumReady', sumDraft: 'impSumDraft', importConfirm: 'impConfirm', resSentToReview: 'impResPublished', draftsHidden: 'impDraftsHidden', openYourDrafts: 'impOpenDrafts' };
@@ -20,8 +21,8 @@ function useText(target: ImportTarget) {
 export interface Progress { done: number; total: number; batch: number; batches: number }
 
 /** Confirm (explicitly), then follow the batches, then the honest per-row result. */
-export default function ImportStep({ target = 'supplier', review, onExisting, confirmed, setConfirmed, progress, results, error, multi, fileName }: {
-    target?: ImportTarget; review: Review; onExisting: 'skip' | 'update'; confirmed: boolean; setConfirmed: (v: boolean) => void;
+export default function ImportStep({ target = 'supplier', uploadId, review, onExisting, confirmed, setConfirmed, progress, results, error, multi, fileName }: {
+    target?: ImportTarget; uploadId?: string | null; review: Review; onExisting: 'skip' | 'update'; confirmed: boolean; setConfirmed: (v: boolean) => void;
     progress: Progress | null; results: CommitResult[] | null; error: string | null; multi: boolean; fileName: string;
 }) {
     const { t, fmt } = useLanguage();
@@ -59,6 +60,17 @@ export default function ImportStep({ target = 'supplier', review, onExisting, co
                 </div>
                 <p className="mt-2 text-[13px] text-ink-3 tabular-nums">{tc('progressRows', { count: progress.total, done: fmt.number(progress.done) })} · {tc('progressBatch', { batch: fmt.number(progress.batch), batches: fmt.number(progress.batches) })}</p>
             </Card>
+        );
+    }
+    if (uploadId) {
+        const failed = results!.filter((r) => r.outcome === 'failed');
+        return (
+            <div className="space-y-4">
+                {error && <Notice tone="danger" title={tc('importStopped')}>{error}</Notice>}
+                <Notice tone="info">{t('imageUpload', 'importNotice')}</Notice>
+                <UploadStatus target={target} id={uploadId} />
+                {failed.length > 0 && <Results target={target} results={failed} review={review} error={null} multi={multi} fileName={fileName} />}
+            </div>
         );
     }
     return <Results target={target} results={results!} review={review} error={error} multi={multi} fileName={fileName} />;

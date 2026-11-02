@@ -24,7 +24,7 @@ import { categoryLabel, statusLabel } from '@/components/supplier/import/types';
  */
 const STATUS_TABS = [
     { id: '', key: 'stAll' }, { id: 'APPROVED', key: 'stLive' }, { id: 'PENDING', key: 'stPending' },
-    { id: 'NEEDS_CHANGES', key: 'stChanges' }, { id: 'DRAFT', key: 'stDraft' }, { id: 'REJECTED', key: 'stRejected' },
+    { id: 'NEEDS_CHANGES', key: 'stChanges' }, { id: 'DRAFT', key: 'stDraft' }, { id: 'REJECTED', key: 'stRejected' }, { id: 'PAUSED', key: 'stPaused' }, { id: 'REMOVED', key: 'stRemoved' },
 ];
 const SORTS = ['newest', 'updated', 'oldest', 'name', 'price_asc', 'price_desc', 'stock_asc', 'stock_desc'];
 
