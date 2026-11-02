@@ -103,3 +103,6 @@ qa/smoke/
 backend/.image-budget.json
 
 qa/alternatives/
+
+# Local pipeline output
+output/

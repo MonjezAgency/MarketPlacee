@@ -11,6 +11,9 @@ export interface Budget {
 
 export const SERPER_DEFAULT_CAP = 200;
 export const serperCap = () => Number(process.env.SERPER_MONTHLY_CAP) || SERPER_DEFAULT_CAP;
+/** Paid cut-outs allowed for this test, counted across runs. */
+export const PHOTOROOM_DEFAULT_CAP = 60;
+export const photoroomCap = () => Number(process.env.PHOTOROOM_CAP) || PHOTOROOM_DEFAULT_CAP;
 
 /**
  * What each barcode database gives for nothing. A source that isn't listed has

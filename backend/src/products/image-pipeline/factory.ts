@@ -2,7 +2,7 @@ import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { buildProviders, HostQueue } from '../product-data-providers';
 import { PhotoroomService } from '../photoroom.service';
-import type { Budget } from './budget';
+import { photoroomCap, type Budget } from './budget';
 import { SourceHttp, type LookupCache } from './http';
 import { ImagePipeline, type PipelineDeps } from './image-pipeline';
 import { barcodeSpider, eanDb, goUpc, openFacts, serper, shutterstock, upcItemDb } from './sources';
@@ -28,6 +28,7 @@ export function buildPipeline(cache: LookupCache, budget: Budget, extra: Partial
     const deps: PipelineDeps = {
         lookups, searches, vision, cache, style: styleImages,
         removeBackground: (image) => photoroom.segment(image),
+        reserveCutout: () => budget.reserve('photoroom', photoroomCap(), 'ever'),
         cutoutBlocked: () => (!liveCutouts() ? 'paid_cutouts_off' : !photoroom.configured ? 'photoroom_not_configured' : photoroom.testMode ? 'photoroom_sandbox_key' : null),
         ...(photoroom.testMode ? { previewBackground: (image: Buffer) => photoroom.sandboxPreview(image) } : {}),
         ...extra,

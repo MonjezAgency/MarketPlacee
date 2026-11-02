@@ -69,7 +69,8 @@ async function finish(placed: { canvas: Sharp; upscale: number }, engine: 'sharp
     const c = await postCheck(jpeg, png);
     const checks: Checks = { corners: c.corners, centred: c.centred, longestSide: c.longestSide, areaLoss, upscale: placed.upscale };
     if (!c.ok) return { status: 'needs_review', reason: `layout_check_failed:${c.reason}`, engine, checks };
-    if (areaLoss === null || areaLoss > MAX_AREA_LOSS) return { status: 'needs_review', reason: areaLoss === null ? 'subject_loss_not_measurable' : `subject_loss_${(areaLoss * 100).toFixed(1)}%`, engine, checks };
+    // No plain backdrop to measure against: the vision gate looks at the finished picture for a cut pack.
+    if (areaLoss !== null && areaLoss > MAX_AREA_LOSS) return { status: 'needs_review', reason: `subject_loss_${(areaLoss * 100).toFixed(1)}%`, engine, checks };
     return { status: 'ok', jpeg, webp, engine, checks };
 }
 

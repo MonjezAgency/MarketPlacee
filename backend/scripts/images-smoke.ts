@@ -4,20 +4,25 @@
  *
  *   --plan      free sources only: writes the ranking to ../qa/alternatives/ and says what a full run would spend
  *   --search    allows Serper, only after a --plan whose total fits what is left of the month
- *   --rows FILE another row list, same columns as qa/smoke-rows.csv
+ *   --rows FILE another row list, same columns as qa/smoke-rows.csv, plus optional supplier, market, current_image
+ *   --final NAME also writes ../qa/NAME.jpg: the live picture, our final picture, status and source, one row per product
+ *
+ * Every product with a final picture gets ../output/{gtin}.jpg. Paid cut-outs are kept in ../qa/smoke/cutouts by image hash.
  */
 import 'dotenv/config';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { FileBudget, serperCap } from '../src/products/image-pipeline/budget';
+import { FileBudget, photoroomCap, serperCap } from '../src/products/image-pipeline/budget';
 import { buildPipeline } from '../src/products/image-pipeline/factory';
-import type { LookupCache } from '../src/products/image-pipeline/http';
+import { downloadImage, type LookupCache } from '../src/products/image-pipeline/http';
 import { sharp } from '../src/products/image-pipeline/sharp';
 import type { PipelineResult } from '../src/products/image-pipeline/types';
 
 const QA = join(process.cwd(), '..', 'qa');
 const OUT = join(QA, 'smoke');
 const ALTERNATIVES = join(QA, 'alternatives');
+const FINAL = join(QA, '..', 'output');
+const CUTOUTS = join(OUT, 'cutouts');
 const PLAN_FILE = join(OUT, 'plan.json');
 const flag = (name: string) => process.argv.includes(name);
 const option = (name: string) => { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; };
@@ -31,6 +36,13 @@ class FileCache implements LookupCache {
     constructor(private readonly file: string) { this.map = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}; }
     async get(key: string) { return this.map[key]; }
     async set(key: string, value: unknown) { this.map[key] = value; writeFileSync(this.file, JSON.stringify(this.map)); }
+}
+
+/** Cut-outs are too big for one JSON file. Kept for good: each one was paid for. */
+class CutoutCache implements LookupCache {
+    private file(key: string) { return join(CUTOUTS, `${key.replace(/\W/g, '_')}.png`); }
+    async get(key: string) { return existsSync(this.file(key)) ? readFileSync(this.file(key)).toString('base64') : undefined; }
+    async set(key: string, value: unknown) { writeFileSync(this.file(key), Buffer.from(String(value), 'base64')); }
 }
 
 function parseCsv(text: string) {
@@ -91,12 +103,28 @@ async function alternativesSheet(row: Record<string, string>, r: PipelineResult)
     await sharp({ create: { width: columns * W + 10, height: rows * H + head, channels: 3, background: '#ffffff' } }).composite(layers).jpeg({ quality: 80 }).toFile(join(ALTERNATIVES, `${row.ean}.jpg`));
 }
 
+/** One row per product: what is live today, what we would put there, and why. */
+async function finalSheet(items: Item[], file: string) {
+    const W = THUMB * 2 + 560, H = THUMB + 16;
+    const layers: { input: Buffer; left: number; top: number }[] = [];
+    for (const [i, { row, r }] of items.entries()) {
+        const top = i * H + 8;
+        const live = row.current_image ? await downloadImage(row.current_image).catch(() => null) : null;
+        layers.push({ input: await tile(live?.ok ? live.bytes : null, row.current_image ? 'live image failed to load' : 'none'), left: 8, top });
+        layers.push({ input: await tile(r.output?.jpeg ?? null, `no final image: ${r.status}`), left: THUMB + 16, top });
+        const lines = [`#${row.n} ${row.ean} ${row.supplier ?? ''}`, cut(`${row.brand} ${row.name} ${row.size}`.replace(/\s+/g, ' '), 60) || cut(r.trace.identity?.name ?? '', 60), `status: ${r.status}`, `source: ${r.chosen?.source ?? '-'} · score ${r.chosen?.score ?? '-'} · ${r.trace.compose?.engine ?? '-'} · licence ${r.chosen?.licence ?? '-'}`, ...cut(r.reason, 180).match(/.{1,60}/g)!, ...r.trace.notes.map((n) => cut(n, 60))];
+        layers.push({ input: Buffer.from(`<svg width="540" height="${THUMB}">${lines.map((l, n) => `<text x="0" y="${24 + n * 24}" font-family="Arial" font-size="17" fill="#222">${esc(l)}</text>`).join('')}</svg>`), left: THUMB * 2 + 32, top });
+    }
+    await sharp({ create: { width: W, height: items.length * H + 16, channels: 3, background: '#ffffff' } }).composite(layers).jpeg({ quality: 82 }).toFile(file);
+}
+
 function planText(items: Item[], left: number) {
     const plans = items.flatMap((x) => (x.r.plan ? [x.r.plan] : []));
     const sum = (k: keyof NonNullable<PipelineResult['plan']>) => plans.reduce((a, p) => a + p[k], 0);
     const total = sum('searches') + sum('searchesIfRejected');
     const out = {
-        rows: plans.length, withStudioFinalists: plans.filter((p) => p.finalists).length, visionCallsNow: sum('visionCalls'), visionCallsAfterSearch: sum('visionCallsAfterSearch'),
+        rows: plans.length, visionCallsNow: sum('visionCalls'), visionCallsAfterSearch: sum('visionCallsAfterSearch'),
+        whiteRoute: plans.filter((p) => p.route === 'white').length, cutoutRoute: plans.filter((p) => p.route === 'cutout').length, noRoute: plans.filter((p) => p.route === 'none').length, photoroomCalls: sum('photoroomCalls'),
         serperCertain: sum('searches'), serperIfVisionRejects: sum('searchesIfRejected'), serperTotal: total, serperLeft: left, fits: total <= left,
     };
     writeFileSync(PLAN_FILE, JSON.stringify(out, null, 1));
@@ -110,7 +138,7 @@ async function compareSheets(items: Item[]) {
     for (let i = 0; i < pairs.length; i += PER_PAGE) await sheet(pairs.slice(i, i + PER_PAGE), join(OUT, 'pages', `page-${String(i / PER_PAGE + 1).padStart(2, '0')}.jpg`));
 }
 
-function summary(items: Item[], searches: { used: number; cap: number }) {
+function summary(items: Item[], searches: { used: number; cap: number }, cutouts: { used: number; cap: number }) {
     const n = items.length, real = items.filter((x) => x.row.ean);
     const counts: Record<string, number> = {};
     for (const { r } of items) counts[r.status] = (counts[r.status] || 0) + 1;
@@ -137,7 +165,7 @@ function summary(items: Item[], searches: { used: number; cap: number }) {
         '## Cost',
         `- Serper: ${live('serper').length} real searches this run, ${searches.used}/${searches.cap} used this month, ${searches.cap - searches.used} left, ${skipped('over its allowance')} skipped by the cap, ${skipped('key refused')} skipped because the key is refused`,
         `- OpenRouter: ${live('vision').filter((c) => c.status === 200).length} answered calls, ${live('vision').filter((c) => c.status !== 200).length} refused or limited, model(s) ${models.join(', ') || 'none'}, reported cost $${visionCost.toFixed(4)}`,
-        `- Photoroom: ${live('photoroom').length} calls`,
+        `- Photoroom: ${live('photoroom').length} paid this run, ${all.filter((c) => c.source === 'photoroom' && c.status === 'cached').length} from the cache, $${live('photoroom').reduce((a, c) => a + (c.cost || 0), 0).toFixed(2)}, ${cutouts.used}/${cutouts.cap} of the allowance used`,
         ...free.map((s) => `- ${s}: ${live(s).length} real calls, $0`), '',
         '## Rows\n| EAN | Group | Synthetic | Status | Reason |\n|---|---|---|---|---|', ...items.map(({ row, r }) => `| ${row.ean || '(none)'} | ${row.group} | ${row.synthetic} | ${r.status} | ${cut(r.reason.replace(/\|/g, '/'), 110)} |`), '',
     ].join('\n');
@@ -146,6 +174,8 @@ function summary(items: Item[], searches: { used: number; cap: number }) {
 async function main() {
     mkdirSync(OUT, { recursive: true });
     mkdirSync(ALTERNATIVES, { recursive: true });
+    mkdirSync(FINAL, { recursive: true });
+    mkdirSync(CUTOUTS, { recursive: true });
     const rows = parseCsv(readFileSync(option('--rows') ?? join(QA, 'smoke-rows.csv'), 'utf8')).map((row, i) => ({ ...row, n: String(i + 1) }));
     const budget = new FileBudget(join(process.cwd(), '.image-budget.json'));
     const left = serperCap() - await budget.used('serper', 'month');
@@ -155,25 +185,29 @@ async function main() {
         if (!known) throw new Error('run --plan first: the number of searches must be known before any is spent');
         if (known.serperTotal > left) throw new Error(`the plan needs ${known.serperTotal} searches and ${left} are left this month`);
     }
-    const { pipeline } = buildPipeline(new FileCache(join(OUT, 'cache.json')), budget, plan || flag('--search') ? {} : { searches: [] });
+    const { pipeline } = buildPipeline(new FileCache(join(OUT, 'cache.json')), budget, { cutoutCache: new CutoutCache(), ...(plan || flag('--search') ? {} : { searches: [] }) });
     const items: Item[] = new Array(rows.length);
     let next = 0;
     await Promise.all(Array.from({ length: AT_ONCE }, async () => {
         while (next < rows.length) {
             const i = next++;
             const row = rows[i];
-            const r = await pipeline.run({ ean: row.ean, name: row.name, brand: row.brand, weight: row.size, category: row.category }, { upload: 'smoke', plan });
+            const r = await pipeline.run({ ean: row.ean, name: row.name, brand: row.brand, weight: row.size, category: row.category, market: row.market }, { upload: 'smoke', plan });
             items[i] = { row, r };
             console.log(`${String(i + 1).padStart(2)}/${rows.length} ${row.ean || '(none)'} ${r.status} ${cut(r.reason, 90)}`);
             await alternativesSheet(row, r);
             const { top: _t, chosen: _c, output: _o, preview: _p, ranked: _r, ...plain } = r;
             writeFileSync(join(OUT, `${String(i + 1).padStart(2, '0')}-${row.ean || 'none'}.json`), JSON.stringify(plain, null, 1));
-            if (r.output) writeFileSync(join(OUT, `${String(i + 1).padStart(2, '0')}-${row.ean}.jpg`), r.output.jpeg);
+            if (plan || !row.ean) continue;
+            const final = join(FINAL, `${row.ean}.jpg`);
+            if (r.output) writeFileSync(final, r.output.jpeg);
+            else rmSync(final, { force: true });
         }
     }));
     if (plan) { console.log(JSON.stringify(planText(items, left), null, 1)); return; }
-    await compareSheets(items);
-    const text = summary(items, { used: await budget.used('serper', 'month'), cap: serperCap() });
+    if (!option('--rows')) await compareSheets(items);
+    if (option('--final')) await finalSheet(items, join(QA, `${option('--final')}.jpg`));
+    const text = summary(items, { used: await budget.used('serper', 'month'), cap: serperCap() }, { used: await budget.used('photoroom', 'ever'), cap: photoroomCap() });
     writeFileSync(join(OUT, 'summary.md'), text);
     console.log(text.split('## Rows')[0]);
 }

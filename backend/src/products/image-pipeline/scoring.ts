@@ -103,4 +103,10 @@ export function flawsOf(print: Fingerprint, c: Pick<Candidate, 'role' | 'title'>
 
 /** A barcode in shot proves the product and usually means the back: that one alone doesn't rule a photo out, vision does. */
 export const isStudio = (flaws: Flaw[]) => flaws.every((f) => f === 'shows_barcode');
+/** What no cut-out can repair. Hands, angle and cropping need eyes: the vision screen decides those before anything is paid for. */
+const NOT_CUTTABLE: Flaw[] = ['blurry', 'back_of_pack', 'multipack', 'close_up', 'low_contrast', 'shows_barcode'];
+export const MIN_CUTOUT_FILL = 0.4;
+/** On a scene the pack can't be measured, so only a plain backdrop can rule a photo out here. */
+export const cutoutFits = (print: Pick<Fingerprint, 'plain' | 'fill'>) => !print.plain || print.fill >= MIN_CUTOUT_FILL;
+export const cuttable = (s: { flaws: Flaw[]; cutoutFits: boolean }) => s.cutoutFits && !s.flaws.some((f) => NOT_CUTTABLE.includes(f));
 export const penaltyOf = (flaws: Flaw[]) => -flaws.reduce((sum, f) => sum + PENALTY[f], 0);

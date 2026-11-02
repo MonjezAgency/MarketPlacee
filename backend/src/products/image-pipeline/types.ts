@@ -13,6 +13,8 @@ export interface PipelineRow {
     brand?: string | null;
     weight?: string | null;
     category?: string | null;
+    /** The market or pack language the supplier sells, when the sheet says. */
+    market?: string | null;
     /** Pictures the supplier gave for this row: URL column, or bytes from the sheet or inbox. */
     supplierImages?: { url?: string; bytes?: Buffer; label?: string }[];
 }
@@ -76,22 +78,29 @@ export interface Scored extends Candidate {
     flaws: Flaw[];
     /** Nothing in the pixels speaks against a studio packshot. Vision still has to agree. */
     studio: boolean;
+    /** Large enough in its frame to be worth a cut-out, when that can be measured. */
+    cutoutFits: boolean;
 }
 
 /** One line of the contact sheet: a photo and why it did or didn't win. */
 export interface RankedPhoto { url: string; source: string; width: number; height: number; score: number; why: string; bytes: Buffer }
 
 /** What a run would spend, worked out from free sources only. */
-export interface RunPlan { finalists: number; visionCalls: number; visionCallsAfterSearch: number; searches: number; searchesIfRejected: number }
+export interface RunPlan { finalists: number; route: 'white' | 'cutout' | 'none'; visionCalls: number; visionCallsAfterSearch: number; photoroomCalls: number; searches: number; searchesIfRejected: number }
 
 export interface VisionAnswer {
     best_index: number;
-    same_product: boolean; same_variant: boolean; same_size_or_count: boolean; front_face: boolean; single_product: boolean; studio_quality: boolean;
-    hand_shelf_or_lifestyle: boolean; watermark_or_overlay: boolean; matches_reference_style: boolean;
-    confidence: number; reason: string; read_text?: string;
+    same_product: boolean; same_variant: boolean; same_size_or_count: boolean; front_face: boolean; single_product: boolean;
+    watermark_or_overlay: boolean; confidence: number; reason: string; read_text?: string;
+    /** On the raw photo, before a cut-out is paid for. */
+    whole_pack_visible?: boolean; hand_over_pack?: boolean; sharp?: boolean; fills_frame?: boolean; straight_on?: boolean; stands_out_from_background?: boolean; pack_language?: string;
+    /** On the final composed picture. */
+    edges_clean?: boolean; no_leftover_background?: boolean; hand_fragments?: boolean; pack_not_cut?: boolean; text_readable?: boolean;
 }
+export type VisionStage = 'screen' | 'final';
 export interface VisionVerdict {
     model: string;
+    stage: VisionStage;
     passed: boolean;
     /** Which rule failed. Empty when it passed. */
     failed: string[];
@@ -117,6 +126,8 @@ export interface Trace {
     barcode: { attempted: number; decoded: number; matched: number };
     vision: VisionVerdict[];
     compose?: { engine: 'sharp' | 'photoroom'; checks: Record<string, unknown> };
+    /** Things a person reading the trace should know, such as a photo that came through a carton code. */
+    notes: string[];
     cost: { total: number; bySource: Record<string, number> };
 }
 

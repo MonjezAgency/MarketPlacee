@@ -128,7 +128,7 @@ describe('licences', () => {
 });
 
 describe('the vision answer', () => {
-    const good = { best_index: 1, read_text: 'Monster Energy Aussie Lemonade 500ml', same_product: true, same_variant: true, same_size_or_count: true, front_face: true, single_product: true, studio_quality: true, hand_shelf_or_lifestyle: false, watermark_or_overlay: false, matches_reference_style: true, confidence: 0.92, reason: '' };
+    const good = { best_index: 1, read_text: 'Monster Energy Aussie Lemonade 500ml', same_product: true, same_variant: true, same_size_or_count: true, front_face: true, single_product: true, edges_clean: true, no_leftover_background: true, hand_fragments: false, pack_not_cut: true, text_readable: true, straight_on: true, watermark_or_overlay: false, confidence: 0.92, reason: '' };
     it('passes only when every rule holds', () => {
         expect(judgeAnswer(good, 5, 'Monster')).toMatchObject({ passed: true, index: 1 });
         expect(judgeAnswer({ ...good, same_variant: false }, 5, 'Monster').failed).toEqual(['same_variant']);
