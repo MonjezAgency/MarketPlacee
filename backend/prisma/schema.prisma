@@ -208,6 +208,11 @@ model Product {
   ///                      "origin"?: "discovery", "originalUrl"?: "…", "chosenBy"?: "supplier" | "staff", "approvedBy"?: userId, "approvedByRole"?: role, "approvedAt"?: ISO, "tier"?: 1 | 2 | 3 | null, "imgid"?: "…" } }
   /// Null / missing key = the supplier's (or staff's) own uploaded photo.
   imageCredits Json?
+  /// Where the image pipeline stands for this product: pending, searching, approved, needs_review, not_found, invalid_ean, low_res, failed.
+  /// Null = never been through it; such products keep showing the photos they have.
+  imageStatus       String?
+  /// The exact reason, shown to admins. Never just "no image".
+  imageStatusReason String?
   /// Background photo search by barcode for a product saved without a photo (a person must approve any result;
   /// nothing here is ever applied automatically). Additive and optional; null = no search for this product. Shape:
   ///   { "status": "searching" | "found_review" | "not_found" | "unavailable" | "invalid_barcode", "mode"?: "fill" | "add",
@@ -1545,4 +1550,50 @@ model ProductReviewEvent {
 
   @@index([productId, createdAt])
   @@index([action, createdAt])
+}
+
+/// One barcode's trip through the image pipeline. At most one per GTIN, so a re-run never pays twice for an approved product.
+model ImageJob {
+  id        String           @id @default(uuid())
+  gtin      String           @unique
+  productId String?
+  uploadId  String?
+  status    String           @default("pending")
+  reason    String?
+  attempts  Int              @default(0)
+  /// Sources asked, rejects, scores, vision answers and costs. Never a key or a signed URL.
+  trace     Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  candidates ImageCandidate[]
+
+  @@index([status])
+  @@index([uploadId])
+}
+
+/// The top five photos kept for one-click review.
+model ImageCandidate {
+  id       String   @id @default(uuid())
+  jobId    String
+  job      ImageJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  rank     Int
+  url      String
+  source   String
+  score    Float
+  licence  String
+  /// The house-style result, when one was made.
+  composedUrl String?
+  createdAt DateTime @default(now())
+
+  @@index([jobId])
+}
+
+/// Answers from paid sources, kept 30 days by key. Brave's are never stored here.
+model ImageLookupCache {
+  key       String   @id
+  value     Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
 }

@@ -20,18 +20,23 @@ export interface Checks { corners: boolean; centred: boolean; longestSide: numbe
 async function exportBoth(canvas: Sharp) {
     const png = await canvas.png().toBuffer();
     return {
+        png,
         jpeg: await sharp(png).jpeg({ quality: 90, chromaSubsampling: '4:4:4' }).withMetadata({ icc: 'srgb' }).toBuffer(),
         webp: await sharp(png).webp({ quality: 90 }).withMetadata({ icc: 'srgb' }).toBuffer(),
     };
 }
 
-/** Exactly white corners, centred within 2px, longest side 880 within 2px. Read back from the JPEG that will be published. */
-export async function postCheck(jpeg: Buffer): Promise<{ ok: boolean; corners: boolean; centred: boolean; longestSide: number; reason: string }> {
+/**
+ * Exactly white corners, read from the JPEG that will be published; centred within 2px and longest side 880 within 2px.
+ * JPEG rings a few pixels round a hard edge, which is no part of the product, so the box comes from the lossless picture when there is one.
+ */
+export async function postCheck(jpeg: Buffer, lossless?: Buffer): Promise<{ ok: boolean; corners: boolean; centred: boolean; longestSide: number; reason: string }> {
     const r = await rawRgb(jpeg);
     const at = (x: number, y: number) => { const i = (y * r.width + x) * r.channels; return [r.data[i], r.data[i + 1], r.data[i + 2]]; };
     const last = CANVAS - 1;
     const corners = r.width === CANVAS && r.height === CANVAS && [at(0, 0), at(last, 0), at(0, last), at(last, last)].every((p) => p.every((v) => v === 255));
-    const box = boxOf(subjectMask(r, 250), r.width, r.height);
+    const measured = lossless ? await rawRgb(lossless) : r;
+    const box = boxOf(subjectMask(measured, 250), measured.width, measured.height);
     if (!box) return { ok: false, corners, centred: false, longestSide: 0, reason: 'no_subject' };
     const w = box.right - box.left, h = box.bottom - box.top;
     const centred = Math.abs(box.left - (CANVAS - box.right)) <= TOLERANCE * 2 && Math.abs(box.top - (CANVAS - box.bottom)) <= TOLERANCE * 2;
@@ -60,8 +65,8 @@ async function place(rgb: Raw, mask: Uint8Array): Promise<{ canvas: Sharp; upsca
 
 async function finish(placed: { canvas: Sharp; upscale: number }, engine: 'sharp' | 'photoroom', areaLoss: number | null): Promise<ComposeOutcome> {
     if (placed.upscale > MAX_UPSCALE) return { status: 'low_res', reason: `would need ${placed.upscale.toFixed(2)}x enlargement`, engine, checks: { upscale: placed.upscale } };
-    const { jpeg, webp } = await exportBoth(placed.canvas);
-    const c = await postCheck(jpeg);
+    const { jpeg, webp, png } = await exportBoth(placed.canvas);
+    const c = await postCheck(jpeg, png);
     const checks: Checks = { corners: c.corners, centred: c.centred, longestSide: c.longestSide, areaLoss, upscale: placed.upscale };
     if (!c.ok) return { status: 'needs_review', reason: `layout_check_failed:${c.reason}`, engine, checks };
     if (areaLoss === null || areaLoss > MAX_AREA_LOSS) return { status: 'needs_review', reason: areaLoss === null ? 'subject_loss_not_measurable' : `subject_loss_${(areaLoss * 100).toFixed(1)}%`, engine, checks };

@@ -43,8 +43,8 @@ function unit(value: string, name: string) {
 function sizeOf(text: string): { size: string; rest: string } {
     let rest = text;
     const parts: string[] = [];
-    // A "Gr." with a small bare number is a German clothing or nappy size ("Gr. 4"), not grams.
-    const clothing = rest.match(/\b(?:gr\.?|größe|groesse|marimea|mărimea|maat|taille|size)\s*(\d{1,2}(?:\s*[-+/]\s*\d{1,2})?\+?)(?![\d.,]*\s*(?:kg|g|gr|ml|l)\b)/i);
+    // "Gr. 4" is a German clothing or nappy size; "100 Gr. 24 Stk" is grams, the number comes first.
+    const clothing = rest.match(/(?<!\d\s*)\b(?:gr\.?|größe|groesse|marimea|mărimea|maat|taille|size)\s*(\d{1,2}(?:\s*[-+/]\s*\d{1,2})?\+?)(?![\d.,]*\s*(?:kg|g|gr|ml|l)\b)/i);
     if (clothing) { parts.push(`size ${clothing[1].replace(/\s/g, '')}`); rest = rest.replace(clothing[0], ' '); }
     const multi = rest.match(new RegExp(`\\b(\\d{1,3})\\s*[x×*]\\s*(\\d+(?:[.,]\\d+)?)\\s*${UNIT}\\b\\.?`, 'i'));
     const after = rest.match(new RegExp(`\\b(\\d+(?:[.,]\\d+)?)\\s*${UNIT}\\s*[x×*]\\s*(\\d{1,3})\\b`, 'i'));
@@ -62,6 +62,7 @@ export function cleanName(raw: string | null | undefined, brandRaw?: string | nu
     const brand = squash(String(brandRaw ?? ''));
     let text = original
         .replace(/[€$£]\s*\d+(?:[.,]\d{1,2})?|\b\d+(?:[.,]\d{1,2})?\s*(?:€|eur|usd|ron|lei)\b/gi, ' ')
+        .replace(/\bart(?:ikel)?\.?\s*(?:nr\.?)?\s*:?\s*\d{3,}\b/gi, ' ')
         .replace(NOISE, ' ')
         // Article codes: a code at the start, or any long digit run.
         .replace(/^\s*(?:[A-Z]{0,3}[-/]?\d{4,}[A-Z]?)\b[\s:.-]*/, ' ')

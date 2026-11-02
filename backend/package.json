@@ -19,6 +19,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "images:providers": "ts-node --transpile-only scripts/images-providers.ts",
+    "images:smoke": "ts-node --transpile-only scripts/images-smoke.ts",
     "test:integration": "ts-node --transpile-only test/integration-test.ts"
   },
   "dependencies": {
