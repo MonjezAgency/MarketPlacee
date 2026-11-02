@@ -35,6 +35,8 @@ export interface LookupOutcome {
     /** Best first. All come from one database record, so they share the confidence. */
     candidates: RankedCandidate[];
     secondSourceNeeded?: boolean;
+    /** Which code a case-code row answered to. */
+    matched?: 'case' | 'inner';
 }
 export interface EnrichResult {
     key: string;
@@ -47,7 +49,7 @@ export interface EnrichResult {
 }
 interface Job { id: string; supplierId: string; createdAt: number; items: EnrichItem[]; results: Map<string, EnrichResult>; done: boolean; failed?: string }
 type Found = { p: ProductDataProvider; record: ProviderRecord };
-interface Records { found: Found[]; unavailable: boolean; viaInner: boolean; code: string; skip?: string }
+interface Records { found: Found[]; unavailable: boolean; viaInner: boolean; code: string; skip?: string; matched?: 'case' | 'inner' }
 
 export const MAX_ENRICH_ITEMS = 500;
 /** Photos offered per product: a few front packshots (languages differ) and one packaging photo. */
@@ -211,11 +213,12 @@ export class ImportEnrichmentService {
         if (plan.skip) return { found: [], unavailable: false, viaInner: false, code: plan.code, skip: plan.skip };
         const first = await this.ask(plan.code, kind, opts);
         const hasPhoto = (r: Records | { found: Found[] }) => r.found.some((f) => f.record.photos.length);
-        if (hasPhoto(first) || first.unavailable || !plan.inner) return { ...first, viaInner: false, code: plan.code };
-        // A case code nobody has: the inner item's EAN-13 (a photo of the piece, so never "verified").
+        if (!plan.inner) return { ...first, viaInner: false, code: plan.code };
+        // A case code: both codes are asked, the case first. The inner item's EAN-13 is a photo of the piece, so never "verified".
         const inner = await this.ask(plan.inner, kind, opts);
-        if (hasPhoto(inner) || inner.unavailable) return { ...inner, viaInner: true, code: plan.inner };
-        return { found: [...first.found, ...inner.found], unavailable: false, viaInner: false, code: plan.code };
+        if (hasPhoto(first)) return { ...first, viaInner: false, code: plan.code, matched: 'case' };
+        if (hasPhoto(inner)) return { ...inner, viaInner: true, code: plan.inner, matched: 'inner' };
+        return { found: [...first.found, ...inner.found], unavailable: first.unavailable || inner.unavailable, viaInner: false, code: plan.code };
     }
 
     private async ask(code: string, kind: ProductKind, opts: { fresh?: boolean }): Promise<{ found: Found[]; unavailable: boolean }> {
@@ -306,7 +309,7 @@ export class ImportEnrichmentService {
             ...this.toCandidate(p, record, ph, normaliseBarcode(it.ean)), confidence,
             reasons: lowResolution(ph) ? [...reasons, 'low_resolution'] : reasons,
         }));
-        return { status: 'found', reasons: [], candidates, ...(clean && !sourceMayVerify && !kindUnknown ? { secondSourceNeeded: true } : {}) };
+        return { status: 'found', reasons: [], candidates, ...(recs.matched ? { matched: recs.matched } : {}), ...(clean && !sourceMayVerify && !kindUnknown ? { secondSourceNeeded: true } : {}) };
     }
 
     private toCandidate(p: ProductDataProvider, r: ProviderRecord, ph: ProviderPhoto, barcode: string): PhotoCandidate {

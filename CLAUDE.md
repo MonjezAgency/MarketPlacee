@@ -57,14 +57,12 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
   "Different barcode: similar product" (role `similar`) and the server refuses them without the person's `confirmed` (or the AI check's yes, below).
   "Make background white" (`photoroom.service.ts`, key `PHOTOROOM_API_KEY` on the server only) keeps its result on the found photo; a `sandbox_` key
   gives a watermarked preview that `apply` refuses to save, so a watermark can't reach a product page.
-  Last resort, after the barcode and name search: `web-image-search.service.ts` (SerpApi Google Images, key `SERPAPI_API_KEY`
-  on the server only, unset = off). It searches the name (the barcode returns unrelated products), keeps only a title that says this product and a whole pack on pure white, so no
-  Photoroom. At most 200 searches a month for the whole site (`AppConfig`, one answer per barcode kept 30 days). Shown apart as `similar`, used only after `confirmed` or the AI check; no licence.
+  SerpApi was removed for good: `SERPAPI_API_KEY` does nothing and logs an error at start.
   Automatic decision (`image-discovery.service.ts`, `photo-check.service.ts`, needs `OPENROUTER_API_KEY`, model `PHOTO_CHECK_MODEL`): after a save without a photo the chain runs by itself,
   cheapest source first, and each clean photo goes to a vision model. `judge()` decides: same brand (and read on the pack), variant, size, whole front, one unit, no overlay, confidence 0.9+;
-  an unsure or failed check is a no. The first yes goes on the product as `chosenBy: 'auto'`; the product's status never changes, a live product waits for staff (`held`), and staff review in the
-  `auto` bucket (accepting a product for sale counts as review). A removed automatic photo is never offered again. The daily sweep picks up what the limits held back. 5,000 checks a month.
-  `AUTO_APPLY` in `image-discovery.service.ts` off = the check answers and logs (`[photo-check]`), nothing is applied.
+  an unsure or failed check is a no. A yes goes on the product as `chosenBy: 'auto'` only when its licence allows it (`image-pipeline/licensing.ts` `mayPublish`, policy A by default); otherwise it waits as
+  `needs_review`. The product's status never changes, and staff review in the `auto` bucket (accepting a product for sale counts as review). A removed automatic photo is never offered again.
+  The daily sweep picks up what a broken check held back. 5,000 checks a month. A refused key is one admin alert per run of failures (`image-pipeline/alerts.ts`), and nothing is applied until it works.
 - Product bulk actions: `POST /products/admin/bulk`, per-row rules in `backend/src/products/admin-bulk.ts`; every skip is reported.
 - Notifications: persisted per user; `data.kind` + `data.params` let the bell (`components/ui/NotificationBell.tsx`,
   `lib/notifications.ts`) render them in the reader's language (keys in `locales/sections/notificationsCenter.ts`);

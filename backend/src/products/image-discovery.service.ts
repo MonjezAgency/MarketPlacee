@@ -10,8 +10,9 @@ import { ImportEnrichmentService, type RankedCandidate } from './import-enrichme
 import { USER_AGENT } from './product-data-providers';
 import { MAX_ANALYSE_BYTES, analyseBuffer, rankScored, scoreCandidate, type ScoreLine, type Tier, type Visual } from './image-quality';
 import { ProductsService } from './products.service';
-import { WebImageSearchService } from './web-image-search.service';
 import { PhotoCheckService, type PhotoCheck } from './photo-check.service';
+import { DEFAULT_POLICY, mayPublish } from './image-pipeline/licensing';
+import { readVisionAlert } from './image-pipeline/alerts';
 
 /**
  * Background photo search for products saved without a photo.
@@ -33,17 +34,14 @@ import { PhotoCheckService, type PhotoCheck } from './photo-check.service';
  * is searched too. Those photos carry another barcode: they are shown apart as
  * a similar product (role `similar`), never ranked as a match, and only used
  * after the person states they show exactly this product (`confirmed`).
- * If that finds nothing either, one person's search may fall back to the web
- * (web-image-search.service.ts): white-background photos with the same care.
  *
  * With the AI check available (photo-check.service.ts) all of this runs by
  * itself after a save, cheapest source first, stopping at the first photo the
- * check confirms. That photo goes on the product marked as automatic (credit
- * `chosenBy: 'auto'`) and staff review it (`auto` bucket). It never changes the
- * product's status, and a live product only gets it after staff accept it, so
- * buyers don't see an automatic photo nobody looked at. Without a confirmation
- * nothing is applied: the photos wait for a person's "Use this photo".
- * Products the monthly limits held back are picked up by the daily sweep.
+ * check confirms. A confirmed photo whose licence allows it goes on the product
+ * marked as automatic (credit `chosenBy: 'auto'`) and staff review it (`auto`
+ * bucket). It never changes the product's status. Anything else waits for a
+ * person's "Use this photo"; while the check is down nothing is applied, and
+ * admins see one clear error. Products that held back are picked up by the sweep.
  *
  * A product that has a photo is never searched in the background, and a found
  * photo never replaces one: on a product without a photo it fills the gallery;
@@ -93,8 +91,8 @@ export interface DiscoveryState {
     attempts?: number;
     /** Who asked for the last search by hand, if anyone. */
     requestedBy?: { id: string; role: string } | null;
-    /** How the automatic decision ended. held = confirmed, waiting for staff (live product) · dry_run = confirmed, automatic use is off · waiting_month / check_down = the daily sweep tries again. */
-    auto?: { at: string; outcome: 'applied' | 'held' | 'dry_run' | 'no_match' | 'waiting_month' | 'check_down' };
+    /** How the automatic decision ended. needs_review = confirmed, but its licence needs a person · check_down = the daily sweep tries again. held, dry_run and waiting_month are only in older records. */
+    auto?: { at: string; outcome: 'applied' | 'needs_review' | 'held' | 'dry_run' | 'no_match' | 'waiting_month' | 'check_down' };
 }
 export type DiscoveryActor = { id: string; role: string };
 
@@ -107,8 +105,6 @@ export const RETRY_COOLDOWN_MS = 30 * 1000;
  * never offered. A name or brand worded differently only needs a person's check (shown as "check before using").
  */
 const CONTRADICTIONS = new Set(['barcode_differs', 'size_differs', 'variant_differs']);
-/** Off = the check runs and logs its answers but puts nothing on a product. Stays off until its answers have been measured. */
-export const AUTO_APPLY = false;
 /** Photos checked per source for one product: the cheap ones are ranked first, the rest rarely change the answer. */
 const AUTO_MAX_CHECKS = 3;
 /** Products the daily sweep picks up (each gets a search and AI checks). */
@@ -131,7 +127,6 @@ export class ImageDiscoveryService implements OnModuleInit {
     /** previewUrl → what its pixels showed (a photo is downloaded and measured once). */
     private readonly visuals = new Map<string, Promise<Visual>>();
     private turn: Promise<unknown> = Promise.resolve();
-    autoApply = AUTO_APPLY;
     now = () => Date.now();
     /**
      * Download a candidate's preview and measure it. Tests replace this; under
@@ -147,12 +142,13 @@ export class ImageDiscoveryService implements OnModuleInit {
         private readonly enrichment: ImportEnrichmentService,
         private readonly imageLookup: ImageLookupService,
         private readonly photoroom: PhotoroomService,
-        private readonly webImages: WebImageSearchService,
         private readonly photoCheck: PhotoCheckService,
     ) {}
 
     /** Searches cut short by a restart are picked up again (the cache is gone, the queue keeps the pace). */
     onModuleInit() {
+        // SerpApi is gone for good: its key does nothing, and whoever left it set should know.
+        if (process.env.SERPAPI_API_KEY) this.logger.error('[discovery] SERPAPI_API_KEY is set but SerpApi is not used. The key is ignored; delete it.');
         if (process.env.NODE_ENV === 'test') return;
         setTimeout(() => {
             this.prisma.product.findMany({ where: { imageDiscovery: { path: ['status'], equals: 'searching' } } as any, select: { id: true }, take: 500 })
@@ -160,18 +156,16 @@ export class ImageDiscoveryService implements OnModuleInit {
                 .catch((e) => this.logger.warn(`[discovery] resume: ${e?.message}`));
         }, 15_000).unref?.();
         // Soon after a deploy, so a change to the check shows up in the logs without waiting for the night.
-        setTimeout(() => { this.sweep(this.autoApply ? SWEEP_LIMIT : 20).catch((e) => this.logger.warn(`[discovery] sweep: ${e?.message}`)); }, 120_000).unref?.();
+        setTimeout(() => { this.sweep().catch((e) => this.logger.warn(`[discovery] sweep: ${e?.message}`)); }, 120_000).unref?.();
     }
 
     /**
      * Products without a photo that never had an automatic decision (saved
-     * before it existed), or that the monthly limits or a broken check held
-     * back. Each is answered once, so running this again costs nothing.
+     * before it existed), or that a broken check held back. Each is answered once, so running this again costs nothing.
      */
     @Cron('0 3 * * *')
     async sweep(limit = SWEEP_LIMIT) {
         if (!(await this.photoCheck.ready())) return 0;
-        const webLeft = this.webImages.enabled ? await this.webImages.remaining() : 0;
         const rows = await this.prisma.product.findMany({
             where: { status: { not: 'REJECTED' }, ean: { not: null }, images: { isEmpty: true } } as any,
             orderBy: { createdAt: 'asc' }, take: 5000, select: { id: true, imageDiscovery: true },
@@ -180,16 +174,16 @@ export class ImageDiscoveryService implements OnModuleInit {
             const st = asState(r.imageDiscovery);
             if (st?.status === 'searching' || st?.status === 'invalid_barcode') return false;
             const o = st?.auto?.outcome;
-            return !o || o === 'check_down' || (o === 'waiting_month' && webLeft > 0) || (o === 'dry_run' && this.autoApply);
+            return !o || o === 'check_down' || o === 'dry_run' || o === 'waiting_month';
         }).slice(0, limit);
-        for (const r of due) await this.enqueue(r.id, { again: true, web: true }).catch((e) => this.logger.warn(`[discovery] sweep ${r.id}: ${e?.message}`));
+        for (const r of due) await this.enqueue(r.id, { again: true }).catch((e) => this.logger.warn(`[discovery] sweep ${r.id}: ${e?.message}`));
         if (due.length) this.logger.log(`[discovery] sweep: ${due.length} of ${rows.length} products without a photo`);
         return due.length;
     }
 
     /** After any save: start a search if it is needed. Never throws. */
     trigger(productId: string) {
-        this.enqueue(productId, { web: true }).catch((e) => this.logger.warn(`[discovery] ${productId}: ${e?.message}`));
+        this.enqueue(productId).catch((e) => this.logger.warn(`[discovery] ${productId}: ${e?.message}`));
     }
 
     /**
@@ -197,11 +191,10 @@ export class ImageDiscoveryService implements OnModuleInit {
      * state now stored. `force` = a person asked to search again (skips cached
      * "not found" answers; never runs twice at once). `add` = a person asked
      * for more photos of a product that already has some. `restore` = a person
-     * takes back their "Not my product" answers for this barcode. `web` = this
-     * one search may use the paid web fallback. `again` = answer once more,
-     * keeping the caches (the sweep).
+     * takes back their "Not my product" answers for this barcode. `again` =
+     * answer once more, keeping the caches (the sweep).
      */
-    async enqueue(productId: string, opts: { force?: boolean; add?: boolean; restore?: boolean; web?: boolean; again?: boolean; by?: DiscoveryActor } = {}): Promise<DiscoveryState | null> {
+    async enqueue(productId: string, opts: { force?: boolean; add?: boolean; restore?: boolean; again?: boolean; by?: DiscoveryActor } = {}): Promise<DiscoveryState | null> {
         const p = await this.load(productId);
         if (!p) return null;
         const state = asState(p.imageDiscovery);
@@ -236,14 +229,14 @@ export class ImageDiscoveryService implements OnModuleInit {
         };
         await this.write(p, next);
         this.inflight.set(p.id, code);
-        const job = this.run(p.id, code, !!opts.force, mode, !!opts.web)
+        const job = this.run(p.id, code, !!opts.force, mode)
             .catch((e) => this.logger.warn(`[discovery] ${p.id}: ${e?.message}`))
             .finally(() => { if (this.inflight.get(p.id) === code) this.inflight.delete(p.id); this.running.delete(p.id); });
         this.running.set(p.id, job);
         return next;
     }
 
-    private async run(id: string, code: string, fresh: boolean, mode: 'fill' | 'add', web = false) {
+    private async run(id: string, code: string, fresh: boolean, mode: 'fill' | 'add') {
         const p0 = await this.load(id);
         if (!p0) return;
         const out = await this.enrichment.lookupOne({ ean: code, name: p0.name, brand: p0.brand || undefined, weight: p0.weight || undefined, category: p0.category }, { fresh });
@@ -258,10 +251,8 @@ export class ImageDiscoveryService implements OnModuleInit {
         // Identity first: a record that says it's another flavour, size or brand is not this product.
         const rejected = fresh0.filter((c) => c.reasons.some((r) => CONTRADICTIONS.has(r)));
         let usable = fresh0.filter((c) => !c.reasons.some((r) => CONTRADICTIONS.has(r)));
-        let webNote: string | null = null;
         const item = { ean: code, name: p0.name, brand: p0.brand || undefined, weight: p0.weight || undefined };
         const wanted = mode === 'fill' && this.photoCheck.enabled && p0.status !== 'REJECTED';
-        // Without a working check nothing is searched on its behalf: the web allowance isn't spent on photos nobody can decide on.
         const auto = wanted && await this.photoCheck.ready();
         const checks = new Map<string, PhotoCheck>();
         const verdict: { confirmed: string | null; down: boolean } = { confirmed: null, down: false };
@@ -285,16 +276,6 @@ export class ImageDiscoveryService implements OnModuleInit {
                 const named = await this.score(similar.filter((c) => !dismissed.has(c.url) && !inGallery.has(c.url)));
                 pool = [...pool, ...named];
                 await decide(named);
-                // Nothing left to try for free: the web, last.
-                if (web && !verdict.confirmed && !verdict.down && (auto || !pool.length)) {
-                    const found = await this.webImages.find(item, new Set([...dismissed, ...inGallery]));
-                    found.candidates.forEach((c) => this.visuals.set(c.previewUrl, Promise.resolve(c.visual)));
-                    if (found.status === 'no_white') webNote = 'web_no_white';
-                    if (found.status === 'limit_reached') webNote = 'web_limit_reached';
-                    const fromWeb = await this.score(found.candidates);
-                    pool = [...pool, ...fromWeb];
-                    await decide(fromWeb);
-                }
             }
             return pool;
         };
@@ -302,7 +283,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         const ranked = rankScored(pool);
         let primaryGiven = mode === 'add';
         const candidates: DiscoveryCandidate[] = ranked.map((c) => {
-            const role: DiscoveryCandidate['role'] = c.reasons.includes('different_barcode') || c.reasons.includes('web_search') ? 'similar' : c.tier === null ? 'review' : !primaryGiven ? 'primary' : 'gallery';
+            const role: DiscoveryCandidate['role'] = c.reasons.includes('different_barcode') ? 'similar' : c.tier === null ? 'review' : !primaryGiven ? 'primary' : 'gallery';
             if (role === 'primary') primaryGiven = true;
             const aiCheck = checks.get(c.url);
             return { ...c, role, ...(aiCheck ? { aiCheck } : {}) };
@@ -319,13 +300,13 @@ export class ImageDiscoveryService implements OnModuleInit {
             state = { ...base, status: 'not_found', reason: 'record_mismatch', reasons: ['record_mismatch', ...why], candidates: [], record: { productName: r.productName, brand: r.brand, quantity: r.quantity, sourceUrl: r.sourceUrl } };
         } else {
             const dropped = out.candidates.length > 0;   // everything found was dismissed or is already in the gallery
-            state = { ...base, status: out.status === 'unavailable' ? 'unavailable' : out.status === 'invalid_barcode' ? 'invalid_barcode' : 'not_found', reason: dropped ? (mode === 'add' && !dismissed.size ? 'already_in_gallery' : 'dismissed') : out.reasons[0] || 'not_in_database', reasons: dropped ? [mode === 'add' && !dismissed.size ? 'already_in_gallery' : 'dismissed'] : [...out.reasons, ...(webNote ? [webNote] : [])], candidates: [] };
+            state = { ...base, status: out.status === 'unavailable' ? 'unavailable' : out.status === 'invalid_barcode' ? 'invalid_barcode' : 'not_found', reason: dropped ? (mode === 'add' && !dismissed.size ? 'already_in_gallery' : 'dismissed') : out.reasons[0] || 'not_in_database', reasons: dropped ? [mode === 'add' && !dismissed.size ? 'already_in_gallery' : 'dismissed'] : out.reasons, candidates: [] };
         }
         p = await this.load(id);
         if (!p || normaliseBarcode(p.ean) !== code) return;
         if (mode === 'fill' && realImages(p.images).length) { if (asState(p.imageDiscovery)) await this.write(p, null); return; }
-        const live = p.status === 'APPROVED';
-        const outcome = !wanted ? null : !auto ? 'check_down' : verdict.confirmed ? (!this.autoApply ? 'dry_run' : live ? 'held' : 'applied') : verdict.down ? 'check_down' : webNote === 'web_limit_reached' ? 'waiting_month' : 'no_match';
+        const chosen = verdict.confirmed ? candidates.find((c) => c.url === verdict.confirmed) : undefined;
+        const outcome = !wanted ? null : !auto ? 'check_down' : chosen ? (autoApplyAllowed(chosen) ? 'applied' : 'needs_review') : verdict.down ? 'check_down' : 'no_match';
         if (outcome) state.auto = { at: this.iso(), outcome };
         await this.write(p, state);
         if (outcome === 'applied') {
@@ -385,7 +366,7 @@ export class ImageDiscoveryService implements OnModuleInit {
     async retry(supplierId: string, id: string, restore = false): Promise<DiscoveryState | null> {
         const p = await this.own(supplierId, id);
         if (!normaliseBarcode(p.ean)) throw new BadRequestException({ code: 'NO_BARCODE', message: 'Add the product’s barcode and save it first.' });
-        return this.enqueue(id, { force: true, restore, add: realImages(p.images).length > 0, web: true, by: { id: supplierId, role: 'SUPPLIER' } });
+        return this.enqueue(id, { force: true, restore, add: realImages(p.images).length > 0, by: { id: supplierId, role: 'SUPPLIER' } });
     }
 
     /**
@@ -443,6 +424,7 @@ export class ImageDiscoveryService implements OnModuleInit {
         const page = Math.max(1, Number(q.page) || 1);
         const slice = list.slice((page - 1) * limit, page * limit);
         return {
+            alert: await readVisionAlert(this.prisma),
             scope, total: list.length, page, limit, counts, canApply: scope === 'catalog',
             items: slice.map(({ r, bucket }) => ({
                 id: r.id, name: r.name, brand: r.brand, ean: r.ean, status: r.status, bucket, hasPhoto: realImages(r.images).length > 0, photo: realImages(r.images)[0] || null,
@@ -467,8 +449,7 @@ export class ImageDiscoveryService implements OnModuleInit {
             // Looking for more photos of a supplier's product is the supplier's call.
             if (hasPhoto && !staff.has(p.supplierId)) { out.push({ id, outcome: 'has_photo' }); continue; }
             const before = asState(p.imageDiscovery);
-            // The web fallback costs a search: one product at a time, never a whole list.
-            const s = await this.enqueue(id, { force: true, add: hasPhoto, web: unique.length === 1, by: actor });
+            const s = await this.enqueue(id, { force: true, add: hasPhoto, by: actor });
             const started = s?.status === 'searching' && s.startedAt !== before?.startedAt;
             out.push({ id, outcome: started ? 'started' : s?.status === 'searching' ? 'searching' : 'answered_recently', status: s?.status ?? null });
         }
@@ -594,7 +575,6 @@ export class ImageDiscoveryService implements OnModuleInit {
         if (!latest) throw new NotFoundException('Product not found');
         const existing = realImages(latest.images);
         if (mode === 'fill' && existing.length) throw new ConflictException({ code: 'HAS_PHOTO', message: 'This product got a photo in the meantime; nothing was changed.' });
-        if (actor.role === 'SYSTEM' && latest.status === 'APPROVED') throw new ConflictException({ code: 'LIVE', message: 'A live product only gets an automatic photo after staff accept it.' });
         const images = [...existing, ...saved.map((s) => s.url).filter((u) => !existing.includes(u))];
         const isAuto = actor.role === 'SYSTEM';
         const who = actor.role === 'SUPPLIER' ? 'the supplier' : isAuto ? 'the automatic check' : `Ali FMCG (${actor.role.toLowerCase()})`;
@@ -704,7 +684,14 @@ export class ImageDiscoveryService implements OnModuleInit {
 const SYSTEM: DiscoveryActor = { id: 'system', role: 'SYSTEM' };
 type Ranked = DiscoveryCandidate & { tier: Tier | null; score: number; breakdown: ScoreLine[]; visual: Visual | null };
 
-/** Worth asking the AI about: the pixels were read, the whole pack is shown, and the background is clean. Web photos passed this when found. */
+/** The AI confirmed it, and the licence lets it go on a product with nobody looking. Open*Facts photos are CC BY-SA; anything else waits for a person. */
+function autoApplyAllowed(c: DiscoveryCandidate): boolean {
+    const check = c.aiCheck;
+    if (!check?.ok) return false;
+    return mayPublish({ licence: /CC BY-SA/i.test(c.license) ? 'cc_by_sa' : 'unknown', confidence: check.confidence, domain: 'ean_database' }, DEFAULT_POLICY);
+}
+
+/** Worth asking the AI about: the pixels were read, the whole pack is shown, and the background is clean. */
 function autoEligible(c: DiscoveryCandidate): boolean {
     const v = c.visual;
     return !!v && v.analysed === true && (v.background === 'white' || v.background === 'light_neutral') && v.fit !== 'cut';
@@ -718,7 +705,7 @@ export function autoWaiting(r: { images: string[]; status?: string; imageDiscove
         if (url) return { url, held: false, check: credits[url].auto || null };
     }
     const st = asState(r.imageDiscovery);
-    const held = st?.auto?.outcome === 'held' ? st.candidates.find((c) => c.aiCheck?.ok) : undefined;
+    const held = st?.auto?.outcome === 'held' || st?.auto?.outcome === 'needs_review' ? st.candidates.find((c) => c.aiCheck?.ok) : undefined;
     return held ? { url: held.url, held: true, check: held.aiCheck! } : null;
 }
 

@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { PrismaService } from '../common/prisma.service';
-import { reserveMonthly } from './web-image-search.service';
+import { clearVisionAlert, raiseVisionAlert } from './image-pipeline/alerts';
+import { DEFAULT_VISION_MODEL } from './image-pipeline/vision';
 
 /** Stops a mistake (or a very large import) from running up the AI bill: past this, photos wait for next month. */
 export const PHOTO_CHECK_MONTHLY_LIMIT = 5000;
 /** Below this the model is unsure, and an unsure answer is a "no". */
 export const PHOTO_CHECK_MIN_CONFIDENCE = 0.9;
-const DEFAULT_MODEL = 'google/gemini-3.5-flash-lite';
 const KEY_CHECK_MS = 10 * 60 * 1000;
 /** Bad key, no credit, or not allowed: no point trying again until someone fixes it. */
 const REFUSED = new Set([401, 402, 403]);
@@ -24,6 +24,23 @@ export interface PhotoCheck {
 }
 export type PhotoCheckResult = { status: 'checked'; check: PhotoCheck } | { status: 'unavailable' | 'limit_reached' };
 export type CheckItem = { ean?: string; name: string; brand?: string | null; weight?: string | null };
+
+/** Takes one from this month's allowance, with no two callers getting the same one. False when it's used up (fails closed). */
+export async function reserveMonthly(prisma: PrismaService, prefix: string, limit: number, now: number): Promise<boolean> {
+    const key = `${prefix}:${new Date(now).toISOString().slice(0, 7)}`;
+    for (let i = 0; i < 6; i++) {
+        const row = await prisma.appConfig.findUnique({ where: { key } });
+        const used = Number(row?.value) || 0;
+        if (used >= limit) return false;
+        if (!row) {
+            if (await prisma.appConfig.create({ data: { key, value: '1' } }).then(() => true, () => false)) return true;
+            continue;
+        }
+        const r = await prisma.appConfig.updateMany({ where: { key, value: row.value }, data: { value: String(used + 1) } });
+        if (r.count) return true;
+    }
+    return false;
+}
 
 const compact = (s: unknown) => String(s ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 
@@ -71,13 +88,13 @@ export class PhotoCheckService {
     now = () => Date.now();
     post: (url: string, body: any, config: any) => Promise<{ data: any }> = (url, body, config) => axios.post(url, body, config);
     get: (url: string, config: any) => Promise<unknown> = (url, config) => axios.get(url, config);
-    /** The last word on the key, so a dead one isn't discovered after paying for a web search. */
+    /** The last word on the key, so one dead key gives one error and not one per product. */
     private key: { at: number; ok: boolean } | null = null;
 
     constructor(private readonly prisma: PrismaService) {}
 
     get enabled() { return !!process.env.OPENROUTER_API_KEY; }
-    private get model() { return process.env.PHOTO_CHECK_MODEL || process.env.SUPPORT_AI_MODEL || DEFAULT_MODEL; }
+    private get model() { return process.env.PHOTO_CHECK_MODEL || DEFAULT_VISION_MODEL; }
 
     /** Can the check answer right now? Asked before anything is spent on a search. Free, and remembered for a while. */
     async ready(): Promise<boolean> {
@@ -85,9 +102,15 @@ export class PhotoCheckService {
         if (this.key && this.now() - this.key.at < KEY_CHECK_MS) return this.key.ok;
         const status = await this.get('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` }, timeout: 10_000 }).then(() => 200, (e: any) => e?.response?.status);
         const ok = !REFUSED.has(status);
-        if (!ok) this.logger.warn(`[photo-check] the AI service refused the key (${status})`);
         this.key = { at: this.now(), ok };
+        if (ok) await clearVisionAlert(this.prisma).catch(() => undefined);
+        else await this.down(status);
         return ok;
+    }
+
+    /** One clear error for admins per run of failures, whatever the number of products behind it. */
+    private down(status: number) {
+        return raiseVisionAlert(this.prisma, this.logger, { code: 'vision_unavailable', status, scope: new Date(this.now()).toISOString().slice(0, 13) }).catch(() => undefined);
     }
 
     async check(item: CheckItem, imageUrl: string): Promise<PhotoCheckResult> {
@@ -111,7 +134,11 @@ export class PhotoCheckService {
             this.logger.log(`[photo-check] ${item.ean || ''} "${item.name}" ${verdict.ok ? 'YES' : `NO ${verdict.why.join(',')}`} ${verdict.confidence} read="${verdict.read.slice(0, 120)}" cost=${cost ?? '?'} ${imageUrl}`);
             return { status: 'checked', check: { ...verdict, model, at: new Date(this.now()).toISOString() } };
         } catch (e: any) {
-            if (REFUSED.has(e?.response?.status)) this.key = { at: this.now(), ok: false };
+            if (REFUSED.has(e?.response?.status)) {
+                this.key = { at: this.now(), ok: false };
+                await this.down(e.response.status);
+                return { status: 'unavailable' };
+            }
             // The request headers hold the key, so only the status or message is logged, never the error object.
             this.logger.warn(`[photo-check] ${item.ean || ''}: check failed (${e?.response?.status ?? e?.message ?? 'error'})`);
             return { status: 'unavailable' };

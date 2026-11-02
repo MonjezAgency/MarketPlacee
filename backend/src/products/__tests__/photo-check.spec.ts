@@ -1,3 +1,4 @@
+import { clearVisionAlert, raiseVisionAlert, readVisionAlert } from '../image-pipeline/alerts';
 import { PHOTO_CHECK_MONTHLY_LIMIT, PhotoCheckService, judge } from '../photo-check.service';
 
 const item = { ean: '5061013941402', name: 'MONSTER ZERO CLASSIC (black-green) 500ml', brand: 'Monster', weight: '500ml' };
@@ -6,6 +7,8 @@ const good = { read_text: 'Monster Energy Zero Sugar 500ml', same_brand: true, s
 function db(used = 0) {
     const store = new Map<string, string>(used ? [[`photo_check_count:${new Date().toISOString().slice(0, 7)}`, String(used)]] : []);
     return { appConfig: {
+        deleteMany: jest.fn(async () => ({ count: 0 })),
+        upsert: jest.fn(async () => undefined),
         findUnique: jest.fn(async ({ where }: any) => (store.has(where.key) ? { key: where.key, value: store.get(where.key) } : null)),
         create: jest.fn(async ({ data }: any) => { store.set(data.key, data.value); return data; }),
         updateMany: jest.fn(async ({ where, data }: any) => { store.set(where.key, data.value); return { count: 1 }; }),
@@ -80,5 +83,26 @@ describe('PhotoCheckService', () => {
         svc.post = jest.fn();
         expect(await svc.check(item, 'u')).toEqual({ status: 'limit_reached' });
         expect(svc.post).not.toHaveBeenCalled();
+    });
+});
+
+describe('a dead AI key is one clear error', () => {
+    it('sixteen refused products give one admin alert and one error log', async () => {
+        const logs: string[] = [];
+        const rows = new Map<string, string>();
+        const store: any = { appConfig: {
+            findUnique: async ({ where }: any) => (rows.has(where.key) ? { value: rows.get(where.key) } : null),
+            upsert: async ({ where, create }: any) => { rows.set(where.key, create.value); },
+            deleteMany: async ({ where }: any) => { rows.delete(where.key); },
+        } };
+        const logger = { error: (m: string) => logs.push(m) };
+        for (let i = 0; i < 16; i++) await raiseVisionAlert(store, logger, { code: 'vision_unavailable', status: 401, scope: 'upload-1' });
+        expect(logs).toHaveLength(1);
+        expect(logs[0]).toMatch(/HTTP 401/);
+        expect(await readVisionAlert(store)).toMatchObject({ code: 'vision_unavailable', status: 401, scope: 'upload-1' });
+        await raiseVisionAlert(store, logger, { code: 'vision_unavailable', status: 401, scope: 'upload-2' });
+        expect(logs).toHaveLength(2);
+        await clearVisionAlert(store);
+        expect(await readVisionAlert(store)).toBeNull();
     });
 });

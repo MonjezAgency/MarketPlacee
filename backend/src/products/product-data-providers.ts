@@ -221,7 +221,7 @@ export function photoSize(images: any, url: string): { width?: number; height?: 
 
 // ─── Barcode forms ────────────────────────────────────────────────────
 
-const checkDigit = (body: string) => {
+export const checkDigit = (body: string) => {
     const sum = body.split('').reverse().reduce((s, d, i) => s + Number(d) * (i % 2 === 0 ? 3 : 1), 0);
     return String((10 - (sum % 10)) % 10);
 };
@@ -247,7 +247,8 @@ export function lookupPlan(raw: string): { code: string; inner?: string; skip?: 
     if (code.length === 8 && code[0] === '2') return { code, skip: 'internal_code' };
     if (code.length === 12 && /^[24]/.test(code)) return { code, skip: 'internal_code' };
     if (code.length === 13 && (/^2/.test(code) || /^0[24]/.test(code))) return { code, skip: 'internal_code' };
-    return { code };
+    // A UPC is an EAN-13 with a leading zero: every lookup and comparison uses the one form.
+    return { code: code.length === 12 ? `0${code}` : code };
 }
 
 /** Same product code? UPC-A 012345678905 and EAN-13 0012345678905 are the same GTIN. */

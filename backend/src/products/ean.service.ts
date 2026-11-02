@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { EanCacheService } from './ean-cache.service';
 import { EanValidatorService } from './ean-validator.service';
+import { sameCode } from './image-pipeline/gtin';
 
 /**
  * Structured result returned by `fetchProductByEan` — matches the user-facing spec:
@@ -131,7 +132,7 @@ export class EanService {
             const apiBrand: string = product.brands || opts.brand || '';
 
             // (a) EAN sanity check
-            if (apiEan && apiEan !== cleanEan) {
+            if (apiEan && !sameCode(apiEan, cleanEan)) {
                 const result: EanProductResult = {
                     ean: cleanEan,
                     title: title || apiTitle,
@@ -146,10 +147,13 @@ export class EanService {
                 return result;
             }
 
-            // (b) Title match check (only when caller supplied a title)
-            if (title && apiTitle) {
-                const sim = this.titleSimilarity(apiTitle, title);
-                if (sim < this.TITLE_MATCH_THRESHOLD) {
+            // (b) A different wording is no proof of a different product: the
+            // vision check below decides. With no vision behind it (bulk runs),
+            // the wording is all there is, so it still stops the record.
+            const nameDoubt = !!title && !!apiTitle && this.titleSimilarity(apiTitle, title) < this.TITLE_MATCH_THRESHOLD;
+            if (nameDoubt) {
+                const sim = this.titleSimilarity(apiTitle, title!);
+                if (opts.skipAiValidation) {
                     const result: EanProductResult = {
                         ean: cleanEan,
                         title: title,
@@ -192,7 +196,7 @@ export class EanService {
             if (!opts.skipAiValidation) {
                 const validation = await this.validator.validateImages(candidates, {
                     ean: cleanEan,
-                    title: apiTitle || title,
+                    title: nameDoubt ? title : apiTitle || title,
                     brand: apiBrand || opts.brand,
                 });
                 // Put the highest-confidence catalog image first. Every image
@@ -215,7 +219,7 @@ export class EanService {
                 const validatorUnavailable = validation.accepted.length === 0 &&
                     validation.rejected.length > 0 &&
                     validation.rejected.every(r => /disabled|error|failed|timeout/i.test(r.reason || ''));
-                if (images.length === 0 && validatorUnavailable && candidates.length > 0) {
+                if (images.length === 0 && validatorUnavailable && candidates.length > 0 && !nameDoubt) {
                     images = candidates.slice(0, count);
                     imagesVerified = false;
                     confidence = 0.6;
@@ -513,17 +517,7 @@ export class EanService {
             return null;
         }
 
-        // 2. Title verification (Jaccard ≥ 0.4) when caller supplied a title.
-        if (title && apiTitle) {
-            const sim = this.titleSimilarity(apiTitle, title);
-            if (sim < this.TITLE_MATCH_THRESHOLD) {
-                this.logger.debug(
-                    `ean-search.org title mismatch (${sim.toFixed(2)} < ${this.TITLE_MATCH_THRESHOLD}): ` +
-                    `requested "${title}" vs API "${apiTitle}" — falling through.`
-                );
-                return null;
-            }
-        }
+        // 2. Wording is no gate here: step 4 only keeps what the vision check accepts, against the supplier's name.
 
         // 3. Image lookup. The product-image endpoint serves the image
         // directly (image bytes via redirect to a CDN URL). We treat the
@@ -561,7 +555,7 @@ export class EanService {
         // 4. AI validation — same threshold and prompt as every other source.
         const validation = await this.validator.validateImages(candidates, {
             ean: cleanEan,
-            title: apiTitle || title,
+            title: title || apiTitle,
             brand: opts.brand,
         });
         if (validation.accepted.length === 0) return null;
