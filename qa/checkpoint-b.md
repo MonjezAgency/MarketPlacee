@@ -13,7 +13,7 @@ Date: 2 Nov 2026. Branch `feat/image-pipeline`, local commits only. Nothing push
 | Status | Rows |
 |---|---|
 | `needs_bg_removal` | 3 |
-| `needs_review` | 23 (16 by vision or no usable photo, 7 with a photo waiting for vision; see the table) |
+| `needs_review` | 23: 12 rejected by vision, 7 with a photo waiting for vision, 4 with no usable photo |
 | `not_found` | 3 |
 | `invalid_ean` | 3 (no barcode in the test row) |
 | Composed locally, already white | 0 |
@@ -89,7 +89,7 @@ Sample is small; 4 approvals prove little.
 | UPCitemdb | 3 | 0 |
 | Serper | not tested | not tested |
 
-Only EAN-DB's candidates that came after the Open Food Facts verdicts have no verdict of their own yet. EAN-DB started working during this session, so its account is now confirmed.
+EAN-DB's photos have no verdicts yet: it started working during this session, after the day's vision allowance ran out. So its 0 wins mean nothing so far.
 
 **Policy A and B gave the same result:** 0 now, 3 after cut-outs. All 3 winners are CC BY-SA, so B changes nothing until Serper supplies `unknown` photos.
 
