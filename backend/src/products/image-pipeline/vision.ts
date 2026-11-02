@@ -12,7 +12,9 @@ export const FALLBACK_VISION_MODEL = 'dots-studio/dots-3-note-preview:free';
 const URL = 'https://openrouter.ai/api/v1/chat/completions';
 const KEY_URL = 'https://openrouter.ai/api/v1/key';
 const LONGEST_SENT = 768;
-const TIMEOUT_MS = 120_000;
+const TIMEOUT_MS = 180_000;
+/** These models think before they answer, and the thinking counts: too few tokens and the answer never comes. */
+const MAX_TOKENS = 6_000;
 /** The free tier allows 20 calls a minute. */
 const GAP_MS = 3_200;
 const TRIES = 3;
@@ -184,7 +186,7 @@ export class VisionGate {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${(process.env.OPENROUTER_API_KEY || '').trim()}`, 'Content-Type': 'application/json', 'X-Title': 'Ali FMCG image pipeline' },
                 body: JSON.stringify({
-                    model, temperature: 0, max_tokens: 1200, response_format: { type: 'json_object' }, usage: { include: true },
+                    model, temperature: 0, max_tokens: MAX_TOKENS, response_format: { type: 'json_object' }, usage: { include: true },
                     messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...urls.map((url) => ({ type: 'image_url', image_url: { url } }))] }],
                 }),
                 signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -200,7 +202,7 @@ export class VisionGate {
                 if (cost > 0) this.logger.error(`[vision] ${model} reported a cost of $${cost}: it should be free`);
                 calls.push({ source: 'vision', ean, what: model, status: res.status, ms: Date.now() - started, cost });
                 const answer = parseAnswer(String(body?.choices?.[0]?.message?.content ?? ''));
-                if (!answer) this.logger.warn(`[vision] ${ean}: unreadable answer from ${model}`);
+                if (!answer) this.logger.warn(`[vision] ${ean}: unreadable answer from ${model} (finish: ${body?.choices?.[0]?.finish_reason})`);
                 return { model, answer, cost };
             }
             calls.push({ source: 'vision', ean, what: model, status: res.status, ms: Date.now() - started });

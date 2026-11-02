@@ -6,6 +6,8 @@ export const CACHE_DAYS = 30;
 const TIMEOUT_MS = 15_000;
 const RETRIES = 2;
 const BACKOFF_MS = 800;
+/** A source that refuses the key isn't asked again for this long: one dead key is one log line, not one per row. */
+const REFUSED_MS = 10 * 60 * 1000;
 
 export interface LookupCache {
     get(key: string): Promise<unknown | undefined>;
@@ -45,6 +47,7 @@ export class SourceHttp {
     private readonly logger = new Logger('ImagePipeline');
     private readonly turns = new Map<string, Promise<unknown>>();
     private readonly last = new Map<string, number>();
+    private readonly refused = new Map<string, number>();
 
     constructor(
         private readonly cache: LookupCache,
@@ -60,8 +63,9 @@ export class SourceHttp {
                 return { status: 'cached', data: hit };
             }
         }
-        if (req.allow && !(await req.allow())) {
-            calls.push({ source: req.source, ean: req.ean, what: req.what, status: 'skipped', ms: 0, cost: 0 });
+        const refusedAt = this.refused.get(req.source);
+        if ((refusedAt && Date.now() - refusedAt < REFUSED_MS) || (req.allow && !(await req.allow()))) {
+            calls.push({ source: req.source, ean: req.ean, what: req.what, status: 'skipped', ms: 0, cost: 0, note: refusedAt ? 'key refused' : 'over its allowance' });
             return { status: 'skipped', data: null };
         }
         const started = Date.now();
@@ -71,6 +75,7 @@ export class SourceHttp {
         if (typeof reply.status === 'number' && reply.status < 500 && reply.status !== 429 && reply.status !== 401 && reply.status !== 403 && req.cacheKey) {
             await this.cache.set(req.cacheKey, reply.data ?? null, req.cacheDays ?? CACHE_DAYS).catch((e) => this.logger.warn(`[cache] ${req.source} ${req.ean}: ${e?.message}`));
         }
+        if (reply.status === 401 || reply.status === 403) this.refused.set(req.source, Date.now());
         if (reply.status !== 200 && reply.status !== 404) this.logger.warn(`[${req.source}] ${req.ean} ${req.what}: ${reply.status}`);
         return reply;
     }

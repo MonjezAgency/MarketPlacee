@@ -233,6 +233,17 @@ describe('spending limits', () => {
         await serper(new SourceHttp(new MemoryCache(), fetcher, noWait), new MemoryBudget()).search('a', '1', 'en', []);
         expect(fetcher).toHaveBeenCalledTimes(1);
     });
+    it('a refused key is tried once, then left alone, and the allowance stops counting', async () => {
+        fresh();
+        const budget = new MemoryBudget();
+        const fetcher = jest.fn(async () => ({ status: 403, text: async () => '{}' })) as any;
+        const source = serper(new SourceHttp(new MemoryCache(), fetcher, noWait), budget);
+        const calls: SourceCall[] = [];
+        for (const q of ['a', 'b', 'c']) await source.search(q, '1', 'en', calls);
+        expect(fetcher).toHaveBeenCalledTimes(1);
+        expect(calls.map((c) => c.status)).toEqual([403, 'skipped', 'skipped']);
+        expect(await budget.used('serper', 'month')).toBe(1);
+    });
     it('the count starts over on the 1st', async () => {
         let now = Date.UTC(2026, 10, 30, 23, 59);
         const budget = new MemoryBudget(() => now);
