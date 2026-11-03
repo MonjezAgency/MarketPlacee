@@ -26,7 +26,7 @@ const LIMIT_CHECK_MS = 10 * 60 * 1000;
 /** A verdict on one photo of one barcode is never asked twice. */
 const VERDICT_DAYS = 365;
 /** Raised when a question changes: an answer to an older one says nothing. */
-const QUESTIONS = 'b5';
+const QUESTIONS = 'b6';
 
 const IDENTITY = ['same_product', 'same_variant', 'same_size_or_count', 'front_face', 'single_product'] as const;
 const RULES: Record<VisionStage, { yes: readonly (keyof VisionAnswer)[]; no: readonly (keyof VisionAnswer)[] }> = {
@@ -35,7 +35,7 @@ const RULES: Record<VisionStage, { yes: readonly (keyof VisionAnswer)[]; no: rea
     /** The finished picture, exactly as a buyer would see it. */
     final: { yes: [...IDENTITY, 'edges_clean', 'no_leftover_background', 'pack_not_cut', 'text_readable', 'straight_on'], no: ['hand_fragments', 'watermark_or_overlay'] },
     /** The finished crop, background left as it was. */
-    crop: { yes: [...IDENTITY, 'pack_not_cut'], no: ['hand_over_pack', 'watermark_or_overlay'] },
+    crop: { yes: [...IDENTITY, 'pack_not_cut', 'straight_on'], no: ['hand_fragments', 'hand_over_pack', 'watermark_or_overlay'] },
 };
 
 export const isFreeModel = (model: string) => model.trim().endsWith(':free');
@@ -87,9 +87,10 @@ Reply with one JSON object only:`;
     const identityRules = `same_product: this brand and product line. Any other brand or product on the pack is false, whatever the barcode databases say.
 same_variant: flavour, range and version on the pack are this one. Pants are not Active Baby; Aussie Lemonade is not Mango Loco; Zero is not Original.
 same_size_or_count: the size or count printed on the pack matches, or none is legible and nothing contradicts it. A case or multipack for a single unit is false unless the product is that multipack.
-front_face: the front of the pack faces the camera, not the back, side or nutrition panel.
+front_face: the front of the pack faces the camera, not the back, side or nutrition panel. The whole brand name must be in view: a can turned so that part of the name runs round the curve is false.
 single_product: one pack only, unless the product is itself a multipack.
-watermark_or_overlay: any watermark, badge, price, sticker or text laid over the photo that is not printed on the pack.
+watermark_or_overlay: any watermark, badge, price, sticker or text laid over the photo that is not printed on the pack, or a price tag or shop sticker stuck on the pack itself.
+read_text: copy only the letters you can actually see in this picture. Where a word is partly hidden write just the visible part, even if you know the brand.
 confidence: how sure you are this photo shows exactly this product.`;
     if (stage === 'screen') return `${head}
 {"images": [{"index": 0, "read_text": "brand and words legible on that pack", "same_product": true, "same_variant": true, "same_size_or_count": true, "front_face": true, "single_product": true, "whole_pack_visible": true, "hand_over_pack": false, "sharp": true, "watermark_or_overlay": false, "pack_box": [0.1, 0.1, 0.9, 0.9], "pack_language": "en", "confidence": 0.0, "reason": ""}]}
@@ -101,10 +102,12 @@ sharp: the print on the pack is in focus.
 pack_box: the smallest box round the whole pack as [left, top, right, bottom], each a share of the picture from 0 to 1.
 pack_language: main language printed on the front, as a two-letter code.`;
     if (stage === 'crop') return `${head}
-{"images": [{"index": 0, "read_text": "brand and words legible on that pack", "same_product": true, "same_variant": true, "same_size_or_count": true, "front_face": true, "single_product": true, "pack_not_cut": true, "hand_over_pack": false, "watermark_or_overlay": false, "pack_language": "en", "confidence": 0.0, "reason": ""}]}
+{"images": [{"index": 0, "read_text": "brand and words legible on that pack", "same_product": true, "same_variant": true, "same_size_or_count": true, "front_face": true, "single_product": true, "pack_not_cut": true, "straight_on": true, "hand_fragments": false, "hand_over_pack": false, "watermark_or_overlay": false, "pack_language": "en", "confidence": 0.0, "reason": ""}]}
 Each candidate is the finished picture: a photo cropped to the pack, centred on a white canvas, with the photo's own background still behind the pack. That background is fine and is not a fault.
 ${identityRules}
-pack_not_cut: the whole pack is there, cap, corners and transparent parts included.
+pack_not_cut: the whole pack is there, cap, corners, base and transparent parts included. A pack that stops at the edge of the photo is cut.
+straight_on: facing the camera, not heavily tilted or seen from an angle.
+hand_fragments: any part of a hand or finger shows anywhere in the picture, even behind the pack.
 hand_over_pack: a hand or finger covers any part of the pack. A hand behind or below it that overlaps nothing is false.
 pack_language: main language printed on the front, as a two-letter code.`;
     return `${head}

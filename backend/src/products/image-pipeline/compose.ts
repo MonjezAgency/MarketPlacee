@@ -1,6 +1,6 @@
 import { sharp } from './sharp';
 import type { Sharp } from 'sharp';
-import { areaOf, boxOf, rawRgb, subjectMask, type Raw } from './pixels';
+import { areaOf, boxOf, paleFrame, rawRgb, subjectMask, type Raw } from './pixels';
 
 export const CANVAS = 1000;
 export const SUBJECT = 880;
@@ -106,6 +106,8 @@ export async function composeWhite(input: Buffer): Promise<ComposeOutcome> {
     // A white cap or a pale pack melts into the background at the lower level; the stricter one shows how much.
     const strict = subjectMask(rgb, 253);
     const loss = areaOf(strict) ? Math.max(0, 1 - areaOf(mask) / areaOf(strict)) : 0;
+    const box = boxOf(mask, rgb.width, rgb.height);
+    if (box && paleFrame(rgb, box)) return { status: 'needs_review', reason: 'leftover_backdrop', engine: 'sharp', checks: {} };
     const placed = await place(rgb, mask);
     if (!placed) return { status: 'failed', reason: 'no_subject', engine: 'sharp', checks: {} };
     return finish(placed, 'sharp', loss);

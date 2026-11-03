@@ -71,7 +71,7 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
   `/supplier/products/import/status/[id]`, with one summary notification per upload. A row waiting for vision stays a draft (`image_preparing`) and publishes by itself after the reset, with a second
   summary when the last waiting row is decided. Only a verified account (`kycStatus` VERIFIED, or a staff account for the catalog) auto-publishes: `ProductsService.mayAutoPublish`, also enforced in
   `publishFromPipeline`. An unverified supplier's complete row stays a draft (`awaiting_verification`) and the minute cron publishes it once the account is verified; a draft saved by hand is never
-  touched. KYC is still not required to list by the normal flow (see `products.service.ts create`). Serper runs only with `SERPER_LIVE=true`, never under jest, and only with the database counter
+  touched. KYC is still not required to list by the normal flow (see `products.service.ts create`). A failed source waits and retries (15 minutes apart, 8 tries) instead of saying no image; the model is not trusted alone: a page naming another size, a pack reaching the photo's edge and a pale panel left in the photo are refused in code. Serper runs only with `SERPER_LIVE=true`, never under jest, and only with the database counter
   (`PrismaBudget`), so a script can't spend it. A right product on a non-white
   background is cropped and kept as `bg_pending`; with `PHOTOROOM_LIVE=true`, `npm run images:backfill` replaces those. Staff control comes after publishing: pause, remove, re-publish
   (`POST /products/admin/:id/take-down|republish`, comment required, statuses `PAUSED`/`REMOVED`, supplier reads the comment). Staff see the trace on the review page and use in `/admin/products/photos`.

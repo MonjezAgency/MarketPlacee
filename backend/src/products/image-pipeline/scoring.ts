@@ -71,6 +71,34 @@ export function namesProduct(c: Pick<Candidate, 'title' | 'pageUrl' | 'url'>, br
     return words.length > 0 && words.every((w) => fuzzyHas(w, pool));
 }
 
+const SIZE_TOLERANCE = 0.03;
+const OZ = { volume: 29.57, weight: 28.35 };
+
+/** Every size written in a text, in ml and g. Ounces can be either. */
+function sizesIn(text: string): { volume: number[]; weight: number[] } {
+    const out = { volume: [] as number[], weight: [] as number[] };
+    for (const m of text.toLowerCase().matchAll(/(?<![\d.,])(\d+(?:[.,-]\d{1,2})?)\s*(ml|cl|dl|ltr|litres?|liters?|l|kg|gr|g|(?:fl\.?\s*)?oz)(?![\p{L}\d])/gu)) {
+        const n = Number(m[1].replace(/[,-]/, '.'));
+        const unit = m[2];
+        if (unit.endsWith('oz')) { out.volume.push(n * OZ.volume); out.weight.push(n * OZ.weight); }
+        else if (unit === 'ml') out.volume.push(n);
+        else if (unit === 'cl') out.volume.push(n * 10);
+        else if (unit === 'dl') out.volume.push(n * 100);
+        else if (unit === 'kg') out.weight.push(n * 1000);
+        else if (unit === 'g' || unit === 'gr') out.weight.push(n);
+        else out.volume.push(n * 1000);
+    }
+    return out;
+}
+
+/** The page sells another size: "35,5cl" next to a 250 ml product is another can, however alike the two look. */
+export function sizeDiffers(c: Pick<Candidate, 'title' | 'pageUrl'>, size: string): boolean {
+    const want = sizesIn(size);
+    const page = sizesIn(`${c.title ?? ''} ${c.pageUrl ?? ''}`);
+    const differs = (a: number[], b: number[]) => a.length > 0 && b.length > 0 && !a.some((x) => b.some((y) => Math.abs(x - y) <= y * SIZE_TOLERANCE));
+    return differs(page.volume, want.volume) || differs(page.weight, want.weight);
+}
+
 /** Best match against the photos a database links to this barcode. */
 export function visualPoints(print: Fingerprint, references: Fingerprint[]): number {
     if (!references.length) return 0;

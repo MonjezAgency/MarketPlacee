@@ -73,6 +73,22 @@ export function boxOf(mask: Uint8Array, width: number, height: number): Box | nu
     return right < 0 ? null : { left, top, right: right + 1, bottom: bottom + 1 };
 }
 
+const PALE_LEVEL = 225;
+const PALE_SPREAD = 6;
+const PALE_EDGE_SHARE = 0.9;
+
+/** The "pack" ends in a pale straight line on all four sides: that is a grey studio panel left in the photo, not a pack. */
+export function paleFrame(r: Raw, box: Box): boolean {
+    const pale = (x: number, y: number) => {
+        const i = (y * r.width + x) * r.channels;
+        const c = [r.data[i], r.data[i + 1], r.data[i + 2]];
+        return Math.min(...c) >= PALE_LEVEL && Math.max(...c) - Math.min(...c) <= PALE_SPREAD;
+    };
+    const across = (n: number, at: (k: number) => boolean) => { let hits = 0; for (let k = 0; k < n; k++) if (at(k)) hits++; return n > 0 && hits / n >= PALE_EDGE_SHARE; };
+    const w = box.right - box.left, h = box.bottom - box.top;
+    return across(w, (k) => pale(box.left + k, box.top)) && across(w, (k) => pale(box.left + k, box.bottom - 1)) && across(h, (k) => pale(box.left, box.top + k)) && across(h, (k) => pale(box.right - 1, box.top + k));
+}
+
 export const areaOf = (mask: Uint8Array) => mask.reduce((n, v) => n + (v ? 1 : 0), 0);
 
 /** How far a pixel may stray from the backdrop's colour and still be backdrop: soft studio shading stays in, a table's grain doesn't. */

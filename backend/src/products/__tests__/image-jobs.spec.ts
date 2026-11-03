@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { decide } from '../image-pipeline/image-outcome';
 import { backfillBgPending } from '../image-pipeline/image-backfill';
 import { ImageJobsService, ownStorageDownload } from '../image-pipeline/image-jobs.service';
-import { composeCrop } from '../image-pipeline/compose';
+import { composeCrop, composeWhite } from '../image-pipeline/compose';
 import { packBox, rawRgb } from '../image-pipeline/pixels';
 import { sharp } from '../image-pipeline/sharp';
 
@@ -54,6 +54,14 @@ describe('crop to the pack', () => {
         if (made.status !== 'ok') return;
         expect(await sharp(made.jpeg).metadata()).toMatchObject({ width: 1000, height: 1000 });
         expect(made.checks.longestSide).toBe(880);
+    });
+    it('a grey panel left in a white photo is no pack', async () => {
+        const panel = await sharp({ create: { width: 1200, height: 1200, channels: 3, background: '#ffffff' } }).composite([{ input: await sharp({ create: { width: 1100, height: 1100, channels: 3, background: '#f0f0f0' } }).png().toBuffer(), left: 50, top: 50 }, { input: await sharp({ create: { width: 300, height: 800, channels: 3, background: '#113355' } }).png().toBuffer(), left: 450, top: 200 }]).jpeg({ quality: 95 }).toBuffer();
+        expect(await composeWhite(panel)).toMatchObject({ status: 'needs_review', reason: 'leftover_backdrop' });
+    });
+    it('a pack on white is still laid out', async () => {
+        const pack = await sharp({ create: { width: 1200, height: 1200, channels: 3, background: '#ffffff' } }).composite([{ input: await sharp({ create: { width: 300, height: 800, channels: 3, background: '#113355' } }).png().toBuffer(), left: 450, top: 200 }]).jpeg({ quality: 95 }).toBuffer();
+        expect((await composeWhite(pack)).status).toBe('ok');
     });
     it('never enlarges past 1.5x', async () => {
         const made = await composeCrop(await sharp({ create: { width: 500, height: 500, channels: 3, background: '#88aacc' } }).jpeg().toBuffer(), [0.1, 0.1, 0.9, 0.9]);
@@ -153,10 +161,24 @@ describe('uploads and rows', () => {
 
 describe('a blank cell from the file', () => {
     it('is kept for the row, and cleared when the supplier asks for a check after filling it in', async () => {
-        const rows = [{ id: 'r1', ownerId: 's1', params: { blank: ['Stock (cases)'] } }];
+        const rows = [{ id: 'r1', ownerId: 's1', params: { blank: ['Stock (cases)'] }, product: { id: 'p', supplierId: 's1', stock: 40 } }];
         const { service, prisma } = jobs(rows);
         await service.recheck('r1', 's1');
         expect(prisma.imageRow.update.mock.calls[0][0].data.params).toBe(Prisma.DbNull);
+    });
+});
+
+describe('checking a row again', () => {
+    const recheck = async (stock: number) => {
+        const { service, prisma } = jobs([{ id: 'r', ownerId: 's1', state: 'done', photos: [], params: { blank: ['Stock (cases)'] }, product: { id: 'p', supplierId: 's1', stock } }]);
+        await service.recheck('r', 's1');
+        return prisma.imageRow.update.mock.calls[0][0].data.params;
+    };
+    it('a blank stock cell still at 0 stays missing', async () => {
+        expect(await recheck(0)).toEqual({ blank: ['Stock (cases)'] });
+    });
+    it('once the stock is filled in the row is read afresh', async () => {
+        expect(await recheck(40)).toBe(Prisma.DbNull);
     });
 });
 
@@ -179,6 +201,38 @@ describe('an account verified later', () => {
         (service as any).process = jest.fn();
         await (service as any).releaseVerified();
         expect((service as any).process).not.toHaveBeenCalled();
+    });
+});
+
+describe('a source that failed', () => {
+    const run = async (params: any) => {
+        const row = { id: 'r', ownerId: 's1', productId: 'p', state: 'running', photos: [], params };
+        const { service, prisma } = jobs([row], [], { mayAutoPublish: async () => true });
+        prisma.imageRow.findUniqueOrThrow = jest.fn(async () => row);
+        prisma.product.findUnique = jest.fn(async () => ({ id: 'p', supplierId: 's1', name: 'x', images: [], status: 'DRAFT' }));
+        prisma.product.update = jest.fn(async () => ({}));
+        (service as any).built = { pipeline: { run: async () => ({ status: 'pending_vision', reason: 'source_down: asked ean-db', trace: { calls: [] } }) }, deps: {} };
+        await (service as any).process('r');
+        return prisma.imageRow.update.mock.calls[0][0].data;
+    };
+    it('waits and counts the try', async () => {
+        expect(await run(null)).toMatchObject({ state: 'waiting_vision', params: { sourceTries: 1 } });
+    });
+    it('after two hours of tries the supplier is told no image was found', async () => {
+        expect(await run({ sourceTries: 8 })).toMatchObject({ state: 'done', outcome: 'needs_attention', reason: 'no_image' });
+    });
+    it('a waiting row is let back in a quarter of an hour after its last try', async () => {
+        const { service, prisma } = jobs([]);
+        prisma.imageRow.updateMany = jest.fn(async () => ({ count: 0 }));
+        prisma.imageUpload.findMany = jest.fn(async () => []);
+        (service as any).built = { deps: { vision: { unavailable: async () => null } } };
+        const was = process.env.IMAGE_PIPELINE_ENABLED;
+        process.env.IMAGE_PIPELINE_ENABLED = 'true';
+        await service.tick();
+        process.env.IMAGE_PIPELINE_ENABLED = was;
+        const asked = prisma.imageRow.findMany.mock.calls[0][0].where;
+        expect(asked.state).toBe('waiting_vision');
+        expect(Date.now() - asked.updatedAt.lt.getTime()).toBeGreaterThanOrEqual(15 * 60 * 1000);
     });
 });
 

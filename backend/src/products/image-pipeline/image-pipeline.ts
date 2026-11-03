@@ -10,13 +10,14 @@ import { buildIdentity, searchQueries } from './identity';
 import { blockedDomain, DEFAULT_POLICY, domainClass, licenceOf, mayPublish, type LicencePolicy } from './licensing';
 import { cleanName } from './name';
 import { fingerprint, hashDistance, isWhiteBackground, packBox, rawRgb, whiteRingShare, type Fingerprint } from './pixels';
-import { cutoutFits, cuttable, domainPoints, flawsOf, framingPoints, identityTextPoints, isStudio, MIN_LONG_SIDE, namesProduct, penaltyOf, resolutionPoints, total, visualPoints, WEIGHTS } from './scoring';
+import { cutoutFits, cuttable, domainPoints, flawsOf, framingPoints, identityTextPoints, isStudio, MIN_LONG_SIDE, namesProduct, penaltyOf, resolutionPoints, sizeDiffers, total, visualPoints, WEIGHTS } from './scoring';
 import type { LookupSource, SearchSource } from './sources';
 import type { Candidate, Identity, IdentityRecord, ImageStatus, PipelineResult, PipelineRow, RankedPhoto, RunPlan, Scored, SourceCall, Trace, VisionStage, VisionVerdict } from './types';
 import { VisionGate, VisionUnavailable, visionModel } from './vision';
 
-export const PIPELINE_VERSION = 'b5';
+export const PIPELINE_VERSION = 'b6';
 const TOP = 6;
+const FRAME_MARGIN = 0.01;
 /** Only these go to vision, in one call. */
 const FINALISTS = 3;
 /** Paid photos one pass may try before moving on. */
@@ -189,6 +190,8 @@ export class ImagePipeline {
         if (state.failed) return done(state.failed.status, state.failed.reason, { top, chosen: state.failed.chosen });
         if (state.scored.length && state.scored.every((s) => s.isEditorial || s.licence === 'editorial')) return done('needs_review', 'only editorial photos found: never published', { top });
         if (state.scored.length) return done('needs_better_image', `best photo has: ${top[0].flaws.join(', ') || 'no passing verdict'}`, { top, chosen: top[0] });
+        // A source that didn't answer proves nothing about the product: "no image" would be a guess.
+        if (sourcesDown(trace)) return done('pending_vision', `${SOURCE_DOWN}: ${noCandidates(this.deps, trace.calls)}; ${summarise(trace.rejects)}`, { top });
         if (state.tooSmall) return done('low_res', `every usable photo is under ${MIN_LONG_SIDE}px (${state.tooSmall} found)`);
         return trace.candidates.found ? done('not_found', `all_rejected: ${summarise(trace.rejects)}`) : done('not_found', `no_candidates: ${noCandidates(this.deps, trace.calls)}`);
     }
@@ -213,6 +216,7 @@ export class ImagePipeline {
             state.seen.add(c.url);
             const blocked = blockedDomain(c);
             if (blocked) { reject(c, `blocked_domain:${blocked}`); continue; }
+            if (c.source !== 'supplier' && sizeDiffers(c, identity.size)) { reject(c, 'size_differs'); continue; }
             if (longest(c) && longest(c) < MIN_LONG_SIDE && !c.bytes) { state.tooSmall++; reject(c, `under_${MIN_LONG_SIDE}px`); continue; }
             open.push(c);
         }
@@ -341,6 +345,7 @@ export class ImagePipeline {
             state.verdicts.set(s.url, screens[n]);
             if (!screens[n].passed) this.miss(state, s, screens[n]);
             else if (!box) this.note(state, 'needs_better_image', 'vision_failed: pack_box', screens[n].confidence, s);
+            else if (touchesFrame(box)) this.note(state, 'needs_better_image', 'vision_failed: pack runs off the photo', screens[n].confidence, s);
             else boxes[batch.indexOf(s)] = box;
         });
         return boxes;
@@ -485,12 +490,26 @@ function validBox(box: unknown): number[] | null {
     return box[2] > box[0] && box[3] > box[1] ? box : null;
 }
 
+/** Reason of a row that waits because a source failed. */
+export const SOURCE_DOWN = 'source_down';
+
+/** A pack reaching the edge of the photo goes on past it: part of it was never photographed. */
+function touchesFrame(box: number[]) {
+    return box[0] <= FRAME_MARGIN || box[1] <= FRAME_MARGIN || box[2] >= 1 - FRAME_MARGIN || box[3] >= 1 - FRAME_MARGIN;
+}
+
 function visionDown(code: string) {
     return code === 'vision_quota' ? 'vision_quota: today\'s free checks are used up, nothing approved automatically' : `vision_unavailable: ${code === 'no_key' ? 'no OPENROUTER_API_KEY' : code}, nothing approved automatically`;
 }
 
 function supplierCandidates(row: PipelineRow): Candidate[] {
     return (row.supplierImages || []).map((s, i): Candidate => ({ url: s.url || `supplier:${row.ean}:${i}`, source: 'supplier', title: row.name ?? undefined, licence: 'supplier', foundBy: row.ean, ...(s.bytes ? { bytes: s.bytes } : {}) }));
+}
+
+/** A lookup or a download that failed on the way, as opposed to one that answered "no". */
+function sourcesDown(trace: Trace) {
+    const failed = trace.calls.some((c) => c.source !== 'vision' && (c.status === 'timeout' || c.status === 'error' || c.status === 429 || (typeof c.status === 'number' && c.status >= 500)));
+    return failed || trace.rejects.some((r) => /^download_(failed|timeout)/.test(r.reason));
 }
 
 function noCandidates(deps: PipelineDeps, calls: SourceCall[]): string {

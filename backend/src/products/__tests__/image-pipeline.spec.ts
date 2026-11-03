@@ -242,6 +242,21 @@ describe('barcodes and sources', () => {
         const { pipeline } = build({}, { lookups: [db([])] }, () => reply(answer()));
         expect((await pipeline.run(row)).reason).toMatch(/no_candidates: asked ean-db/);
     });
+    it('a download that failed proves nothing: the row waits instead of saying no image', async () => {
+        const { pipeline } = build({}, { lookups: [db([c('https://x.example/a.jpg')])], download: async () => ({ ok: false as const, reason: 'download_failed' }) }, () => reply(answer()));
+        expect(await pipeline.run(row)).toMatchObject({ status: 'pending_vision', reason: expect.stringMatching(/^source_down/) });
+    });
+    it('a page that sells another size never reaches a download', async () => {
+        const download = jest.fn();
+        const { pipeline } = build({}, { lookups: [db([c('https://x.example/a.jpg', { pageUrl: 'https://x.example/coca-cola-1-5l' })])], download }, () => reply(answer()));
+        const r = await pipeline.run({ ...row, name: 'Coca-Cola 330ml' });
+        expect(download).not.toHaveBeenCalled();
+        expect(r.trace.rejects.map((x) => x.reason)).toContain('size_differs');
+    });
+    it('a photo that is really gone is an answer: not found', async () => {
+        const { pipeline } = build({}, { lookups: [db([c('https://x.example/a.jpg')])], download: async () => ({ ok: false as const, reason: 'download_http_404' }) }, () => reply(answer()));
+        expect((await pipeline.run(row)).status).toBe('not_found');
+    });
     it('every photo too small is low_res, not "no image"', async () => {
         const { pipeline } = build({}, { searches: [search([c('https://x.example/s.jpg', { width: 500, height: 500 })])] }, () => reply(answer()));
         expect((await pipeline.run(row)).status).toBe('low_res');
@@ -558,7 +573,7 @@ describe('one final picture per product', () => {
     });
 
     it('another brand under this barcode: refused, even when the model calls it the same product', async () => {
-        const { pipeline } = build({ [url]: await pack() }, { lookups: open([c(url, { licence: 'cc_by_sa' })]) }, () => reply(answer({ read_text: 'Dr. Oetker Bretzels', confidence: 0.95 })));
+        const { pipeline } = build({ [url]: await pack() }, { lookups: open([c(url, { licence: 'cc_by_sa', title: 'Red Bull' })]) }, () => reply(answer({ read_text: 'Dr. Oetker Bretzels', confidence: 0.95 })));
         const r = await pipeline.run({ ean: '9002490205973', name: 'Red Bull Energy Drink 250ml', brand: 'Red Bull' });
         expect(r.status).toBe('needs_review');
         expect(r.reason).toMatch(/brand_not_read/);

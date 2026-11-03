@@ -11,7 +11,7 @@ import { PrismaBudget, PrismaCache, serperCap } from './budget';
 import { buildPipeline } from './factory';
 import { downloadImage } from './http';
 import { decide, type RowOutcome } from './image-outcome';
-import type { ImagePipeline, PipelineDeps } from './image-pipeline';
+import { SOURCE_DOWN, type ImagePipeline, type PipelineDeps } from './image-pipeline';
 import type { PipelineResult } from './types';
 
 const AT_ONCE = 4;
@@ -19,6 +19,10 @@ const AT_ONCE = 4;
 const STUCK_MS = 15 * 60 * 1000;
 /** Waiting rows let back in per minute after the daily reset: the quota decides how far they get. */
 const RESUME_PER_TICK = 20;
+/** A waiting row is let back in this long after its last try, so an outage isn't hammered every minute. */
+const RETRY_GAP_MS = 15 * 60 * 1000;
+/** Tries after a source failed, about two hours of them, before the supplier is told no image was found. */
+const SOURCE_RETRIES = 8;
 /** No last batch after this long: the upload is treated as finished. */
 const IDLE_UPLOAD_MS = 60 * 60 * 1000;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
@@ -113,7 +117,7 @@ export class ImageJobsService {
         if (!this.enabled) return;
         await this.prisma.imageRow.updateMany({ where: { state: 'running', startedAt: { lt: new Date(Date.now() - STUCK_MS) } }, data: { state: 'queued' } });
         if (!(await this.engine.deps.vision.unavailable())) {
-            const ready = await this.prisma.imageRow.findMany({ where: { state: 'waiting_vision' }, orderBy: { updatedAt: 'asc' }, take: RESUME_PER_TICK, select: { id: true } });
+            const ready = await this.prisma.imageRow.findMany({ where: { state: 'waiting_vision', updatedAt: { lt: new Date(Date.now() - RETRY_GAP_MS) } }, orderBy: { updatedAt: 'asc' }, take: RESUME_PER_TICK, select: { id: true } });
             if (ready.length) await this.prisma.imageRow.updateMany({ where: { id: { in: ready.map((r) => r.id) } }, data: { state: 'queued' } });
         }
         await this.releaseVerified();
@@ -132,7 +136,9 @@ export class ImageJobsService {
         const blank: string[] = (row.params as any)?.blank ?? [];
         const missing = [...new Set([...missingForPublish(product).filter((m) => m.field !== 'images').map((m) => m.label), ...blank])];
         const verified = await this.products.mayAutoPublish(product.supplierId);
-        const d = decide({ status: result?.status ?? 'approved', hasPhoto, missing, verified });
+        const sourceDown = !!result?.reason.startsWith(SOURCE_DOWN);
+        const sourceTries: number = (row.params as any)?.sourceTries ?? 0;
+        const d = decide({ status: sourceDown && sourceTries >= SOURCE_RETRIES ? 'not_found' : result?.status ?? 'approved', hasPhoto, missing, verified });
         if (d.attach && result) await this.attach(product.id, result);
         if (d.publish) await this.products.publishFromPipeline(product.id);
         if (result) await this.prisma.product.update({ where: { id: product.id }, data: { imageStatus: result.status, imageStatusReason: result.reason.slice(0, 500) } });
@@ -144,7 +150,7 @@ export class ImageJobsService {
             where: { id },
             data: {
                 state: d.waiting ? 'waiting_vision' : 'done', outcome, imageState: pipelinePicture(product) ?? d.image, reason: d.reason ?? (outcome === 'needs_attention' ? 'missing_fields' : null),
-                params: { ean: row.ean, missing, ...(blank.length ? { blank } : {}) }, detail: result?.reason.slice(0, 500) ?? 'photo_kept', ...(result ? { trace: JSON.parse(JSON.stringify(result.trace)) } : {}), finishedAt: new Date(),
+                params: { ean: row.ean, missing, ...(blank.length ? { blank } : {}), ...(sourceDown ? { sourceTries: sourceTries + 1 } : {}) }, detail: result?.reason.slice(0, 500) ?? 'photo_kept', ...(result ? { trace: JSON.parse(JSON.stringify(result.trace)) } : {}), finishedAt: new Date(),
                 visionCalls: { increment: calls.filter((c) => c.source === 'vision' && c.status !== 'cached').length },
                 searches: { increment: calls.filter((c) => c.source === 'serper' && c.status === 200).length },
             },
@@ -264,8 +270,10 @@ export class ImageJobsService {
 
     /** After the missing fields were filled in on the product. */
     async recheck(id: string, ownerId: string | null) {
-        await this.ownRow(id, ownerId);
-        return this.again(id, { params: Prisma.DbNull });
+        const row = await this.ownRow(id, ownerId);
+        // A stock cell left blank is stored as 0: while it still reads 0, nothing was filled in.
+        const blank: string[] = !row.product.stock ? (row.params as any)?.blank ?? [] : [];
+        return this.again(id, { params: blank.length ? { blank } : Prisma.DbNull });
     }
 
     /** The supplier's own photo goes through the same compose and checks as any other, and is tried first. */

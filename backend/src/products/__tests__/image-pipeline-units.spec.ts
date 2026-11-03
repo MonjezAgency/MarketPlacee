@@ -1,3 +1,4 @@
+import { sizeDiffers } from '../image-pipeline/scoring';
 import { isStudioBackdrop } from '../image-pipeline/pixels';
 import { unlinkSync } from 'fs';
 import { tmpdir } from 'os';
@@ -370,3 +371,29 @@ describe('spending limits', () => {
 });
 
 it.each(studioBackdropCases)('backdrop %j counts as studio: %s', (colour, expected) => expect(isStudioBackdrop(colour)).toBe(expected));
+
+describe('a page that names another size', () => {
+    const size = (title: string, pageUrl?: string) => (want: string) => sizeDiffers({ title, pageUrl }, want);
+    it('another size is another product', () => {
+        expect(size('Red Bull boisson énergisante', 'https://www.houra.fr/red-bull-boisson-energisante-35-5cl/1254843/')('250 ml')).toBe(true);
+        expect(size('Red Bull 35,5cl')('250 ml')).toBe(true);
+        expect(size('Nutella 400 g')('750 g')).toBe(true);
+    });
+    it('the same size in other words is fine', () => {
+        expect(size('Prime Hydration 16.9 fl oz')('500 ml')).toBe(false);
+        expect(size('Red Bull 25cl')('250 ml')).toBe(false);
+        expect(size('Red Bull 24 x 250ml tray')('250 ml')).toBe(false);
+        expect(size('Coca-Cola 1.5L')('1500 ml')).toBe(false);
+        expect(size('Monster 500ml (16.9 oz)')('500 ml')).toBe(false);
+    });
+    it('no size on either side says nothing', () => {
+        expect(size('Red Bull Energy Drink')('250 ml')).toBe(false);
+        expect(size('Red Bull 355ml')('')).toBe(false);
+    });
+    it('a weight says nothing about a volume', () => {
+        expect(size('Milka 35 g')('250 ml')).toBe(false);
+    });
+    it('a word that starts with a unit is no size', () => {
+        expect(size('Pack of 6 large cans 2 gold')('500 ml')).toBe(false);
+    });
+});
